@@ -78,9 +78,10 @@ def ecm_step(
     # Interpolate SOC-dependent parameters
     cache = lookup_cache
     ocv_v = float(np.interp(soc, cache["soc"], cache["ocv_v"]))
-    r0    = float(np.interp(soc, cache["soc"], cache["r0_ohm"])) * math.exp(-0.018 * temp_shift)
-    r1    = float(np.interp(soc, cache["soc"], cache["r1_ohm"])) * math.exp(-0.010 * temp_shift)
-    r2    = float(np.interp(soc, cache["soc"], cache["r2_ohm"])) * math.exp(-0.006 * temp_shift)
+    # NCA (4680): stronger thermal sensitivity than generic Li-ion
+    r0    = float(np.interp(soc, cache["soc"], cache["r0_ohm"])) * math.exp(-0.030 * temp_shift)
+    r1    = float(np.interp(soc, cache["soc"], cache["r1_ohm"])) * math.exp(-0.015 * temp_shift)
+    r2    = float(np.interp(soc, cache["soc"], cache["r2_ohm"])) * math.exp(-0.010 * temp_shift)
     tau1  = float(np.interp(soc, cache["soc"], cache["tau1_s"]))
     tau2  = float(np.interp(soc, cache["soc"], cache["tau2_s"]))
     gamma = float(np.interp(soc, cache["soc"], cache["gamma_hyst_v"]))
@@ -103,7 +104,8 @@ def ecm_step(
         h_target = -1.0
     else:
         h_target = 0.0
-    a_h = math.exp(-float(dt_s) / 100.0)
+    # NCA: very low hysteresis; fast settling, effectively negligible
+    a_h = math.exp(-float(dt_s) / 5.0)
     h_next = a_h * float(hysteresis) + (1.0 - a_h) * h_target
     h_next = max(-1.0, min(h_next, 1.0))
 

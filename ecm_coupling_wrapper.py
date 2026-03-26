@@ -53,6 +53,10 @@ class PersistedState:
     last_step_id: int
     last_time_s: float
     state: ECMState
+    # Call-interval interpolation fields (state format v2)
+    last_ecm_call_time_s: float = 0.0
+    q_gen_w_at_last_ecm: float = 0.0
+    dq_gen_dt_w_per_s: float = 0.0
 
 
 def parse_key_value_pairs(items: list[str] | None) -> dict[str, str]:
@@ -201,10 +205,10 @@ def parse_persisted_state(path: Path) -> PersistedState | None:
         version_i = int(version)
     except (TypeError, ValueError) as exc:
         raise WrapperError("STATE_VALIDATION_ERROR", f"Invalid state file version: {version}", 3) from exc
-    if version_i != FORMAT_VERSION:
+    if version_i not in (1, 2):
         raise WrapperError(
             "STATE_VALIDATION_ERROR",
-            f"Unsupported state file version {version_i}. Expected {FORMAT_VERSION}.",
+            f"Unsupported state file version {version_i}. Expected 1 or 2.",
             3,
         )
 
@@ -218,16 +222,31 @@ def parse_persisted_state(path: Path) -> PersistedState | None:
     if not math.isfinite(last_time_s):
         raise WrapperError("STATE_VALIDATION_ERROR", f"Invalid last_time_s in {path}: {last_time_s}", 3)
 
-    return PersistedState(last_step_id=last_step_id, last_time_s=last_time_s, state=state)
+    # v2 interpolation fields; default to "treat next call as first ECM fire" for v1 state files
+    last_ecm_call_time_s = float(payload.get("last_ecm_call_time_s", last_time_s))
+    q_gen_w_at_last_ecm  = float(payload.get("q_gen_w_at_last_ecm", 0.0))
+    dq_gen_dt_w_per_s    = float(payload.get("dq_gen_dt_w_per_s", 0.0))
+
+    return PersistedState(
+        last_step_id=last_step_id,
+        last_time_s=last_time_s,
+        state=state,
+        last_ecm_call_time_s=last_ecm_call_time_s,
+        q_gen_w_at_last_ecm=q_gen_w_at_last_ecm,
+        dq_gen_dt_w_per_s=dq_gen_dt_w_per_s,
+    )
 
 
 def build_state_payload(persisted: PersistedState) -> dict[str, Any]:
     return {
         "magic": STATE_MAGIC,
-        "version": FORMAT_VERSION,
+        "version": 2,
         "last_step_id": int(persisted.last_step_id),
         "last_time_s": float(persisted.last_time_s),
         "state": persisted.state.to_dict(),
+        "last_ecm_call_time_s": float(persisted.last_ecm_call_time_s),
+        "q_gen_w_at_last_ecm":  float(persisted.q_gen_w_at_last_ecm),
+        "dq_gen_dt_w_per_s":    float(persisted.dq_gen_dt_w_per_s),
     }
 
 
@@ -495,15 +514,34 @@ def parse_args() -> argparse.Namespace:
         help="Path to cellprops.csv for ecm-step backend.",
     )
 
-    parser.add_argument("--capacity-ah", type=float, default=5.0, help="Mock backend configuration.")
-    parser.add_argument("--ocv-min-v", type=float, default=3.0, help="Mock backend configuration.")
-    parser.add_argument("--ocv-max-v", type=float, default=4.2, help="Mock backend configuration.")
-    parser.add_argument("--r0-ohm", type=float, default=0.012, help="Mock backend configuration.")
-    parser.add_argument("--r1-ohm", type=float, default=0.004, help="Mock backend configuration.")
-    parser.add_argument("--r2-ohm", type=float, default=0.002, help="Mock backend configuration.")
-    parser.add_argument("--tau1-s", type=float, default=8.0, help="Mock backend configuration.")
-    parser.add_argument("--tau2-s", type=float, default=40.0, help="Mock backend configuration.")
-    parser.add_argument("--hyst-mag-v", type=float, default=0.015, help="Mock backend configuration.")
+    # ECM call-interval subcycling (4680 NCA defaults)
+    parser.add_argument(
+        "--ecm-call-interval",
+        type=float,
+        default=0.5,
+        help=(
+            "Minimum simulation-time interval [s] between actual ECM calls. "
+            "Between calls Q is extrapolated with a first-order hold. "
+            "Set to 0 to call every CFD step (legacy behaviour). "
+            "Default 0.5 s ≈ tau1/2 for 4680 NCA."
+        ),
+    )
+    parser.add_argument(
+        "--ecm-q-deriv-clamp",
+        type=float,
+        default=10.0,
+        help="Max absolute dQ/dt [W/s] used in first-order-hold interpolation. Prevents runaway extrapolation.",
+    )
+
+    parser.add_argument("--capacity-ah", type=float, default=9.0, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--ocv-min-v", type=float, default=2.7, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--ocv-max-v", type=float, default=4.2, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--r0-ohm", type=float, default=0.007, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--r1-ohm", type=float, default=0.0027, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--r2-ohm", type=float, default=0.0015, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--tau1-s", type=float, default=1.0, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--tau2-s", type=float, default=45.0, help="Mock backend configuration (4680 NCA).")
+    parser.add_argument("--hyst-mag-v", type=float, default=0.003, help="Mock backend configuration (4680 NCA).")
 
     parser.add_argument("--verbose", action="store_true", help="Print a short success line to stdout.")
     return parser.parse_args()
@@ -526,47 +564,91 @@ def run(args: argparse.Namespace) -> int:
 
     state_in = initial_state_from_request_or_args(args, request) if request.reset_state or persisted is None else persisted.state
 
-    try:
-        result = backend.step(
-            dt_s=request.dt_s,
-            current_a=request.current_a,
-            t_cell_degc=request.t_jellyroll_degc,
-            state=state_in,
-        )
-    except ECMBackendError as exc:
-        raise WrapperError("BACKEND_ERROR", str(exc), 4) from exc
-    except OSError as exc:
-        raise WrapperError("BACKEND_ERROR", f"Backend OS error: {exc}", 4) from exc
+    # ── ECM call-interval gating ──────────────────────────────────────────────
+    # Fire the ECM only every ecm_call_interval seconds of simulation time.
+    # Between fires, extrapolate Q with a first-order hold using the derivative
+    # estimated from the last two ECM calls.  The ECM itself receives the full
+    # accumulated dt so its RC integrators stay correct.
+    call_interval_s = float(args.ecm_call_interval)
+    is_first_call    = (request.reset_state or persisted is None)
+    dt_since_ecm     = 0.0 if is_first_call else (request.time_s - persisted.last_ecm_call_time_s)
+    ecm_fired        = is_first_call or (dt_since_ecm >= call_interval_s)
 
-    validate_result(args, result.q_gen_w, result.v_t_v, result.state_next)
+    if ecm_fired:
+        dt_for_ecm = request.dt_s if is_first_call else dt_since_ecm
+        try:
+            result = backend.step(
+                dt_s=dt_for_ecm,
+                current_a=request.current_a,
+                t_cell_degc=request.t_jellyroll_degc,
+                state=state_in,
+            )
+        except ECMBackendError as exc:
+            raise WrapperError("BACKEND_ERROR", str(exc), 4) from exc
+        except OSError as exc:
+            raise WrapperError("BACKEND_ERROR", f"Backend OS error: {exc}", 4) from exc
+
+        validate_result(args, result.q_gen_w, result.v_t_v, result.state_next)
+
+        # Estimate dQ/dt from last two ECM fires for use in next interpolation window
+        if not is_first_call and dt_since_ecm > 0.0:
+            raw_deriv = (result.q_gen_w - persisted.q_gen_w_at_last_ecm) / dt_since_ecm
+            clamp = float(args.ecm_q_deriv_clamp)
+            new_dq_dt = max(-clamp, min(clamp, raw_deriv))
+        else:
+            new_dq_dt = 0.0
+
+        q_gen_w    = result.q_gen_w
+        state_next = result.state_next
+        v_t_v      = result.v_t_v
+        diagnostics = result.diagnostics
+
+    else:
+        # First-order hold: Q(t) = Q_ecm + dQ/dt * Δt_since_ecm
+        q_gen_w = persisted.q_gen_w_at_last_ecm + persisted.dq_gen_dt_w_per_s * dt_since_ecm
+        q_gen_w = max(0.0, q_gen_w)   # heat generation is non-negative
+
+        if not math.isfinite(q_gen_w):
+            raise WrapperError("OUTPUT_VALIDATION_ERROR", f"Interpolated Q_GEN_W is not finite: {q_gen_w}", 5)
+
+        new_dq_dt  = persisted.dq_gen_dt_w_per_s
+        state_next = persisted.state
+        v_t_v      = None   # terminal voltage not available between ECM fires
+        diagnostics = {"ecm_interpolated": True, "dt_since_ecm_s": dt_since_ecm}
+    # ─────────────────────────────────────────────────────────────────────────
 
     success_output = build_success_output(
         request=request,
-        q_gen_w=result.q_gen_w,
-        v_t_v=result.v_t_v,
-        state_next=result.state_next,
-        diagnostics=result.diagnostics,
+        q_gen_w=q_gen_w,
+        v_t_v=v_t_v,
+        state_next=state_next,
+        diagnostics=diagnostics,
     )
 
     next_persisted = PersistedState(
         last_step_id=request.step_id,
         last_time_s=request.time_s,
-        state=result.state_next,
+        state=state_next,
+        last_ecm_call_time_s=request.time_s if ecm_fired else persisted.last_ecm_call_time_s,
+        q_gen_w_at_last_ecm=q_gen_w if ecm_fired else persisted.q_gen_w_at_last_ecm,
+        dq_gen_dt_w_per_s=new_dq_dt,
     )
 
     write_json_atomic(output_path, success_output)
     write_json_atomic(state_path, build_state_payload(next_persisted))
 
     if args.verbose:
-        vt_text = "None" if result.v_t_v is None else f"{result.v_t_v:.8f}"
+        vt_text   = "None" if v_t_v is None else f"{v_t_v:.8f}"
+        fire_flag = "" if ecm_fired else f" [interp dt_ecm={dt_since_ecm:.3f}s dQ/dt={new_dq_dt:.4f}]"
         print(
             f"step_id={request.step_id} "
             f"time_s={request.time_s:.12g} "
             f"dt_s={request.dt_s:.12g} "
             f"T_jellyroll_degC={request.t_jellyroll_degc:.8f} "
             f"current_a={request.current_a:.8f} "
-            f"Q_GEN_W={result.q_gen_w:.8f} "
+            f"Q_GEN_W={q_gen_w:.8f} "
             f"V_T_V={vt_text}"
+            f"{fire_flag}"
         )
 
     return 0
