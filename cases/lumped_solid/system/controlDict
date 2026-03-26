@@ -1,0 +1,222 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          controlDict;
+}
+
+application     chtMultiRegionSolidFoam;
+
+libs            ( "libecmPatchFields.so" );
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         100;
+
+deltaT          1;
+
+maxCo           1;
+
+maxDi           10;
+
+adjustTimeStep  no;
+
+writeControl    runTime;
+
+writeInterval   10;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    ecmCoupling
+    {
+        type            ecmCoupler;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll;
+        zone            jellyRoll;
+        T               T;
+        qField          ecmQdot;
+        stField         ecmST;
+        outputMode      volumetricHeat;
+        couplingMode    lumped;
+        lumpedOutput    totalPower;
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+        relaxation      0.5;
+        writeFields     false;
+        subIterations   3;
+        subIterationResult average;
+        lastGoodFile    "ecm/ecm_last_good.bin";
+        inFile          "ecm/ecm_in.json";
+        outFile         "ecm/ecm_out.json";
+        ioMode          jsonWrapper;
+        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.json --output ecm/ecm_out.json --state ecm/ecm_state.json --backend ecm-step --vt-min-v -100";
+        wrapperStateReset true;
+        electricalInputs
+        {
+            current_A       79;
+            SOC             0.5;
+            T_min_K         273.15;
+            T_max_K         373.15;
+        }
+    }
+    interfaceT_jellyRoll_to_shell
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_shell;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_shell_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell;
+        regionType      patch;
+        name            shell_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_jellyRoll_to_cap
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_cap;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_cap_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap;
+        regionType      patch;
+        name            cap_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    jellyRollSlices
+    {
+        type            surfaces;
+        libs            ( sampling );
+        region          jellyRoll;
+        writeControl    runTime;
+        writeInterval   1000;
+        surfaceFormat   vtk;
+        fields          ( T ecmQdot );
+        interpolationScheme cellPoint;
+        surfaces
+        {
+            axial_x0
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.03 );
+                    normal          ( 1 0 0 );
+                }
+                interpolate     true;
+            }
+            axial_z1
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.01 );
+                    normal          ( 0 0 1 );
+                }
+                interpolate     true;
+            }
+            axial_z2
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.02 );
+                    normal          ( 0 0 1 );
+                }
+                interpolate     true;
+            }
+            axial_z3
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.03 );
+                    normal          ( 0 0 1 );
+                }
+                interpolate     true;
+            }
+            axial_z4
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.04 );
+                    normal          ( 0 0 1 );
+                }
+                interpolate     true;
+            }
+            axial_z5
+            {
+                type            cuttingPlane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point           ( 0 0 0.05 );
+                    normal          ( 0 0 1 );
+                }
+                interpolate     true;
+            }
+        }
+    }
+}
+
+
+// ************************************************************************* //
