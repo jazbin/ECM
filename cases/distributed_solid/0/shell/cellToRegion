@@ -10,41 +10,34 @@ FoamFile
     version     2.0;
     format      ascii;
     arch        "LSB;label=32;scalar=64";
-    class       polyBoundaryMesh;
-    location    "constant/cap/polyMesh";
-    object      boundary;
+    class       volScalarField;
+    location    "0/shell";
+    object      cellToRegion;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-3
-(
-    externalWall
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform 1;
+
+boundaryField
+{
+    shell_to_ambient
     {
-        type            wall;
-        inGroups        1(wall);
-        nFaces          4056;
-        startFace       42632;
+        type            calculated;
+        value           uniform 0;
     }
-    cap_to_jellyRoll
+    shell_to_jellyRoll
     {
-        type            mappedWall;
-        inGroups        1(wall);
-        nFaces          1160;
-        startFace       46688;
-        sampleMode      nearestPatchFace;
-        sampleRegion    jellyRoll;
-        samplePatch     jellyRoll_to_cap;
+        type            calculated;
+        value           uniform 0;
     }
-    cap_to_shell
+    shell_to_cap
     {
-        type            mappedWall;
-        inGroups        1(wall);
-        nFaces          236;
-        startFace       47848;
-        sampleMode      nearestPatchFace;
-        sampleRegion    shell;
-        samplePatch     shell_to_cap;
+        type            calculated;
+        value           uniform 0;
     }
-)
+}
+
 
 // ************************************************************************* //

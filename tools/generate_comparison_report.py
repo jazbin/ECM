@@ -37,8 +37,8 @@ REPORTS = ROOT / "artifacts" / "reports"
 PLOTS.mkdir(parents=True, exist_ok=True)
 REPORTS.mkdir(parents=True, exist_ok=True)
 
-LUMPED_LOG   = ROOT / "cases" / "lumped_solid"  / "log.ecm_step_300s"
-DIST_LOG     = ROOT / "cases" / "distributed_solid" / "log.chtMultiRegionSimpleFoam_ecm_100s"
+LUMPED_LOG   = ROOT / "cases" / "lumped_solid"  / "log.run_clean"
+DIST_LOG     = ROOT / "cases" / "distributed_solid" / "log.run_clean"
 LUMPED_CASE  = ROOT / "cases" / "lumped_solid"
 DIST_CASE    = ROOT / "cases" / "distributed_solid"
 

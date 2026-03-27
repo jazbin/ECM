@@ -22,15 +22,15 @@ FoamFile
     {
         type            wall;
         inGroups        1(wall);
-        nFaces          11404;
-        startFace       39740;
+        nFaces          14960;
+        startFace       80500;
     }
     shell_to_jellyRoll
     {
         type            mappedWall;
         inGroups        1(wall);
-        nFaces          9976;
-        startFace       51144;
+        nFaces          18184;
+        startFace       95460;
         sampleMode      nearestPatchFace;
         sampleRegion    jellyRoll;
         samplePatch     jellyRoll_to_shell;
@@ -39,8 +39,8 @@ FoamFile
     {
         type            mappedWall;
         inGroups        1(wall);
-        nFaces          276;
-        startFace       61120;
+        nFaces          236;
+        startFace       113644;
         sampleMode      nearestPatchFace;
         sampleRegion    cap;
         samplePatch     cap_to_shell;

@@ -24,7 +24,7 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         300;
+endTime         30;
 
 deltaT          1;
 
@@ -70,7 +70,7 @@ functions
         lumpedOutput    totalPower;
         parallelMode    masterGather;
         keyMode         globalCellId;
-        relaxation      0.5;
+        relaxation      1.0;
         writeFields     false;
         subIterations   3;
         subIterationResult average;
@@ -78,8 +78,8 @@ functions
         inFile          "ecm/ecm_in.json";
         outFile         "ecm/ecm_out.json";
         ioMode          persistentPipe;
-        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.json --output ecm/ecm_out.json --state ecm/ecm_state.json --backend ecm-step --ecm-call-every-n-steps 10 --vt-min-v -100 --pipe-mode";
-        wrapperStateReset true;
+        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.json --output ecm/ecm_out.json --state ecm/ecm_state.json --backend ecm-step --ecm-call-every-n-steps 3 --vt-min-v -100 --pipe-mode";
+        wrapperStateReset false;
         electricalInputs
         {
             current_A       79;

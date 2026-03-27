@@ -24,7 +24,7 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         300;
+endTime         30;
 
 deltaT          1;
 
@@ -69,14 +69,14 @@ functions
         couplingMode    elementWise;
         parallelMode    masterGather;
         keyMode         globalCellId;
-        relaxation      0.5;
+        relaxation      1.0;
         writeFields     false;
         inFile          "ecm/ecm_in.bin";
         outFile         "ecm/ecm_out.bin";
-        // NCA 4680 chemistry via ecm_step; ECM_CALL_EVERY_N_STEPS=10 matches
-        // lumped_solid --ecm-call-every-n-steps 10 subcycling.
+        // NCA 4680 chemistry via ecm_step; ECM_CALL_EVERY_N_STEPS=3 (frequent updates
+        // to capture temperature effects before v_rc saturation).
         // NOTE: ioMode=binary is mandatory for couplingMode=elementWise (C++ constraint).
-        command         "ECM_IN=ecm/ecm_in.bin ECM_OUT=ecm/ecm_out.bin ECM_MAPPING_FILE=ecm/mapping_table_axial6_radial3.csv ECM_STATE_FILE=ecm/ecm_state.json ECM_USE_REAL_STEP=1 ECM_CALL_EVERY_N_STEPS=10 python3 ../../ecm/ecm_coupler.py";
+        command         "ECM_IN=ecm/ecm_in.bin ECM_OUT=ecm/ecm_out.bin ECM_MAPPING_FILE=ecm/mapping_table_axial6_radial3_2170mesh.csv ECM_STATE_FILE=ecm/ecm_state.json ECM_USE_REAL_STEP=1 ECM_CALL_EVERY_N_STEPS=3 python3 ../../ecm/ecm_coupler.py";
         electricalInputs
         {
             current_A       79;

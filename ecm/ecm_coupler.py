@@ -359,6 +359,13 @@ def main():
     steps_since_ecm = int(state.get("steps_since_ecm", call_every_n))  # default → fire on first call
     should_fire_ecm = (call_every_n <= 0) or reset_flag or (steps_since_ecm >= call_every_n - 1)
 
+    # Accumulated dt since last ECM fire — mirrors lumped wrapper's dt_since_ecm logic.
+    # When subcycling (call_every_n > 1), the RC circuit must advance by the TOTAL elapsed
+    # time since the last real ECM call, not just the current CFD step dt.
+    last_ecm_time = float(state.get("last_ecm_time", h.time - h.deltaT))
+    is_first_ecm_call = not state.get("last_ecm_time")
+    dt_for_ecm = h.deltaT if is_first_ecm_call else (h.time - last_ecm_time)
+
     if len(temps) == 0:
         raise ValueError("No temperature records found in ECM input.")
 
@@ -395,7 +402,7 @@ def main():
             qvol_ecm, next_partition_states = run_ecm_step_per_partition(
                 ecm_ids=ecm_ids,
                 ecm_temps_K=ecm_temps,
-                dt_s=float(h.deltaT),
+                dt_s=dt_for_ecm,
                 current_a=current_a,
                 partition_states=partition_states,
                 partition_volumes=partition_volumes,
@@ -405,6 +412,7 @@ def main():
             )
             state["partitions"] = next_partition_states
             state["steps_since_ecm"] = 0
+            state["last_ecm_time"] = h.time
             state["last_qvol_by_ecmid"] = {str(eid): qv for eid, qv in zip(ecm_ids, qvol_ecm)}
             try:
                 with open(state_file, "w", encoding="utf-8") as sf:
@@ -413,6 +421,7 @@ def main():
                 pass
             sys.stderr.write(
                 f"[ecm_coupler] Real ECM: {len(ecm_ids)} partitions, "
+                f"dt_ecm={dt_for_ecm:.4f}s, "
                 f"qVol=[{min(qvol_ecm):.1f}..{max(qvol_ecm):.1f}] W/m³\n"
             )
         else:
