@@ -1,0 +1,91 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2506                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     chtMultiRegionFoam;
+
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         5;
+
+deltaT          1;
+
+maxCo           1.0;
+maxDi           10.0;
+
+adjustTimeStep  no;
+
+writeControl    runTime;
+writeInterval   1;
+
+purgeWrite      5;
+writeFormat     ascii;
+writePrecision  8;
+writeCompression off;
+
+timeFormat      general;
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    ecmCoupling
+    {
+        type            ecmCoupler;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll;
+        zone            jellyRoll;
+
+        T               T;
+
+        qField          ecmQdot;
+        stField         ecmST;
+        outputMode      volumetricHeat;
+
+        couplingMode    lumped;
+        lumpedOutput    totalPower;
+
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+
+        relaxation      0.5;
+        writeFields     false;
+        subIterations   3;
+        subIterationResult average;
+        lastGoodFile    "ecm/ecm_last_good.bin";
+
+        inFile          "ecm/ecm_in.bin";
+        outFile         "ecm/ecm_out.bin";
+
+        ioMode          jsonWrapper;
+        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.bin --output ecm/ecm_out.bin --state ecm/ecm_state.json --backend mock-inproc";
+        wrapperStateReset true;
+
+        electricalInputs
+        {
+            current_A   79.0;
+            SOC         0.50;
+            T_min_K     273.15;
+            T_max_K     373.15;
+        }
+    }
+}
+
+// ************************************************************************* //

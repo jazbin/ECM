@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import socket
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -350,6 +351,88 @@ class VendorCLIBackend(BaseECMBackend):  # noqa: E302
         q_gen_w = float(payload["Q_GEN_W"])
         v_t_v = None if "V_T_V" not in payload else float(payload["V_T_V"])
         diagnostics = payload.get("diagnostics", {})
+
+        result = ECMStepResult(
+            state_next=state_next,
+            q_gen_w=q_gen_w,
+            v_t_v=v_t_v,
+            diagnostics=diagnostics,
+        )
+        result.validate()
+        return result
+
+
+class PersistentSocketBackend(BaseECMBackend):
+    """
+    Send ECM step requests to a running ecm_daemon.py over a Unix domain socket.
+
+    Eliminates per-call process spawn + module import overhead (~45 ms/call).
+    The daemon loads all modules once at startup; each call costs only the IPC
+    round-trip (~1-3 ms) plus the ECM computation itself (~2 ms).
+    """
+
+    def __init__(self, socket_path: str, timeout_s: float = 5.0) -> None:
+        self.socket_path = str(socket_path)
+        self.timeout_s = float(timeout_s)
+
+    def ping(self) -> bool:
+        """Return True if the daemon is alive and responding."""
+        try:
+            resp = self._call(json.dumps({"ping": True}))
+            return json.loads(resp).get("pong") is True
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _call(self, request_line: str) -> str:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout_s)
+        try:
+            sock.connect(self.socket_path)
+            sock.sendall((request_line + "\n").encode("utf-8"))
+            buf = b""
+            while b"\n" not in buf:
+                chunk = sock.recv(4096)
+                if not chunk:
+                    raise ECMBackendError("Daemon closed connection without response")
+                buf += chunk
+            return buf.split(b"\n", 1)[0].decode("utf-8")
+        finally:
+            sock.close()
+
+    def step(
+        self,
+        *,
+        dt_s: float,
+        current_a: float,
+        t_cell_degc: float,
+        state: ECMState,
+    ) -> ECMStepResult:
+        state.validate()
+        req = json.dumps({
+            "dt_s":        float(dt_s),
+            "current_a":   float(current_a),
+            "t_cell_degc": float(t_cell_degc),
+            "state":       state.to_dict(),
+        })
+        try:
+            raw = self._call(req)
+        except ECMBackendError:
+            raise
+        except Exception as exc:
+            raise ECMBackendError(f"Socket error communicating with ECM daemon: {exc}") from exc
+
+        try:
+            resp = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ECMBackendError(f"Invalid JSON from ECM daemon: {exc}") from exc
+
+        if resp.get("status") != "ok":
+            raise ECMBackendError(f"ECM daemon error: {resp.get('message', resp)}")
+
+        state_next = ECMState.from_dict(resp["state_next"])
+        q_gen_w    = float(resp["q_gen_w"])
+        v_t_v      = float(resp["v_t_v"]) if "v_t_v" in resp else None
+        diagnostics = resp.get("diagnostics", {})
 
         result = ECMStepResult(
             state_next=state_next,

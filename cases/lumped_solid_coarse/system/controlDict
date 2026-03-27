@@ -30,9 +30,9 @@ deltaT          1;
 
 maxCo           1;
 
-maxDi           50;
+maxDi           10;
 
-adjustTimeStep  yes;
+adjustTimeStep  no;
 
 writeControl    runTime;
 
@@ -77,8 +77,8 @@ functions
         lastGoodFile    "ecm/ecm_last_good.bin";
         inFile          "ecm/ecm_in.json";
         outFile         "ecm/ecm_out.json";
-        ioMode          persistentPipe;
-        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.json --output ecm/ecm_out.json --state ecm/ecm_state.json --backend ecm-step --ecm-call-every-n-steps 10 --vt-min-v -100 --pipe-mode";
+        ioMode          jsonWrapper;
+        command         "python3 ../../ecm_coupling_wrapper.py --input ecm/ecm_in.json --output ecm/ecm_out.json --state ecm/ecm_state.json --backend ecm-step --vt-min-v -100 -persistent-ecm";
         wrapperStateReset true;
         electricalInputs
         {

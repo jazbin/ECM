@@ -1,0 +1,109 @@
+#!/bin/bash
+set -euo pipefail
+
+case_dir="$(cd "$(dirname "$0")" && pwd)"
+cd "$case_dir"
+
+reset_ecm=0
+for arg in "${@:-}"; do
+  case "$arg" in
+    --reset-ecm) reset_ecm=1 ;;
+    *) ;;
+  esac
+done
+
+# Ensure OpenFOAM environment is loaded for library resolution.
+if [ -f /opt/openfoam/etc/bashrc ]; then
+  # shellcheck disable=SC1091
+  set +e
+  set +u
+  source /opt/openfoam/etc/bashrc
+  set -u
+  set -e
+fi
+
+# Prefer workspace-local build outputs if present.
+if [ -d /workspace/.openfoam/bin ]; then
+  export FOAM_USER_APPBIN=/workspace/.openfoam/bin
+fi
+if [ -d /workspace/.openfoam/lib ]; then
+  export FOAM_USER_LIBBIN=/workspace/.openfoam/lib
+fi
+
+# Ensure user-local bins/libs are discoverable.
+if [ -n "${FOAM_USER_APPBIN:-}" ]; then
+  export PATH="$FOAM_USER_APPBIN:$PATH"
+fi
+if [ -n "${FOAM_USER_LIBBIN:-}" ]; then
+  export LD_LIBRARY_PATH="$FOAM_USER_LIBBIN:${LD_LIBRARY_PATH:-}"
+fi
+
+log_dir="$case_dir/../../artifacts/logs"
+mkdir -p "$log_dir"
+
+stamp=$(date -u +%Y%m%d_%H%M%S)
+log="$log_dir/distributed_solid_run_${stamp}.log"
+
+# Remove stale time directories (keep 0 and 0.orig).
+find "$case_dir" -maxdepth 1 -type d \
+  -regextype posix-extended \
+  -regex ".*/[0-9]+(\.[0-9]+)?" \
+  ! -name "0" \
+  -exec rm -rf {} +
+
+# Remove stale postProcessing outputs.
+rm -rf "$case_dir/postProcessing"
+
+# Optionally reset ECM persisted state for a clean run.
+if [ "$reset_ecm" -eq 1 ]; then
+  rm -f "$case_dir/ecm_state.json" "$case_dir/ecm/ecm_last_good.bin"
+fi
+
+# Require ecmCoupler library when coupling is configured.
+ecm_type="$(foamDictionary -entry functions/ecmCoupling/type -value system/controlDict 2>/dev/null || true)"
+if [ "$ecm_type" = "ecmCoupler" ]; then
+  lib_name="libecmCouplingFunctionObjects.so"
+  lib_found=0
+  search_paths=()
+  if [ -n "${FOAM_USER_LIBBIN:-}" ]; then
+    search_paths+=("$FOAM_USER_LIBBIN")
+  fi
+  if [ -d /workspace/.openfoam/lib ]; then
+    search_paths+=("/workspace/.openfoam/lib")
+  fi
+  if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+    IFS=':' read -r -a ld_paths <<< "$LD_LIBRARY_PATH"
+    search_paths+=("${ld_paths[@]}")
+  fi
+  for path in "${search_paths[@]}"; do
+    if [ -n "$path" ] && [ -f "$path/$lib_name" ]; then
+      lib_found=1
+      break
+    fi
+  done
+  if [ "$lib_found" -ne 1 ]; then
+    echo "ERROR: ecmCoupler is configured but $lib_name was not found on LD_LIBRARY_PATH." >&2
+    echo "Set FOAM_USER_LIBBIN or build the coupling library before running." >&2
+    exit 2
+  fi
+  if ! python3 - <<'PY'; then
+import sys
+try:
+    import numpy  # noqa: F401
+    import pandas  # noqa: F401
+except Exception as exc:
+    print(f"ERROR: ecmCoupler requires numpy/pandas: {exc}", file=sys.stderr)
+    sys.exit(3)
+PY
+    exit 3
+  fi
+fi
+
+# Run solver from controlDict and capture output.
+solver="$(foamDictionary -entry application -value system/controlDict 2>/dev/null || true)"
+if [ -z "$solver" ]; then
+  solver="chtMultiRegionSolidFoam"
+fi
+"$solver" -case "$case_dir" > "$log" 2>&1
+
+echo "Run log: $log"

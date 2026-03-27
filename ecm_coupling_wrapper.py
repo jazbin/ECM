@@ -18,6 +18,7 @@ from ecm_backend import (
     EcmStepBackend,
     MockECMBackend,
     MockECMConfig,
+    PersistentSocketBackend,
     VendorCLIBackend,
 )
 
@@ -57,6 +58,8 @@ class PersistedState:
     last_ecm_call_time_s: float = 0.0
     q_gen_w_at_last_ecm: float = 0.0
     dq_gen_dt_w_per_s: float = 0.0
+    # Iteration-based gating (state format v3)
+    steps_since_last_ecm: int = 0
 
 
 def parse_key_value_pairs(items: list[str] | None) -> dict[str, str]:
@@ -205,10 +208,10 @@ def parse_persisted_state(path: Path) -> PersistedState | None:
         version_i = int(version)
     except (TypeError, ValueError) as exc:
         raise WrapperError("STATE_VALIDATION_ERROR", f"Invalid state file version: {version}", 3) from exc
-    if version_i not in (1, 2):
+    if version_i not in (1, 2, 3):
         raise WrapperError(
             "STATE_VALIDATION_ERROR",
-            f"Unsupported state file version {version_i}. Expected 1 or 2.",
+            f"Unsupported state file version {version_i}. Expected 1, 2, or 3.",
             3,
         )
 
@@ -226,6 +229,8 @@ def parse_persisted_state(path: Path) -> PersistedState | None:
     last_ecm_call_time_s = float(payload.get("last_ecm_call_time_s", last_time_s))
     q_gen_w_at_last_ecm  = float(payload.get("q_gen_w_at_last_ecm", 0.0))
     dq_gen_dt_w_per_s    = float(payload.get("dq_gen_dt_w_per_s", 0.0))
+    # v3 iteration-based gating; default 0 so next step triggers a fire on v1/v2 state files
+    steps_since_last_ecm = int(payload.get("steps_since_last_ecm", 0))
 
     return PersistedState(
         last_step_id=last_step_id,
@@ -234,19 +239,21 @@ def parse_persisted_state(path: Path) -> PersistedState | None:
         last_ecm_call_time_s=last_ecm_call_time_s,
         q_gen_w_at_last_ecm=q_gen_w_at_last_ecm,
         dq_gen_dt_w_per_s=dq_gen_dt_w_per_s,
+        steps_since_last_ecm=steps_since_last_ecm,
     )
 
 
 def build_state_payload(persisted: PersistedState) -> dict[str, Any]:
     return {
         "magic": STATE_MAGIC,
-        "version": 2,
+        "version": 3,
         "last_step_id": int(persisted.last_step_id),
         "last_time_s": float(persisted.last_time_s),
         "state": persisted.state.to_dict(),
-        "last_ecm_call_time_s": float(persisted.last_ecm_call_time_s),
-        "q_gen_w_at_last_ecm":  float(persisted.q_gen_w_at_last_ecm),
-        "dq_gen_dt_w_per_s":    float(persisted.dq_gen_dt_w_per_s),
+        "last_ecm_call_time_s":  float(persisted.last_ecm_call_time_s),
+        "q_gen_w_at_last_ecm":   float(persisted.q_gen_w_at_last_ecm),
+        "dq_gen_dt_w_per_s":     float(persisted.dq_gen_dt_w_per_s),
+        "steps_since_last_ecm":  int(persisted.steps_since_last_ecm),
     }
 
 
@@ -294,6 +301,60 @@ def validate_request_against_state(request: StepRequest, persisted: PersistedSta
         )
 
 
+def _resolve_socket_path(args: argparse.Namespace) -> str:
+    if args.ecm_socket:
+        return str(Path(args.ecm_socket).resolve())
+    return str(Path(args.state).resolve().parent / "ecm_daemon.sock")
+
+
+def _ensure_daemon_running(args: argparse.Namespace, sock_path: str) -> None:
+    """Start ecm_daemon.py in the background if it is not already listening."""
+    import socket as _socket
+    import subprocess as _subprocess
+    import time
+
+    pid_path = str(Path(sock_path).with_suffix(".pid"))
+
+    # Quick liveness check — try to ping the daemon
+    probe = PersistentSocketBackend(sock_path, timeout_s=1.0)
+    if probe.ping():
+        return  # already running
+
+    # Not responding — launch it
+    daemon_script = Path(__file__).resolve().parent / "ecm_daemon.py"
+    cmd = [
+        sys.executable, str(daemon_script),
+        "--socket", sock_path,
+        "--pid",    pid_path,
+        "--backend", args.backend,
+        "--ecm-step-params",    str(args.ecm_step_params),
+        "--ecm-step-cellprops", str(args.ecm_step_cellprops),
+    ]
+    if args.ecm_step_module:
+        cmd += ["--ecm-step-module", str(args.ecm_step_module)]
+
+    _subprocess.Popen(
+        cmd,
+        stdout=_subprocess.DEVNULL,
+        stderr=_subprocess.DEVNULL,
+        start_new_session=True,  # detach from OpenFOAM process group
+    )
+
+    # Wait up to 10 seconds for daemon to become ready
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        time.sleep(0.1)
+        if probe.ping():
+            return
+
+    raise WrapperError(
+        "DAEMON_START_ERROR",
+        f"ECM daemon did not become ready within 10 s (socket={sock_path}). "
+        "Check that ecm_daemon.py, params.csv, and cellprops.csv are accessible.",
+        11,
+    )
+
+
 def build_backend(args: argparse.Namespace) -> BaseECMBackend:
     if args.backend == "mock-inproc":
         config = MockECMConfig(
@@ -329,11 +390,21 @@ def build_backend(args: argparse.Namespace) -> BaseECMBackend:
         )
 
     if args.backend == "ecm-step":
+        if args.persistent_ecm:
+            sock_path = _resolve_socket_path(args)
+            _ensure_daemon_running(args, sock_path)
+            return PersistentSocketBackend(sock_path)
         return EcmStepBackend(
             params_path=args.ecm_step_params,
             cellprops_path=args.ecm_step_cellprops,
             ecm_step_module_path=args.ecm_step_module,
         )
+
+    if args.backend == "mock-inproc":
+        if args.persistent_ecm:
+            sock_path = _resolve_socket_path(args)
+            _ensure_daemon_running(args, sock_path)
+            return PersistentSocketBackend(sock_path)
 
     raise WrapperError("CONFIG_ERROR", f"Unsupported backend '{args.backend}'", 10)
 
@@ -514,7 +585,19 @@ def parse_args() -> argparse.Namespace:
         help="Path to cellprops.csv for ecm-step backend.",
     )
 
-    # ECM call-interval subcycling (4680 NCA defaults)
+    # ECM call gating
+    parser.add_argument(
+        "--ecm-call-every-n-steps",
+        type=int,
+        default=0,
+        dest="ecm_call_every_n_steps",
+        help=(
+            "Fire ECM every N CFD timesteps (iteration-based gating). "
+            "Takes priority over --ecm-call-interval when N > 0. "
+            "Recommended for adaptive-dt simulations where simulation-time gating "
+            "is unpredictable. Default 0 = use --ecm-call-interval instead."
+        ),
+    )
     parser.add_argument(
         "--ecm-call-interval",
         type=float,
@@ -543,6 +626,35 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tau2-s", type=float, default=45.0, help="Mock backend configuration (4680 NCA).")
     parser.add_argument("--hyst-mag-v", type=float, default=0.003, help="Mock backend configuration (4680 NCA).")
 
+    # Persistent daemon mode
+    parser.add_argument(
+        "--persistent-ecm",
+        action="store_true",
+        help=(
+            "Use a persistent ecm_daemon.py process instead of spawning a new process "
+            "for each call. Eliminates ~45 ms/call Python startup overhead. "
+            "Daemon is auto-started on first invocation and stays alive between calls. "
+            "Only supported with --backend ecm-step or mock-inproc."
+        ),
+    )
+    parser.add_argument(
+        "--ecm-socket",
+        default=None,
+        help=(
+            "Path to the Unix domain socket for the persistent ECM daemon. "
+            "Default: <state_file_dir>/ecm_daemon.sock"
+        ),
+    )
+
+    parser.add_argument(
+        "--pipe-mode",
+        action="store_true",
+        help=(
+            "Run as a persistent process: read JSON requests line-by-line from stdin, "
+            "write JSON responses to stdout. Used with ioMode=persistentPipe in the "
+            "OpenFOAM function object. Eliminates per-call Python startup overhead."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true", help="Print a short success line to stdout.")
     return parser.parse_args()
 
@@ -564,15 +676,35 @@ def run(args: argparse.Namespace) -> int:
 
     state_in = initial_state_from_request_or_args(args, request) if request.reset_state or persisted is None else persisted.state
 
-    # ── ECM call-interval gating ──────────────────────────────────────────────
-    # Fire the ECM only every ecm_call_interval seconds of simulation time.
-    # Between fires, extrapolate Q with a first-order hold using the derivative
-    # estimated from the last two ECM calls.  The ECM itself receives the full
-    # accumulated dt so its RC integrators stay correct.
+    # ── ECM call gating ───────────────────────────────────────────────────────
+    # Two modes (mutually exclusive; iteration-based takes priority):
+    #
+    #  Iteration-based (--ecm-call-every-n-steps N > 0):
+    #    Fire after every N CFD timesteps regardless of simulation-time increment.
+    #    Robust under adaptive dt — N steps always means exactly N solver iterations.
+    #
+    #  Time-based (--ecm-call-interval T, default):
+    #    Fire when accumulated simulation time since last fire >= T seconds.
+    #    May fire more/less frequently under large dt swings.
+    #
+    # Between fires Q is extrapolated with a first-order hold using the
+    # derivative estimated from the last two ECM calls.  The ECM itself
+    # receives the full accumulated simulation-time dt so its RC integrators
+    # stay correct.
+    is_first_call = (request.reset_state or persisted is None)
+    dt_since_ecm  = 0.0 if is_first_call else (request.time_s - persisted.last_ecm_call_time_s)
+
+    call_every_n    = int(args.ecm_call_every_n_steps)
     call_interval_s = float(args.ecm_call_interval)
-    is_first_call    = (request.reset_state or persisted is None)
-    dt_since_ecm     = 0.0 if is_first_call else (request.time_s - persisted.last_ecm_call_time_s)
-    ecm_fired        = is_first_call or (dt_since_ecm >= call_interval_s)
+
+    if call_every_n > 0:
+        # Iteration-based gating: fire every N steps → gaps of exactly N between fires
+        # (steps_since counts steps elapsed since last fire; fire when it reaches N-1)
+        steps_since = 0 if is_first_call else persisted.steps_since_last_ecm
+        ecm_fired   = is_first_call or (steps_since >= call_every_n - 1)
+    else:
+        # Time-based gating (legacy / default)
+        ecm_fired = is_first_call or (dt_since_ecm >= call_interval_s)
 
     if ecm_fired:
         dt_for_ecm = request.dt_s if is_first_call else dt_since_ecm
@@ -632,6 +764,7 @@ def run(args: argparse.Namespace) -> int:
         last_ecm_call_time_s=request.time_s if ecm_fired else persisted.last_ecm_call_time_s,
         q_gen_w_at_last_ecm=q_gen_w if ecm_fired else persisted.q_gen_w_at_last_ecm,
         dq_gen_dt_w_per_s=new_dq_dt,
+        steps_since_last_ecm=0 if ecm_fired else (0 if is_first_call else persisted.steps_since_last_ecm + 1),
     )
 
     write_json_atomic(output_path, success_output)
@@ -654,8 +787,69 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
+def pipe_mode_loop(args: argparse.Namespace) -> None:
+    """Persistent pipe server: stdin -> process -> stdout.
+
+    The OpenFOAM function object keeps this process alive for the entire
+    simulation. Modules load once; per-call cost is just the ECM computation.
+    """
+    import sys as _sys
+    import tempfile as _tmp
+
+    # Build backend once -- loads numpy, pandas, ecm_step.py here
+    backend = build_backend(args)
+
+    # Unbuffered stdout so C++ reader gets each response immediately
+    _sys.stdout.reconfigure(line_buffering=True)
+
+    state_path = Path(args.state)
+
+    for line in _sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Write request to temp file, run(), read response from temp file
+        with _tmp.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        ) as tf_in:
+            tf_in.write(line)
+            tf_in_path = Path(tf_in.name)
+        tf_out_path = tf_in_path.with_suffix(".out.json")
+
+        saved_input  = args.input
+        saved_output = args.output
+        args.input  = str(tf_in_path)
+        args.output = str(tf_out_path)
+        try:
+            try:
+                run(args)
+            except SystemExit:
+                pass
+            except WrapperError as exc:
+                write_json_atomic(tf_out_path, build_error_output(exc.error_code, exc.message))
+            except Exception as exc:  # noqa: BLE001
+                write_json_atomic(tf_out_path, build_error_output("UNHANDLED_ERROR", str(exc)))
+
+            if tf_out_path.exists():
+                resp = tf_out_path.read_text(encoding="utf-8").replace("\n", " ").replace("\r", "")
+                print(resp, flush=True)
+            else:
+                print('{"status":"error","error_code":"NO_OUTPUT","message":"wrapper produced no output"}', flush=True)
+        finally:
+            args.input  = saved_input
+            args.output = saved_output
+            tf_in_path.unlink(missing_ok=True)
+            tf_out_path.unlink(missing_ok=True)
+
+
 def main() -> None:
     args = parse_args()
+
+    if args.pipe_mode:
+        pipe_mode_loop(args)
+        return
+
     request_payload_for_error: dict[str, Any] | None = None
     output_path = Path(args.output)
 
