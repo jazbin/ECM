@@ -16,21 +16,27 @@ FoamFile
 
 application     chtMultiRegionSolidFoam;
 
+libs            ( "libecmPatchFields.so" );
+
 startFrom       startTime;
 
 startTime       0;
 
 stopAt          endTime;
 
-endTime         30;
+endTime         300;
 
-deltaT          0.1;
+deltaT          1;
 
-adjustTimeStep  no;
+maxCo           1;
 
-writeControl    timeStep;
+maxDi           50;
 
-writeInterval   1;
+adjustTimeStep  yes;
+
+writeControl    runTime;
+
+writeInterval   30;
 
 purgeWrite      5;
 
@@ -46,8 +52,6 @@ timePrecision   8;
 
 runTimeModifiable true;
 
-libs            ( "libecmPatchFields.so" );
-
 functions
 {
     ecmCoupling
@@ -55,7 +59,7 @@ functions
         type            ecmCoupler;
         libs            ( "libecmCouplingFunctionObjects.so" );
         executeControl  timeStep;
-        writeControl    timeStep;
+        writeControl    writeTime;
         region          jellyRoll;
         zone            jellyRoll;
         T               T;
@@ -66,18 +70,68 @@ functions
         parallelMode    masterGather;
         keyMode         globalCellId;
         relaxation      0.5;
-        writeFields     true;
+        writeFields     false;
         inFile          "ecm/ecm_in.bin";
         outFile         "ecm/ecm_out.bin";
-        command         "ECM_IN=ecm/ecm_in.bin ECM_OUT=ecm/ecm_out.bin ECM_MAPPING_FILE=ecm/mapping_table_axial6_radial3.csv ECM_STATE_FILE=ecm/ecm_state.json python3 ../../ecm/ecm_coupler.py";
+        // NCA 4680 chemistry via ecm_step; ECM_CALL_EVERY_N_STEPS=10 matches
+        // lumped_solid --ecm-call-every-n-steps 10 subcycling.
+        // NOTE: ioMode=binary is mandatory for couplingMode=elementWise (C++ constraint).
+        command         "ECM_IN=ecm/ecm_in.bin ECM_OUT=ecm/ecm_out.bin ECM_MAPPING_FILE=ecm/mapping_table_axial6_radial3.csv ECM_STATE_FILE=ecm/ecm_state.json ECM_USE_REAL_STEP=1 ECM_CALL_EVERY_N_STEPS=10 python3 ../../ecm/ecm_coupler.py";
         electricalInputs
         {
             current_A       79;
             SOC             0.5;
             T_min_K         273.15;
             T_max_K         373.15;
-            qVolMax         5e4;
         }
+    }
+    interfaceT_jellyRoll_to_shell
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_shell;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_shell_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell;
+        regionType      patch;
+        name            shell_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_jellyRoll_to_cap
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_cap;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_cap_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap;
+        regionType      patch;
+        name            cap_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
     }
 }
 
