@@ -1,0 +1,12 @@
+Generated: 2026-02-24
+Source: Extracted and generalized from the provided package's AGENTS.md + RUNBOOK/*.md (and supporting PLANS/TASKS/CONTRACTS conventions).
+
+This file is now an index. The full operating rules are split into mode-specific
+sub-documents to avoid re-reading a large monolith every time.
+
+Mode index: docs/codex_modes/00_INDEX.txt
+
+Rule of use
+- Read only the mode guide(s) relevant to the current working state.
+- Repo-local rules override these guides if they conflict.
+- Keep STATUS.md and docs/ASSUMPTIONS.md current and record decisions/blockers/changes under artifacts/logs/.

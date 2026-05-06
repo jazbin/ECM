@@ -1,0 +1,7 @@
+MODE: Codex Settings Profiles
+
+18) Codex Settings Profiles (tune autonomy vs safety)
+Provide profiles such as:
+- Conservative (default): minimal actions without approval, strict logging
+- Autonomous (isolated container only): more unattended commands, still logged
+Always verify that the chosen profile matches repo policy (approval rules).

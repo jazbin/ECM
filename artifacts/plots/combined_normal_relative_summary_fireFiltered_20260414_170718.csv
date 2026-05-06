@@ -1,0 +1,2 @@
+fire_every_steps_inferred,fire_phase_inferred,n_wrapper_points,n_wrapper_fire_points,n_wrapper_fire_zero_q,heat_abs_pct_mean,heat_abs_pct_p95,temp_abs_pct_mean,temp_abs_pct_p95
+5,0,1004,201,121,40.350190331273815,100.0,0.04710194907999552,0.08073157204149312

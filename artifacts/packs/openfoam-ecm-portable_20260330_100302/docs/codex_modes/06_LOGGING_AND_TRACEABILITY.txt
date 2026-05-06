@@ -1,0 +1,15 @@
+MODE: Logging and Traceability
+
+11) Logging Policy (traceability)
+Maintain these logs (names may differ per repo; preserve the concept):
+1. Session log (per session)
+   - commands run, key outputs, decisions
+2. Decision log
+   - assumptions, lane switches, approvals, rationale
+3. Blockers log
+   - missing dependencies, missing data, permission issues, how to resolve
+4. Change log / changelog
+   - user-visible "what changed" summary (per PR/ticket)
+
+Post-processing rule:
+- prefer structured outputs (functionObjects, scripted CSV/JSON) over log scraping.

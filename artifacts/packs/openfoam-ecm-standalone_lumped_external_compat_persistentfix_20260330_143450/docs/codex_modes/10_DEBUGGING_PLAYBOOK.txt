@@ -1,0 +1,17 @@
+MODE: Debugging Playbook
+
+17) Debugging Playbook (general)
+1. Classify failure:
+   - build error, runtime crash, divergence, wrong physics, wrong IO, perf
+2. Standard triage:
+   - reproduce minimal case
+   - check units/contracts
+   - check boundary/initial conditions
+   - reduce to Lane A test and isolate
+3. Instrumentation:
+   - add assertions, diagnostic outputs, small probes
+4. Fix + verify:
+   - implement smallest fix
+   - rerun ladder level that exposed the bug
+5. Regression:
+   - add a test to prevent recurrence

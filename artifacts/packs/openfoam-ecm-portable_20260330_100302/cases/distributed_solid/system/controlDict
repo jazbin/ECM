@@ -1,0 +1,138 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+FoamFile
+{
+    version         2;
+    format          ascii;
+    class           dictionary;
+    object          controlDict;
+}
+
+application     chtMultiRegionSolidFoam;
+
+libs            ( "libecmPatchFields.so" );
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         300;
+
+deltaT          1;
+
+maxCo           1;
+
+maxDi           100;
+
+adjustTimeStep  yes;
+
+writeControl    runTime;
+
+writeInterval   30;
+
+purgeWrite      5;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    ecmCoupling
+    {
+        type            ecmCoupler;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll;
+        zone            jellyRoll;
+        T               T;
+        qField          ecmQdot;
+        stField         ecmST;
+        outputMode      volumetricHeat;
+        couplingMode    elementWise;
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+        relaxation      0.5;
+        temporalInterpolation linear;
+        writeFields     false;
+        inFile          "ecm/ecm_in.bin";
+        outFile         "ecm/ecm_out.bin";
+        ioMode          persistentPipe;
+        command         "ECM_MAPPING_FILE=ecm/mapping_table_axial6_radial3_2170mesh.csv ECM_STATE_FILE=ecm/ecm_state.json ECM_USE_REAL_STEP=1 ECM_DISTRIBUTED_ELECTRICAL_MODE=sharedState ECM_CALL_EVERY_N_STEPS=1 ECM_INTERP_MODE=linear python3 ../../ecm/ecm_coupler.py --pipe-binary";
+        electricalInputs
+        {
+            current_A       79;
+            SOC             0.5;
+            T_min_K         273.15;
+            T_max_K         373.15;
+        }
+    }
+    interfaceT_jellyRoll_to_shell
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_shell;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_shell_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell;
+        regionType      patch;
+        name            shell_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_jellyRoll_to_cap
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll;
+        regionType      patch;
+        name            jellyRoll_to_cap;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+    interfaceT_cap_to_jellyRoll
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap;
+        regionType      patch;
+        name            cap_to_jellyRoll;
+        operation       areaAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+}
+
+
+// ************************************************************************* //

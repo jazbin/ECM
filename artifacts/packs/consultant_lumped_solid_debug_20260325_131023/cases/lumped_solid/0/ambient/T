@@ -1,0 +1,77 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       volScalarField;
+    location    "0/ambient";
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [ 0 0 0 1 0 0 0 ];
+
+internalField   uniform 313.15;
+
+boundaryField
+{
+    minX
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    maxX
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    minY
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    maxY
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    minZ
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    maxZ
+    {
+        type            fixedValue;
+        value           uniform 313.15;
+    }
+    ambient_to_shell
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        value           uniform 313.15;
+        Tnbr            T;
+        qrNbr           none;
+        qr              none;
+        useImplicit     true;
+        kappaMethod     fluidThermo;
+    }
+    ambient_to_cap
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        value           uniform 313.15;
+        Tnbr            T;
+        qrNbr           none;
+        qr              none;
+        useImplicit     true;
+        kappaMethod     fluidThermo;
+    }
+}
+
+// ************************************************************************* //

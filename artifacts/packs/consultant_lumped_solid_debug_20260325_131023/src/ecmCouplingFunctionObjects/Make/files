@@ -1,0 +1,3 @@
+ecmCoupler/ecmCoupler.C
+
+LIB = $(FOAM_USER_LIBBIN)/libecmCouplingFunctionObjects

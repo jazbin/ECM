@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "defaults": {
+    "temperature": {
+      "min_K": 200.0,
+      "max_K": 400.0
+    },
+    "continuity": {
+      "global_abs_max": 1e-6
+    },
+    "courant": {
+      "max": 5.0
+    },
+    "energy": {
+      "residual_rel_max": 0.05
+    },
+    "coupling": {
+      "power_mismatch_rel_max": 0.05
+    }
+  },
+  "cases": {
+    "chtMultiRegionSimpleFoam_ecm": {
+      "solver": "chtMultiRegionSimpleFoam",
+      "temperature": {
+        "min_K": 200.0,
+        "max_K": 400.0
+      },
+      "continuity": {
+        "global_abs_max": 1e-6
+      },
+      "courant": {
+        "max": 5.0
+      },
+      "energy": {
+        "residual_rel_max": 0.05
+      },
+      "coupling": {
+        "power_mismatch_rel_max": 0.05
+      }
+    },
+    "scalarTransport_ecm": {
+      "solver": "scalarTransportFoam",
+      "temperature": {
+        "min_K": 200.0,
+        "max_K": 400.0
+      },
+      "courant": {
+        "max": 5.0
+      },
+      "coupling": {
+        "power_mismatch_rel_max": 0.05
+      }
+    }
+  }
+}

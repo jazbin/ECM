@@ -1,0 +1,28 @@
+Implicit vs explicit coupling issues encountered (solids-only multi-region)
+
+Context
+- Case: `cases/lumped_solid` (solids-only, multi-region) with ECM volumetric heating.
+- When `useImplicit true` at solid-solid interfaces, temperatures undershot below the initial 313.15 K despite positive volumetric heat input.
+- The Tmin drop was observed after `correctThermos`, consistent with fvMatrixAssembly behavior in the implicit path.
+
+Symptoms
+- Non-physical interface cooling with implicit coupling enabled in solids-only runs.
+- Tmin drop appeared after `correctThermos` even with positive `ecmQdot`.
+- Explicit coupling (`useImplicit false`) did not show the undershoot in short runs and produced physically consistent temperature evolution.
+
+Mitigations and current state
+- Forced explicit coupling for solids-only runs when `useImplicit true` is detected (guard added in `chtMultiRegionSolidFoam`).
+- Added `allowImplicitSolidsOnly` override for experimental implicit runs.
+- Added `debugImplicitCoupling` instrumentation around `fvMatrixAssembly` to localize the Tmin drop.
+- Added `implicitClampTMin` (in `fvSolution`) to prevent non-physical undershoot during implicit runs; this is a stopgap, not a root-cause fix.
+
+Evidence / logs
+- Implicit undershoot observed (solids-only): `artifacts/logs/lumped_run_20260325_195021.log`.
+- Tmin drop after `correctThermos`: `artifacts/logs/lumped_run_20260325_204137.log`.
+- Clamp stabilizes Tmin in implicit mode: `artifacts/logs/lumped_run_20260325_210754.log`.
+- Long implicit run with clamp: `artifacts/logs/lumped_run_20260325_211539.log`.
+- Explicit coupling fixes interface cooling in solids-only case: `artifacts/logs/lumped_run_20260325_132444.log`.
+
+Open questions
+- Root cause in `fvMatrixAssembly` for solids-only implicit coupling remains unresolved.
+- Need a minimal reproducer to isolate whether this is mesh-specific, interface BC-specific, or a solver-level artifact.

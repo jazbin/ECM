@@ -1,0 +1,1 @@
+../ecmTemperatureRadCoupledMixedFvPatchScalarField.C

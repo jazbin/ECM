@@ -1,0 +1,39 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Allrun — run wedge_2170 CHT + ECM coupled simulation
+#
+# Prerequisites:
+#   1. OpenFOAM v2506 environment sourced
+#   2. Package built: cd ../../ && ./Allwmake
+#   3. Python deps installed: pip install -r ../../python/requirements.txt
+#
+# Usage: ./Allrun
+#------------------------------------------------------------------------------
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# Locate package root (two levels up from cases/wedge_2170/)
+PACK_DIR="$(cd "$(dirname "$0")/../../" && pwd)"
+
+# Load OpenFOAM environment if not already loaded
+if [ -f /opt/openfoam/etc/bashrc ]; then
+    set +e; set +u
+    source /opt/openfoam/etc/bashrc
+    set -u; set -e
+fi
+
+# Use compiled libs and binary from this package
+export LD_LIBRARY_PATH="${PACK_DIR}/lib:${LD_LIBRARY_PATH:-}"
+export PATH="${PACK_DIR}/bin:${PATH}"
+
+# Clean stale time directories (keep 0/ and constant/)
+find . -maxdepth 1 -type d -regextype posix-extended \
+    -regex ".*/[0-9]+(\.[0-9]+)?" ! -name "0" -exec rm -rf {} + 2>/dev/null || true
+
+mkdir -p logs ecm
+stamp=$(date -u +%Y%m%d_%H%M%S)
+log="logs/run_${stamp}.log"
+
+echo "Running chtMultiRegionSolidFoam — wedge 2170 CHT + ECM  ($(date -u))" | tee "$log"
+chtMultiRegionSolidFoam 2>&1 | tee -a "$log"
+echo "Done. Log: $log"

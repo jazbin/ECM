@@ -1,0 +1,23 @@
+MODE: Planning and Roles
+
+6) Roles and Handoffs (work like an autonomous team)
+For each ticket/change, explicitly cover:
+1) Planner
+   - reads plan + ticket, makes a short sub-plan, identifies risks
+   - chooses smallest reproducible test
+2) Implementer
+   - edits code/config/docs as required
+3) Verifier
+   - runs verification ladder, captures artifacts, updates status pass/fail
+4) Documenter
+   - updates contracts/specs/user-facing docs, keeps claims aligned
+
+7) Planning and Tasking Discipline
+1) Work is driven by tickets/tasks. Each ticket must have:
+   - objective, scope constraints, inputs/outputs, acceptance criteria
+   - work log: what changed, what was tested, what passed/failed
+2) Maintain an always-current STATUS file:
+   - what is active
+   - what is done
+   - what is blocked (with next actions)
+3) Use an ExecPlan index (PLANS/) and ticket index (TASKS/) when present.

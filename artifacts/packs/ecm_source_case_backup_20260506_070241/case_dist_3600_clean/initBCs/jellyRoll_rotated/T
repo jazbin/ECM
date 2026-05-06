@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 298.15;
+
+boundaryField
+{
+    jellyRoll_rotated_to_cap_rotated
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     solidThermo;
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+    jellyRoll_rotated_to_shell_rotated_radial
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     solidThermo;
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+    jellyRoll_rotated_to_shell_rotated_bottom
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     solidThermo;
+        thicknessLayers (1.804785e-03);
+        kappaLayers     (1);  // Rtherm_jroll_base = 5.40067678 K/W using the cell base area
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+}
+
+// ************************************************************************* //

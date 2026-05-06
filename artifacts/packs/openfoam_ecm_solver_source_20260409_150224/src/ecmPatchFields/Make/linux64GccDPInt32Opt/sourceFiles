@@ -1,0 +1,4 @@
+SOURCE = \
+ecmTemperatureRadCoupledMixedFvPatchScalarField.C \
+
+# sources

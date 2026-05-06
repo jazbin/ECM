@@ -1,0 +1,2 @@
+heat_abs_pct_mean,heat_abs_pct_p95,temp_abs_pct_mean,temp_abs_pct_p95,n_heat_points_nonzero_original,n_heat_points_trimmed,n_tail_points_removed,n_temp_points
+0.873164377908339,1.0864006610474362,0.04422409812825755,0.08006998699680089,162,160,2,925

@@ -1,0 +1,26 @@
+MODE: Release and Packaging
+
+15) Release / Claims Discipline (no overclaiming)
+1. Claims must match verified capabilities.
+2. Separate "implemented" from "validated".
+3. If something is only runtime-tested (not experimentally validated), say so.
+4. Do not broaden claims without updating:
+   - claims policy file (if present)
+   - feature status tables
+   - deliverable docs and README
+
+16) Deliverable Packaging Rules
+1. For each meaningful run/change, generate a "report pack" suitable for review:
+   - run passport (config hash, mesh summary, solver version, commit)
+   - key plots/tables
+   - pass/fail checks
+   - limitations and applicability notes
+2. Keep artifacts deterministic:
+   - stable filenames
+   - include scripts used to generate plots/tables
+3. For external reviews/consultants:
+   - provide a self-contained info pack (inputs + questions + pointers)
+   - include everything the reviewer cannot obtain by searching online
+   - assume the consultant has no prior project context
+   - pack must include all relevant docs, config, logs, and code needed to review
+     coupling behavior, even if redundant with repo structure

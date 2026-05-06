@@ -1,0 +1,54 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Allwmake — build all OpenFOAM ECM coupling libraries and solver
+#
+# Targets:
+#   lib/libecmCouplingFunctionObjects.so
+#   lib/libecmFvOptions.so
+#   lib/libecmPatchFields.so
+#   bin/chtMultiRegionSolidFoam
+#
+# Requires: OpenFOAM v2506 environment sourced before running.
+# Usage:    ./Allwmake
+#------------------------------------------------------------------------------
+set -e
+cd "$(dirname "$0")"
+PACK_DIR="$(pwd)"
+
+# Redirect compiled outputs into the package's own lib/ and bin/
+export FOAM_USER_LIBBIN="$PACK_DIR/lib"
+export FOAM_USER_APPBIN="$PACK_DIR/bin"
+
+mkdir -p "$FOAM_USER_LIBBIN" "$FOAM_USER_APPBIN"
+
+echo "============================================================"
+echo " Building ECM coupling libraries and solver"
+echo " FOAM_USER_LIBBIN = $FOAM_USER_LIBBIN"
+echo " FOAM_USER_APPBIN = $FOAM_USER_APPBIN"
+echo "============================================================"
+
+echo ""
+echo "--- ecmCouplingFunctionObjects ---"
+wmake libso src/ecmCouplingFunctionObjects
+echo "Done: $FOAM_USER_LIBBIN/libecmCouplingFunctionObjects.so"
+
+echo ""
+echo "--- ecmFvOptions ---"
+wmake libso src/ecmFvOptions
+echo "Done: $FOAM_USER_LIBBIN/libecmFvOptions.so"
+
+echo ""
+echo "--- ecmPatchFields ---"
+wmake libso src/ecmPatchFields
+echo "Done: $FOAM_USER_LIBBIN/libecmPatchFields.so"
+
+echo ""
+echo "--- chtMultiRegionSolidFoam ---"
+wmake src/chtMultiRegionSolidFoam
+echo "Done: $FOAM_USER_APPBIN/chtMultiRegionSolidFoam"
+
+echo ""
+echo "============================================================"
+echo " Build complete."
+echo " Run case: cd cases/wedge_2170 && ./Allrun"
+echo "============================================================"

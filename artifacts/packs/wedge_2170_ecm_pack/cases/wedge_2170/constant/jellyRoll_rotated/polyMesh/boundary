@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       polyBoundaryMesh;
+    location    "constant/jellyRoll_rotated/polyMesh";
+    object      boundary;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+3
+(
+    jellyRoll_rotated_to_cap_rotated
+    {
+        type            mappedWall;
+        inGroups        2(wall mappedPatch);
+        nFaces          432;
+        startFace       87768;
+        sampleMode      nearestPatchFace;
+        sampleRegion    cap_rotated;
+        samplePatch     cap_rotated_to_jellyRoll_rotated;
+    }
+    jellyRoll_rotated_to_shell_rotated_radial
+    {
+        type            mappedWall;
+        inGroups        2(wall mappedPatch);
+        nFaces          2520;
+        startFace       88200;
+        sampleMode      nearestPatchFace;
+        sampleRegion    shell_rotated;
+        samplePatch     shell_rotated_to_jellyRoll_rotated_radial;
+    }
+    jellyRoll_rotated_to_shell_rotated_bottom
+    {
+        type            mappedWall;
+        inGroups        2(wall mappedPatch);
+        nFaces          432;
+        startFace       90720;
+        sampleMode      nearestPatchFace;
+        sampleRegion    shell_rotated;
+        samplePatch     shell_rotated_to_jellyRoll_rotated_bottom;
+    }
+)
+
+// ************************************************************************* //

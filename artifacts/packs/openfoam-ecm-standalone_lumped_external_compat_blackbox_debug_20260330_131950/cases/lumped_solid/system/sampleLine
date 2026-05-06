@@ -1,0 +1,25 @@
+// -*- C++ -*-
+
+sampleLine
+{
+    type            sets;
+    libs            (sampling);
+    setFormat       raw;
+    writeControl    writeTime;
+    interpolationScheme cellPoint;
+    fields          (T);
+
+    sets
+    {
+        axisLine
+        {
+            type    uniform;
+            axis    xyz;
+            start   (0 0 0);
+            end     (0 0 0.07);
+            nPoints 200;
+        }
+    }
+}
+
+// ************************************************************************* //

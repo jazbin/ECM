@@ -1,0 +1,14 @@
+{
+  "run_id": "2026-02-25T00:00:00Z-acde",
+  "description": "short description",
+  "solver": "solverName",
+  "case_path": "cases/example",
+  "openfoam_version": "v2506",
+  "git_commit": "<commit>",
+  "host": "<hostname>",
+  "parameters": {
+    "time_step": 1.0,
+    "end_time": 10.0
+  },
+  "notes": ""
+}

@@ -1,0 +1,68 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+pointSync false;
+
+patches
+(
+    {
+        name            front;
+        patchInfo
+        {
+            type    wedge;
+        }
+        constructFrom   set;
+        set             frontFaces;
+    }
+    {
+        name            back;
+        patchInfo
+        {
+            type    wedge;
+        }
+        constructFrom   set;
+        set             backFaces;
+    }
+    {
+        name            axis_extruded;
+        patchInfo
+        {
+            type    empty;
+        }
+        constructFrom   patches;
+        patches         (axis_extruded);
+    }
+    {
+        name            shell_outerSurface_extruded;
+        patchInfo
+        {
+            type    wall;
+        }
+        constructFrom   patches;
+        patches         (shell_outerSurface_extruded);
+    }
+    {
+        name            capOuterSurface_extruded;
+        patchInfo
+        {
+            type    wall;
+        }
+        constructFrom   patches;
+        patches         (capOuterSurface_extruded);
+    }
+);
+
+// ************************************************************************* //

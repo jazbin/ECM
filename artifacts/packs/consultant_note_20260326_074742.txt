@@ -1,0 +1,12 @@
+Hello [Consultant Name],
+
+Attached is a consultant pack for the OpenFOAM-ECM coupling work. It includes:
+- All repo Markdown docs (project context and instructions)
+- All code and config files (source + scripts)
+- Session logs (chat + session traces)
+- Codex governance files (AGENTS and codex mode rules)
+
+Please focus your review on coupling correctness, IO contract adherence, and any risks or missing validations you see. If you need additional artifacts or a narrower subset, let me know.
+
+Best,
+[Your Name]

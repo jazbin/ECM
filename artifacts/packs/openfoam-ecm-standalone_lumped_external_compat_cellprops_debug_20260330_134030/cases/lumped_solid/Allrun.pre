@@ -1,0 +1,18 @@
+#!/bin/sh
+cd "${0%/*}" || exit
+. ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
+
+# Expect a single UNV file in the case root.
+UNV_COUNT=$(ls -1 *.unv 2>/dev/null | wc -l | tr -d ' ')
+if [ "$UNV_COUNT" -eq 0 ]; then
+    echo "No .unv file found in $(pwd). Copy the UNV file here first."
+    exit 1
+fi
+if [ "$UNV_COUNT" -ne 1 ]; then
+    echo "Expected exactly one .unv file in $(pwd); found $UNV_COUNT."
+    exit 1
+fi
+
+UNV_FILE=$(ls -1 *.unv)
+
+runApplication ideasUnvToFoam "$UNV_FILE"

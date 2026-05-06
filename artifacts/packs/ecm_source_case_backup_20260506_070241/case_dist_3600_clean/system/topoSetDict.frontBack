@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+actions
+(
+    // front: y < 0 (the -2.5 deg wedge face)
+    {
+        name    frontFaces;
+        type    faceSet;
+        action  new;
+        source  normalToFace;
+        normal  (0 -1 0);
+        cos     0.9;
+    }
+    {
+        name    frontFaces;
+        type    faceSet;
+        action  subset;
+        source  patchToFace;
+        patch   defaultFaces;
+    }
+
+    // back: y > 0 (the +2.5 deg wedge face)
+    {
+        name    backFaces;
+        type    faceSet;
+        action  new;
+        source  normalToFace;
+        normal  (0 1 0);
+        cos     0.9;
+    }
+    {
+        name    backFaces;
+        type    faceSet;
+        action  subset;
+        source  patchToFace;
+        patch   defaultFaces;
+    }
+);
+
+// ************************************************************************* //

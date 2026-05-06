@@ -1,0 +1,18 @@
+# Assumptions Register
+
+| Date (UTC) | Assumption | Rationale |
+| --- | --- | --- |
+| 2026-02-24 | Logging files live under artifacts/logs and STATUS.md is in repo root. | No existing runbook or status convention found; this is the minimal, reversible layout. |
+| 2026-02-25 | OpenFOAM v2506 environment is available at `/opt/openfoam` and can be used for builds/runs. | WM_PROJECT_DIR was set and used for `Allwmake` and case verification. |
+| 2026-02-25 | Project license set to GPLv3 to align with OpenFOAM licensing expectations. | OpenFOAM contributions are GPLv3; repo extends OpenFOAM code. |
+| 2026-02-25 | CI workflow uses `openfoam/openfoam:v2506` container image for builds/tests. | Matches repo's OpenFOAM version; adjust if a different container is preferred. |
+| 2026-03-12 | OpenFOAM 2D workflows use single-cell-thick 3D meshes with `empty` front/back patches rather than true 2D meshes. | OpenFOAM operates on 3D poly meshes; 2D cases are represented as 1-cell-thick meshes with `empty` patches. |
+| 2026-03-17 | Consultant CLI wrapper can write per-run CSV with columns including `Q_GEN_W`, `q_ah_next`, `V_RC_1`, `V_RC_2`, `H`, and accepts `--write-csv` plus `--csv-prefix`. | Required to extract total heat and state updates for lumped coupling until a file-based I/O contract exists. |
+| 2026-03-17 | Python mock backend requires `numpy` and `pandas` when using `ecm/ecm_coupler.py` with `mock_ecm_backend.py`. | The mock ECM backend loads optional CSV tables and uses NumPy/Pandas for calculations. |
+| 2026-03-18 | Khan OSF dataset CSVs provide `time/s` and `Ecell/V` (no temperature), and Stanford 2021 XLSX files expose `Test_Time(s)`, `Voltage(V)`, and `Surface_Temp(degC)` in `sheet1`. | Needed to implement voltage/temperature validation scripts without external dependencies. |
+| 2026-03-18 | `cellFull.stl` coordinates are treated as meters (no scaling) with the main cylinder axis along +Z; concentric radii at ~110 and ~120 define three regions (core, shell, ambient). | STL vertex bounds and radius clustering support this interpretation; used to place snappyHexMesh `locationsInMesh`. |
+| 2026-03-21 | Non-lumped ECM/mesh coupling uses a mapping table with per-pair weights representing intersection volumes (or relative weights in synthetic tests). | Required to aggregate mesh temperatures to ECM elements and distribute `qVol` back to mesh cells without changing the binary IO contract. |
+| 2026-03-21 | Non-lumped cylinder case uses an elevated ambient dynamic viscosity to emulate stronger heat rejection without changing geometry or solver type. | Needed to keep steady-state temperatures in a sensible range for quick ECM/mesh coupling checks. |
+| 2026-03-23 | `cases/lumped` uses `chtMultiRegionFoam` (transient) with `frozenFlow yes` for the ambient fluid region to represent a conduction-only placeholder fluid while still satisfying the solver's requirement for a fluid region. | Prevents pseudo-time artifacts from steady SIMPLE when ECM coupling expects real time stepping; avoids unnecessary pressure/momentum work in the dummy ambient region. |
+| 2026-03-24 | `cellFull_2170.stl` is a non-uniformly scaled version of `cellFull_m.stl` to approximate a 2170 cell envelope (radius ~10.5 mm, height ~70 mm), and snappyHexMesh locationsInMesh were scaled accordingly. | The original STL dimensions were ~0.24 m height and ~0.24 m diameter, far larger than 2170; scaling aligns the geometry to target cell size without rebuilding the CAD. |
+| 2026-03-25 | `cases/lumped_solid` should remain solids-only with no ambient cellZone created by snappyHexMesh locationsInMesh. | Solid-only solver expects three regions (jellyRoll, shell, cap); ambient is removed from mesh generation to avoid extra zones. |
