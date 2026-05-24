@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+actions
+(
+    {
+        name    bottomContactFaces;
+        type    faceSet;
+        action  new;
+        source  zoneToFace;
+        zone    interface_rotated;
+    }
+
+    {
+        name    radialContactFaces;
+        type    faceSet;
+        action  new;
+        source  patchToFace;
+        patch   shell_1_to_jellyRoll_1;
+    }
+    {
+        name    radialContactFaces;
+        type    faceSet;
+        action  subtract;
+        source  faceToFace;
+        set     bottomContactFaces;
+    }
+);
+
+// ************************************************************************* //

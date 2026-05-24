@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 298.15;
+
+boundaryField
+{
+    jellyRoll_0_to_cap_0
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     directionalSolidThermo;
+        alphaAni        Anialpha;
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+    jellyRoll_0_to_shell_0_radial
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     directionalSolidThermo;
+        alphaAni        Anialpha;
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+    jellyRoll_0_to_shell_0_bottom
+    {
+        type            compressible::turbulentTemperatureRadCoupledMixed;
+        Tnbr            T;
+        kappaMethod     directionalSolidThermo;
+        alphaAni        Anialpha;
+        thicknessLayers (9.023925e-04);
+        kappaLayers     (1);  // R/2 on jellyRoll side — total R = R_STAR with R/2 on shell side
+        qrNbr           none;
+        qr              none;
+        value           uniform 298.15;
+    }
+}
+
+// ************************************************************************* //

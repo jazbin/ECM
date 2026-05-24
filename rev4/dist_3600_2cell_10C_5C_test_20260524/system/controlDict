@@ -1,0 +1,178 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Two-battery test: cell0 = 10C (50 A), cell1 = 5C (25 A)
+// Both cells use parallelBranches distributed ECM, dirKfix thermal BCs.
+// No inter-cell thermal coupling — cells are thermally independent.
+
+application     chtMultiRegionSolidFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         300;
+
+deltaT          0.1;
+
+writeControl    adjustableRunTime;
+
+writeInterval   10;
+
+purgeWrite      3;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    // ── Cell 0: 10C discharge (50 A) ────────────────────────────────────────
+    ecmCoupling_cell0
+    {
+        type            ecmCoupler;
+        enabled         true;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll_0;
+        zone            jellyRoll_0;
+        T               T;
+        qField          ecmQdot;
+        outputMode      volumetricHeat;
+        couplingMode    elementWise;
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+        relaxation      1.0;
+        writeFields     true;
+        subIterations   1;
+        subIterationResult average;
+        lastGoodFile    "ecm/cell0/ecm_last_good.bin";
+        elementMappingFile "/workspace/rev4/dist_3600_2cell_10C_5C_test_20260524/ecm/cell0/mapping.csv";
+        inFile          "ecm/cell0/ecm_in.bin";
+        outFile         "ecm/cell0/ecm_out.bin";
+        ioMode          persistentPipe;
+        command         "ECM_MAPPING_FILE=/workspace/rev4/dist_3600_2cell_10C_5C_test_20260524/ecm/cell0/mapping.csv ECM_STATE_FILE=ecm/cell0/ecm_state.json ECM_USE_REAL_STEP=1 ECM_DISTRIBUTED_ELECTRICAL_MODE=parallelBranches ECM_INTERP_MODE=linear ECM_LOG_EVERY_N_STEPS=10 ECM_CELL_ID=0 /workspace/.conda/envs/pv/bin/python3 /workspace/rev4/python/ecm_coupler.py --pipe-binary";
+        wrapperStateReset false;
+        electricalInputsMode csv;
+        electricalInputsFile "constant/electrical_inputs_experimental_10C_discharge.csv";
+        electricalInputsTimeColumn time;
+    }
+
+    // ── Cell 1: 5C discharge (25 A) ─────────────────────────────────────────
+    ecmCoupling_cell1
+    {
+        type            ecmCoupler;
+        enabled         true;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll_1;
+        zone            jellyRoll_1;
+        T               T;
+        qField          ecmQdot;
+        outputMode      volumetricHeat;
+        couplingMode    elementWise;
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+        relaxation      1.0;
+        writeFields     true;
+        subIterations   1;
+        subIterationResult average;
+        lastGoodFile    "ecm/cell1/ecm_last_good.bin";
+        elementMappingFile "/workspace/rev4/dist_3600_2cell_10C_5C_test_20260524/ecm/cell1/mapping.csv";
+        inFile          "ecm/cell1/ecm_in.bin";
+        outFile         "ecm/cell1/ecm_out.bin";
+        ioMode          persistentPipe;
+        command         "ECM_MAPPING_FILE=/workspace/rev4/dist_3600_2cell_10C_5C_test_20260524/ecm/cell1/mapping.csv ECM_STATE_FILE=ecm/cell1/ecm_state.json ECM_USE_REAL_STEP=1 ECM_DISTRIBUTED_ELECTRICAL_MODE=parallelBranches ECM_INTERP_MODE=linear ECM_LOG_EVERY_N_STEPS=10 ECM_CELL_ID=1 /workspace/.conda/envs/pv/bin/python3 /workspace/rev4/python/ecm_coupler.py --pipe-binary";
+        wrapperStateReset false;
+        electricalInputsMode csv;
+        electricalInputsFile "constant/electrical_inputs_5C_discharge.csv";
+        electricalInputsTimeColumn time;
+    }
+
+    // ── Temperature monitors ─────────────────────────────────────────────────
+    jellyRollMeanT_cell0
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_0;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+
+    jellyRollMeanT_cell1
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_1;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+
+    // ── Probes — Cell 0 ──────────────────────────────────────────────────────
+    probeLocations_cell0
+    {
+        region          jellyRoll_0;
+        #include "probeLocations"
+    }
+
+    probeT1_cell0
+    {
+        region          shell_0;
+        #include "probeT1"
+    }
+
+    probeT6_cell0
+    {
+        region          cap_0;
+        #include "probeT6"
+    }
+
+    // ── Probes — Cell 1 ──────────────────────────────────────────────────────
+    probeLocations_cell1
+    {
+        region          jellyRoll_1;
+        #include "probeLocations"
+    }
+
+    probeT1_cell1
+    {
+        region          shell_1;
+        #include "probeT1"
+    }
+
+    probeT6_cell1
+    {
+        region          cap_1;
+        #include "probeT6"
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,9 @@
+FoamFile { version 2.0; format ascii; class volScalarField; object p; }
+dimensions [1 -1 -2 0 0 0 0];
+internalField uniform 101325;
+boundaryField
+{
+    capOuterSurface_1 { type zeroGradient; }
+    cap_1_to_jellyRoll_1 { type zeroGradient; }
+    cap_1_to_shell_1 { type zeroGradient; }
+}

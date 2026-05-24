@@ -1,0 +1,117 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Thermal/geometric setup packaged from in/latest/case12 with ECM enabled.
+
+application     chtMultiRegionSolidFoam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         300;
+
+deltaT          0.1;
+
+writeControl    adjustableRunTime;
+
+writeInterval   10;
+
+purgeWrite      3;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    ecmCoupling
+    {
+        type            ecmCoupler;
+        enabled         true;
+        libs            ( "libecmCouplingFunctionObjects.so" );
+        executeControl  timeStep;
+        writeControl    writeTime;
+        region          jellyRoll_rotated;
+        zone            jellyRoll_rotated;
+        T               T;
+        qField          ecmQdot;
+        outputMode      volumetricHeat;
+        couplingMode    elementWise;
+        parallelMode    masterGather;
+        keyMode         globalCellId;
+        relaxation      1.0;
+        writeFields     true;
+        subIterations   1;
+        subIterationResult average;
+        lastGoodFile    "ecm/ecm_last_good.bin";
+        elementMappingFile "/workspace/rev4/caseLong_dt02_h110_distributed_debug500_overlap/ecm/mapping_table_axial6_radial3_caseLong_overlap.csv";
+        inFile          "ecm/ecm_in.bin";
+        outFile         "ecm/ecm_out.bin";
+        ioMode          persistentPipe;
+        command         "ECM_MAPPING_FILE=/workspace/rev4/caseLong_dt02_h110_distributed_debug500_overlap/ecm/mapping_table_axial6_radial3_caseLong_overlap.csv ECM_STATE_FILE=ecm/ecm_state.json ECM_USE_REAL_STEP=1 ECM_DISTRIBUTED_ELECTRICAL_MODE=parallelBranchesSharedSOC ECM_INTERP_MODE=linear ECM_LOG_EVERY_N_STEPS=10 /workspace/.conda/envs/pv/bin/python3 /workspace/rev4/python/ecm_coupler.py --pipe-binary";
+        wrapperStateReset false;
+        electricalInputsMode csv;
+        electricalInputsFile "constant/electrical_inputs_experimental_10C_discharge.csv";
+        electricalInputsTimeColumn time;
+        /*      
+        electricalInputs
+        {
+            current_A       5;
+        }
+        */
+    }
+
+    jellyRollMeanT
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_rotated;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    writeTime;
+    }
+
+    probeLocations
+    {
+        region          jellyRoll_rotated;
+        #include "probeLocations"
+    }
+
+    probeT1
+    {
+        region          shell_rotated;
+        #include "probeT1"
+    }
+
+    probeT6
+    {
+        region          cap_rotated;
+        #include "probeT6"
+    }
+}
+
+// ************************************************************************* //

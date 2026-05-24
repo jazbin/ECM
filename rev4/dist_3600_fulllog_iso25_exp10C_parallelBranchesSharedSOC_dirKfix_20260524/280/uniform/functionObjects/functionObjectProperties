@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       dictionary;
+    location    "280/uniform/functionObjects";
+    object      functionObjectProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+cdf7e925f5746741c316f5fbcf39ad0dfca90775
+{
+    probeLocations
+    {
+        scalar
+        {
+            average(T)      323.304392033035;
+            min(T)          319.839659554017;
+            max(T)          325.4144222815214;
+        }
+        label
+        {
+            size(T)         4;
+        }
+    }
+    probeT1
+    {
+        scalar
+        {
+            average(T)      298.2740095126524;
+            min(T)          298.2740095126524;
+            max(T)          298.2740095126524;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    probeT6
+    {
+        scalar
+        {
+            average(T)      301.4479034317894;
+            min(T)          301.4479034317894;
+            max(T)          301.4479034317894;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    jellyRollMeanT
+    {
+        scalar
+        {
+            volAverage(jellyRoll_rotated,T) 310.6215365077148;
+        }
+    }
+}
+
+
+// ************************************************************************* //

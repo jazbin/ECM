@@ -1,0 +1,16 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile { version 2.0; format ascii; class volScalarField; object ecmQdot; }
+
+dimensions      [1 -1 -3 0 0 0 0];
+internalField   uniform 0;
+
+boundaryField
+{
+    jellyRoll_0_to_shell_0_radial  { type zeroGradient; }
+    jellyRoll_0_to_shell_0_bottom  { type zeroGradient; }
+    jellyRoll_0_to_cap_0           { type zeroGradient; }
+}

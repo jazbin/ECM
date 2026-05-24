@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+actions
+(
+    // Bottom contact: from Salome-defined face zone
+    {
+        name    bottomContactFaces;
+        type    faceSet;
+        action  new;
+        source  zoneToFace;
+        zone    interface_rotated;
+    }
+
+    // Radial contact: all interface faces minus bottom
+    {
+        name    radialContactFaces;
+        type    faceSet;
+        action  new;
+        source  patchToFace;
+        patch   jellyRoll_1_to_shell_1;
+    }
+    {
+        name    radialContactFaces;
+        type    faceSet;
+        action  subtract;
+        source  faceToFace;
+        set     bottomContactFaces;
+    }
+);
+
+// ************************************************************************* //

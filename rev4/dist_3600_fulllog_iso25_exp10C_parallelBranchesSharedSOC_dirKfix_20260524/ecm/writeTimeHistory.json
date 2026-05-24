@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "currentWriteTime": "300",
+  "previousWriteTime": "290",
+  "stepId": 3000,
+  "lastGoodStepId": 3000,
+  "lastGoodTime": 299.99999999999972,
+  "lastGoodQSum": 35.848609246216753,
+  "callStepCounter": 0,
+  "accumulatedDt": 0,
+  "alpha": 1,
+  "lastTEff": 0,
+  "qByKeyCount": 18
+}

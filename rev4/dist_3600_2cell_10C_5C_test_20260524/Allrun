@@ -1,0 +1,47 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Allrun — run wedge_2170 CHT + ECM coupled simulation
+#
+# Prerequisites:
+#   1. OpenFOAM v2506 environment sourced
+#   2. Package built: ../Allwmake
+#   3. Python deps installed: pip install -r ../python/requirements.txt
+#
+# Usage: ./Allrun
+#------------------------------------------------------------------------------
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# Locate package root
+PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Load OpenFOAM environment if not already loaded
+if [ -f /opt/openfoam/etc/bashrc ]; then
+    set +e; set +u
+    source /opt/openfoam/etc/bashrc
+    set -u; set -e
+fi
+
+# Use compiled libs and binary from this package
+export LD_LIBRARY_PATH="${PACK_DIR}/lib:${LD_LIBRARY_PATH:-}"
+export PATH="${PACK_DIR}/bin:${PATH}"
+
+# Clean stale time directories
+find . -maxdepth 1 -type d -regextype posix-extended \
+    -regex ".*/[0-9]+(\.[0-9]+)?" -exec rm -rf {} + 2>/dev/null || true
+
+rm -rf 0
+# Clean ECM runtime files but preserve per-cell subdirectories and mapping
+for d in ecm/cell0 ecm/cell1; do
+    [ -d "$d" ] && find "$d" -maxdepth 1 -type f ! -name "mapping.csv" -delete
+done
+find ecm -maxdepth 1 -type f -delete 2>/dev/null || true
+
+mkdir -p logs ecm/cell0 ecm/cell1
+stamp=$(date -u +%Y%m%d_%H%M%S)
+log="logs/run_${stamp}.log"
+
+echo "Running chtMultiRegionSolidFoam — wedge 2170 CHT + ECM  ($(date -u))" | tee "$log"
+cp -r initBCs 0
+chtMultiRegionSolidFoam 2>&1 | tee -a "$log"
+echo "Done. Log: $log"

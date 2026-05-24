@@ -1,0 +1,116 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       dictionary;
+    location    "300/uniform/functionObjects";
+    object      functionObjectProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+cdf7e925f5746741c316f5fbcf39ad0dfca90775
+{
+    probeLocations_cell0
+    {
+        scalar
+        {
+            average(T)      321.089271532766;
+            min(T)          318.5608504349344;
+            max(T)          322.4848492749298;
+        }
+        label
+        {
+            size(T)         4;
+        }
+    }
+    probeT1_cell0
+    {
+        scalar
+        {
+            average(T)      298.2687206447462;
+            min(T)          298.2687206447462;
+            max(T)          298.2687206447462;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    probeT6_cell0
+    {
+        scalar
+        {
+            average(T)      301.0768546516341;
+            min(T)          301.0768546516341;
+            max(T)          301.0768546516341;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    probeLocations_cell1
+    {
+        scalar
+        {
+            average(T)      304.3991985536489;
+            min(T)          303.5973113691126;
+            max(T)          304.8669498599425;
+        }
+        label
+        {
+            size(T)         4;
+        }
+    }
+    probeT1_cell1
+    {
+        scalar
+        {
+            average(T)      298.1812053320612;
+            min(T)          298.1812053320612;
+            max(T)          298.1812053320612;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    probeT6_cell1
+    {
+        scalar
+        {
+            average(T)      298.9623334052956;
+            min(T)          298.9623334052956;
+            max(T)          298.9623334052956;
+        }
+        label
+        {
+            size(T)         1;
+        }
+    }
+    jellyRollMeanT_cell0
+    {
+        scalar
+        {
+            volAverage(jellyRoll_0,T) 310.5716686269412;
+        }
+    }
+    jellyRollMeanT_cell1
+    {
+        scalar
+        {
+            volAverage(jellyRoll_1,T) 301.3387728314215;
+        }
+    }
+}
+
+
+// ************************************************************************* //

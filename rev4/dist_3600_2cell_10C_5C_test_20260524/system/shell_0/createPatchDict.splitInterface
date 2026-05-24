@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+pointSync false;
+
+patches
+(
+    {
+        name            shell_0_to_jellyRoll_0_radial;
+        patchInfo
+        {
+            type        mappedWall;
+            sampleMode  nearestPatchFace;
+            sampleRegion jellyRoll_0;
+            samplePatch  jellyRoll_0_to_shell_0_radial;
+        }
+        constructFrom   set;
+        set             radialContactFaces;
+    }
+
+    {
+        name            shell_0_to_jellyRoll_0_bottom;
+        patchInfo
+        {
+            type        mappedWall;
+            sampleMode  nearestPatchFace;
+            sampleRegion jellyRoll_0;
+            samplePatch  jellyRoll_0_to_shell_0_bottom;
+        }
+        constructFrom   set;
+        set             bottomContactFaces;
+    }
+);
+
+// ************************************************************************* //
