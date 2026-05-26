@@ -816,36 +816,67 @@ public class EcmCouplerMacro extends StarMacro {
             sim.println("[ECM-EW] WARN: could not write cell map CSV: " + e.getMessage());
         }
 
-        // auto-regenerate ecm_mapping.csv if stale.
-        // With overlap-weighted mapping, row count > n_cells (boundary cells appear in
-        // multiple zones).  Count unique meshKey values instead of total rows.
-        if (ECM_MAPPING_CSV_FILE != null && ECM_MAPPING_CSV_FILE.exists()) {
-            java.util.HashSet<Integer> seenKeys = new java.util.HashSet<>();
-            try (BufferedReader br = new BufferedReader(new FileReader(ECM_MAPPING_CSV_FILE))) {
-                br.readLine(); // skip header
-                String line;
-                while ((line = br.readLine()) != null) {
-                    int comma = line.indexOf(',');
-                    if (comma > 0) {
-                        try { seenKeys.add(Integer.parseInt(line.substring(0, comma).trim())); }
-                        catch (NumberFormatException ignored) {}
-                    }
+        // auto-regenerate ecm_mapping.csv on fresh start (t≈0) or when stale.
+        // Fresh start: always delete and regenerate so regionIdx changes (e.g. from
+        //   computeRegionIndicesFromFvRep) are reflected in the new zone mapping.
+        // Continuation run (t>0): keep existing mapping; only regenerate if stale
+        //   (cell count mismatch after re-mesh).
+        // First run (no file): regenerate unconditionally.
+        if (ECM_MAPPING_CSV_FILE != null) {
+            double _initPhysTime = tryGetPhysicalTimeFromStar(sim);
+            boolean freshStart = Double.isFinite(_initPhysTime) && _initPhysTime < 1e-9;
+            if (freshStart && ECM_MAPPING_CSV_FILE.exists()) {
+                try {
+                    Files.delete(ECM_MAPPING_CSV_FILE.toPath());
+                    sim.println("[ECM-EW] Fresh run (t=0): deleted ecm_mapping.csv "
+                        + "— will regenerate with current regionIdx.");
+                } catch (IOException ex) {
+                    sim.println("[ECM-EW] WARN: could not delete ecm_mapping.csv: "
+                        + ex.getMessage());
                 }
-            } catch (IOException e) {
-                sim.println("[ECM-EW] FATAL: could not read ecm_mapping.csv: " + e.getMessage());
-                return;
             }
-            int mappedCells = seenKeys.size();
-            if (mappedCells != n) {
-                sim.println(String.format(
-                    "[ECM-EW] ecm_mapping.csv covers %d unique cells but current mesh has %d — stale. "
-                    + "Auto-regenerating...", mappedCells, n));
+
+            if (!ECM_MAPPING_CSV_FILE.exists()) {
+                // Absent (deleted above, or never generated) — regenerate now.
+                sim.println("[ECM-EW] ecm_mapping.csv not found — generating from ecm_cell_map.csv...");
                 try {
                     regenEcmMapping(sim);
                 } catch (Exception e) {
                     sim.println(e.getMessage());
                     sim.println("[ECM-EW] Aborting elementWise coupling.");
                     return;
+                }
+            } else {
+                // File exists on continuation run — check for staleness after re-mesh.
+                // With overlap-weighted mapping, row count > n_cells (boundary cells appear in
+                // multiple zones).  Count unique meshKey values instead of total rows.
+                java.util.HashSet<Integer> seenKeys = new java.util.HashSet<>();
+                try (BufferedReader br = new BufferedReader(new FileReader(ECM_MAPPING_CSV_FILE))) {
+                    br.readLine(); // skip header
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        int comma = line.indexOf(',');
+                        if (comma > 0) {
+                            try { seenKeys.add(Integer.parseInt(line.substring(0, comma).trim())); }
+                            catch (NumberFormatException ignored) {}
+                        }
+                    }
+                } catch (IOException e) {
+                    sim.println("[ECM-EW] FATAL: could not read ecm_mapping.csv: " + e.getMessage());
+                    return;
+                }
+                int mappedCells = seenKeys.size();
+                if (mappedCells != n) {
+                    sim.println(String.format(
+                        "[ECM-EW] ecm_mapping.csv covers %d unique cells but current mesh has %d "
+                        + "— stale. Auto-regenerating...", mappedCells, n));
+                    try {
+                        regenEcmMapping(sim);
+                    } catch (Exception e) {
+                        sim.println(e.getMessage());
+                        sim.println("[ECM-EW] Aborting elementWise coupling.");
+                        return;
+                    }
                 }
             }
         }
@@ -1739,7 +1770,8 @@ public class EcmCouplerMacro extends StarMacro {
             merged.setRegionIndices(new int[merged.nCells()]);  // all zeros fallback
             sim.println("[ECM-EW] WARN: regionIdx could not be computed — all cells assigned to "
                 + "region 0. gen_ecm_mapping.py will treat all cells as one cylinder. "
-                + "Delete ecm_mapping.csv and re-run to regenerate with correct per-cell zones.");
+                + "Re-run from t=0 after resolving FvRep/CSV issues; "
+                + "ecm_mapping.csv will be auto-regenerated.");
         }
 
         sim.println(String.format(
@@ -1854,15 +1886,15 @@ public class EcmCouplerMacro extends StarMacro {
                     regionIndices[i] = 1 - regionIndices[i];
                 }
                 sim.println("[ECM-EW] verifyRegionOrder: regionIdx CORRECTED. "
-                    + "Delete ecm_mapping.csv before next run to regenerate zone "
-                    + "mapping with corrected regionIdx values.");
+                    + "ecm_mapping.csv will be auto-deleted and regenerated on "
+                    + "fresh-start runs (t=0).");
             } else {
                 sim.println("[ECM-EW] verifyRegionOrder: WARN: T-table Parts "
                     + tablePartNames + " do not match regions list " + regionNames
                     + " in any simple 2-region swap. regionIdx may be incorrect. "
                     + "In STAR GUI, set T-table '" + T_TABLE_NAME
-                    + "' Parts to: " + regionNames
-                    + ", then delete ecm_mapping.csv and re-run.");
+                    + "' Parts to: " + regionNames + " and re-run from t=0 "
+                    + "(ecm_mapping.csv will be auto-regenerated).");
             }
 
         } catch (Exception e) {

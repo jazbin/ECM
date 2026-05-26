@@ -1,6 +1,6 @@
 # EcmCouplerMacro — Code Summary
 
-**File:** `src/EcmCouplerMacro.java` (~4042 lines)
+**File:** `src/EcmCouplerMacro.java` (~4074 lines)
 **Also at:** `package/src/EcmCouplerMacro.java`, `in/starCCM_10C_experiment/src/EcmCouplerMacro.java`
 **Last updated:** 2026-05-26 (Add verifyAndCorrectRegionIdxOrdering() — mitigates silent T-table row-ordering assumption; auto-corrects swapped regionIdx for 2-region case)
 
