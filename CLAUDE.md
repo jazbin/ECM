@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session memory
+
+Project memory lives in **`/workspace/MEMORY.md`** (this repo, not the global ~/.claude store).
+At the start of each session: read `/workspace/MEMORY.md` for context.
+At session close: update `/workspace/MEMORY.md` with stable new facts.
+
+## STAR-CCM+ plugin code reference
+
+**`starccm_plugin/CODE_SUMMARY.md`** is the authoritative quick-reference for
+`EcmCouplerMacro.java`. It lists every class, method, constant, and line number.
+
+Rules:
+- **Before reading `EcmCouplerMacro.java` directly**, consult `CODE_SUMMARY.md` first.
+  Use it to find the exact line range needed, then read only that section.
+- **After any code change** to `EcmCouplerMacro.java`, update `CODE_SUMMARY.md` to
+  reflect the new line numbers, method signatures, and behaviour.
+- When syncing copies (see "Files that must stay in sync" in CODE_SUMMARY.md),
+  `CODE_SUMMARY.md` itself does not need to be duplicated — one copy is enough.
+
 ## Project overview
 
 OpenFOAM ↔ ECM (External Electrochemical Model) coupling framework for battery thermal simulation. Implements timestep-level weak two-way coupling:
@@ -127,6 +146,11 @@ Fork of OpenFOAM `chtMultiRegionFoam`. Key additions:
 - **Solids-only implicit coupling**: known undershoot issue — use `useImplicit false` (explicit) unless investigating
 
 ## Operating rules
+
+- **Every plot file saved to `artifacts/plots/` must be traceable to its generating script.**
+  Immediately after saving a plot, append one line to `artifacts/plots/PLOT_REGISTRY.md`:
+  `| <filename> | <tools/script_name.py> | <one-line description> |`
+  If the registry does not exist, create it with a header row first.
 
 - Update `STATUS.md` and `docs/ASSUMPTIONS.md` for any significant change
 - Record decisions in `artifacts/logs/decision.log`, blockers in `artifacts/logs/blockers.log`

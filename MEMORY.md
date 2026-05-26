@@ -9,7 +9,13 @@
 
 OpenFOAM ↔ ECM coupling framework for battery thermal simulation.
 STAR-CCM+ plugin in `starccm_plugin/`. OpenFOAM solver in `src/`, cases in `cases/`.
-Active STAR-CCM+ development case: `in/starCCM_10C_experiment/`.
+Active STAR-CCM+ development case: `in/starCCM_10C_experiment_twoCells/` (2-cell variant, active since 2026-05-26). Single-cell original: `in/starCCM_10C_experiment/`.
+
+**Rule — "analyze the Windows run":**
+1. Use **only** `in/starCCM_10C_experiment_twoCells/` — no other path.
+2. List **all** files in that directory.
+3. Find the **newest file** — its timestamp is the **baseline time**.
+4. Analyze **only** files within **3 hours** of that baseline. Everything older is ignored.
 
 ---
 
@@ -26,18 +32,18 @@ Read it before touching the source. Update it after every code change.
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `EcmCouplerMacro.java` | Main macro — lumped + elementWise coupling loops | 2516 |
-| `EcmBinaryIO` (inner class, line 1948) | Binary I/O for ecm_in.bin / ecm_out.bin | — |
-| `CellMapper` (inner class, line 821) | Loads cell-ID/centroid map; extracts T each step | — |
-| `CurrentProfile` (inner class, line 2191) | Reads current_profile.csv; returns I(t) | — |
-| `PersistentEcmProcess` (inner class, line 2377) | Keeps Python process alive between steps | — |
+| `EcmCouplerMacro.java` | Main macro — lumped + elementWise coupling loops; multi-region support | 4042 |
+| `EcmBinaryIO` (inner class, ~line 3200) | Binary I/O for ecm_in.bin / ecm_out.bin | — |
+| `CellMapper` (inner class, line 1807) | Loads cell-ID/centroid map; extracts T each step; regionIndices field | — |
+| `CurrentProfile` (inner class, line 3493) | Reads current_profile.csv; returns I(t) | — |
+| `PersistentEcmProcess` (inner class, line 3679) | Keeps Python process alive between steps | — |
 | `EcmPrepAndRun.java` | One-shot setup macro (generate cell_map.csv etc.) | — |
 | `TestV4_SpeedProbe.java` | T-extraction speed benchmark (not production) | — |
 | `TestJellyRollTemperatureExtraction.java` | API probe tests (not production) | — |
 | `exportJellyRollMesh.java` | Exports CGNS mesh for cgns_cell_map.py | — |
 
 **Canonical copies kept in sync:**
-- `in/starCCM_10C_experiment/src/EcmCouplerMacro.java` ← active development copy
+- `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java` ← active development copy (2-cell case)
 - `starccm_plugin/src/EcmCouplerMacro.java` ← plugin package copy
 - `starccm_plugin/package/src/EcmCouplerMacro.java` ← deployable zip copy
 - Same sync rule applies to `TestJellyRollTemperatureExtraction.java`
@@ -51,7 +57,18 @@ ecm/   — Python ECM backend + cgns_cell_map.py (co-located here, NOT in tools/
 - `EcmPrepAndRun.java` looks for `cgns_cell_map.py` at `<PROJECT_ROOT>/ecm/`
 - `deriveProjectRoot()` has NO hardcoded fallback — uses env var or file-relative path only
 
-### Key constants in EcmCouplerMacro.java (lines 39–177+)
+### Multi-JellyRoll region support (Option B — implemented 2026-05-26)
+
+- `execute()`: discovers all regions whose name contains `REGION_NAME_PATTERN` (env `ECM_REGION_PATTERN`, default `"jellyRoll"`), sorts alphabetically, dispatches `List<Region>` to `executeElementWise()`.
+- `executeElementWise(sim, List<Region>)`: calls `buildMergedCellMapper()` (N=1 → existing path unchanged); loops `autoConfigureJellyRollEnergySource` over all regions; sets `nRegionsForEnv`.
+- `buildMergedCellMapper()`: N=1 → delegates to `CellMapper.create()`. N>1 → reads combined T-table; assigns `regionIndices` via `computeRegionIndicesFromFvRep()` (primary: FvRep getCellCount per region), CSV fallback, then all-zeros.
+- `writeCellMapCsv()`: now writes `regionIdx` column (all zeros for N=1 — backward compat).
+- `runProcess()` / `PersistentEcmProcess.start()`: both pass `ECM_N_REGIONS` env var to Python.
+- `ecm_coupler.py`: in `parallelBranchesSharedSOC` block reads `ECM_N_REGIONS`; N=1 → unchanged path; N>1 → splits ecm_ids/ecm_temps into N groups, runs N independent `run_ecm_step_parallel_branches` calls, merges.
+- `gen_ecm_mapping.py`: reads optional `regionIdx` column; for each region applies zone offset `region_idx * n_zones`; N=1 output is bit-for-bit identical to before.
+- **Backward invariant**: N=1 is fully bit-for-bit identical to confirmed-working single-region run.
+
+### Key constants in EcmCouplerMacro.java (lines 39–230+)
 
 ```
 REGION_NAME         = "jellyRoll"
@@ -68,6 +85,9 @@ ECM_DISTRIBUTED_ELECTRICAL_MODE = env (same name)        default "partitionState
 ECM_MAPPING_FILE_PATH = env ECM_MAPPING_FILE             default "ecm/ecm_mapping.csv"
 ECM_N_ELEMENTS      = env ECM_N_ELEMENTS                 default 20 (ignored if mapping file present)
 ECM_MAPPING_CSV_FILE = File(PROJECT_ROOT, ECM_MAPPING_FILE_PATH)
+ZONE_WEIGHTS_CSV_PATH = env ECM_ZONE_WEIGHTS_CSV         default "ecm/ecm_zone_weights.csv"
+ZONE_WEIGHTS_TABLE_NAME = env ECM_ZONE_WEIGHTS_TABLE     default "ECM_ZoneWeights_Table"
+ZONE_WEIGHTS_CSV_FILE = File(PROJECT_ROOT, ZONE_WEIGHTS_CSV_PATH)
 ALPHA               = 1.0                  ← under-relaxation (1 = off)
 N_STEPS             = 100000
 ECM_TIMEOUT_S       = 60
@@ -118,20 +138,67 @@ Root cause: STAR-CCM+ Java API is a remote client-server protocol — Java canno
 directly into the solver's C++ field arrays. OpenFOAM functionObject IS the solver,
 so it has direct pointer access to field memory.
 
-### applyElementWiseHeat() — THE STUB (line 738)
-```java
-// Phase 1: sum → total W → ecmQdot_W parameter (uniform, same as lumped)
-// Phase 3 REPLACES this with per-cell field function injection
-double totalW = sum(qPerCellW);
-qParam.getQuantity().setValue(totalW);
-```
-**This is the main missing piece for true distributed heating.**
+### `getOrCreateTReport` — multi-region fix (2026-05-26c)
 
-### CellMapper (line 821)
-- Primary path: reads `ecm_cell_map.csv` (pre-generated by `tools/cgns_cell_map.py`)
-- Fallback: `FvRepresentation.getInternalDataVector()` (STAR 18.06 only; fails on 21.02)
-- Stores: `int[] cellIds`, `double[] x/y/z` (centroids), `Region region`
+Signature changed: `(Simulation sim, Region region)` → `(Simulation sim, List<Region> regions)`.
+Now calls `r.getParts().setObjects(regions)` unconditionally (both new and existing reports).
+This means every macro startup auto-corrects the ECM_T_avg Parts to all coupled regions.
+Call sites: lumped path uses `coupledRegions`; elementWise path uses `regions`.
+Note: `ECM_region_volume` and `VolAvgTemp JellyRoll` are NOT managed by the macro — must be
+updated manually in the STAR-CCM+ GUI for multi-cell cases.
+
+---
+
+### Heat injection — FULLY IMPLEMENTED via csvReload
+
+`applyElementWiseHeatCsv(sim, cellMapper, qVolPerCell[], fileTable)` (line 1175):
+- Writes `(X,Y,Z,qVol_W_m3)` CSV per step, calls `fileTable.extract()` to reload
+- STAR nearest-neighbour XYZ lookup applies per-cell qVol as `VolumetricHeatSourceProfile`
+- Logs Q_total = Σ(qVol_i × V_i) [W]
+
+`applyElementWiseHeat()` (line 1144): legacy globalParam path. DEPRECATED, warns on use.
+
+Binary protocol: Java → Python sends T [K] per cell; Python → Java sends qVol **[W/m³]** per cell.
+No W/m³→W conversion on Python side. No per-cell volume division on Java side. Uniform qVol
+per partition (OpenFOAM-equivalent). See 2026-05-26 hotspot fix notes.
+
+### Overlap-weighted mapping (implemented 2026-05-26)
+
+`ecm_mapping.csv` has **multiple rows per boundary cell** (weight = partial volume [m³]):
+- Boundary cells (35.3%): 2–3 rows with partial-volume weights summing to V_cell
+- Interior cells (64.7%): 1 row, weight = V_cell
+- 2170 mesh: 30,131 rows for 21,552 cells, avg 1.40 per cell
+- Volume conservation verified: 0.0000% error
+
+Python `distribute_qvol_to_mesh()` already handles overlap: `qVol_cell = Σ(qVol_k×w_k)/Σ(w_k)`.
+T aggregation also overlap-correct: `T_zone = Σ(w×T)/Σ(w)`. No Python changes needed.
+
+Stale-mapping check counts **unique meshKey values** (not row count) to handle overlap rows.
+
+`ecm_zone_weights.csv`: X_m, Y_m, Z_m, w_zone_0…w_zone_17 (fractions [0,1], one row per cell).
+`setupWeightVisualization(sim)` (line 1351): loads this as FileTable, creates 18
+`ECM_Zone_k_Weight` UserFieldFunctions → visible in Tools > Field Functions in STAR-CCM+.
+
+### CellMapper (updated 2026-05-26)
+- **Primary path**: reads `ecm_cell_map.csv`; but first pre-extracts XYZ T-table to get live cell count.
+  If CSV count != T-table rows (mesh re-meshed), discards CSV and rebuilds from T-table instead.
+- **createFromXyzTable()**: builds CellMapper from XYZ T-table X/Y/Z columns.
+- **No FvRepresentation fallback** — removed (broken in STAR 2602). Throws FATAL if both CSV and T-table unavailable.
+- Stores: `int[] cellIds`, `double[] x/y/z` (centroids), `double[] volumes` (per-cell m³), `Region region`
 - Lazy fields: `tableRowToMapperIndex[]` (coord-hash match, built once), `tColumnIndex`
+
+#### Per-cell volumes — full chain (2026-05-26, complete)
+`ecm_cell_map.csv` has 5th column `volume_m3`. `extractVolumes()` path order:
+1. **T-table primary (Path A)**: reads any column named `*volume*`/`*vol*`/`*cellvol*` from `ECM_jellyRoll_T_Table`. Requires user to add "Cell Volume" scalar to that table in STAR GUI once. Uses proven `getSeriesArray()` path.
+2. **FvRep (Path B)**: tries `CellVolume`/`Volume`/`Cell Volume`/`CellVol` field function. May fail in STAR 2602.
+3. **Uniform fallback (Path C)**: `JELLY_ROLL_VOLUME_M3/n`. Emits 3 WARN lines. Cannot be missed.
+
+On CSV re-read: if all volumes equal within 1 ppb (previous fallback), re-calls `extractVolumes()` automatically in case user has since added T-table scalar.
+
+`writeQVolInjectionCsv()`: uses `cellMapper.volumes()[i]` per cell for W→W/m³ (not uniform).
+`ecm_coupler.py _maybe_regen_mapping()`: reads `volume_m3` as zone assignment weight.
+`ecm_coupler.py` W/m³→W conversion: `Q_cell = qvol_zone × actual_V_cell` (exact round-trip through Java division). Cached in `_CELL_VOL_CACHE` (not rebuilt every step).
+`applyElementWiseHeatCsv()` diagnostic: computes qVol range from actual per-cell volumes.
 
 ### T extraction path (confirmed fast, implemented 2026-05-21, session_20260521)
 ```
@@ -298,7 +365,8 @@ ecm_out.bin (fileType=2):  header(52B) + echoed_inputs  + N×(int32 cellId + dou
 ## Mesh / geometry facts
 
 - Mesh file: `debugCase.sim` (`in/starCCM_10C_experiment/`)
-- jellyRoll: **160,313 cells**; cap: 36,767; can: 154,635
+- jellyRoll: **160,313 cells** (fine mesh); coarse mesh used in testing: **10,475 cells**
+- cap: 36,767; can: 154,635 (fine mesh)
 - CGNS export: `jellyRollMesh.cgns` (92 MB)
 - Cell map tool: `in/starCCM_10C_experiment/ecm/cgns_cell_map.py` → `ecm_cell_map.csv`
   (Note: NOT under tools/ — co-located with ECM files)
@@ -690,6 +758,80 @@ For series config: all cells receive same `current_A` from shared electrical inp
 - `const10W_anisoK_anisoCapFix_20260523` (aniso cap k): 4.618°C (cap k not the cause)
 - `const10W_swappedK_20260523` (kappa 29 29 1.4): 0.259°C (confirms axis=Z in OF)
 - `const10W_axialKx_20260523` (kappa 29 1.4 1.4): 0.467°C
+
+---
+
+## Plot Registry Rule (added 2026-05-25)
+
+**Every plot saved to `artifacts/plots/` must have a registry entry.**
+- File: `artifacts/plots/PLOT_REGISTRY.md` (created 2026-05-25)
+- Rule written into `CLAUDE.md` under "Operating rules"
+- After saving a plot: append `| <filename> | <script> | <description> |` to the registry
+- Generating script for comparison plots: `tools/plot_starccm_vs_openfoam_10c.py`
+
+---
+
+## Clean CSV Time-History Outputs (added 2026-05-25)
+
+Three dedicated, restart-safe CSV files added to the STAR-CCM+ ECM coupler:
+
+| File | Schema | Source | Restart |
+|------|--------|--------|---------|
+| `ecm/tempLog.csv` | `time_s,temp_c` | STAR `VolumeAverageReport` on jellyRoll (Java) | Overwritten at run start |
+| `ecm/appliedTotalHeatLog.csv` | `time_s,applied_total_heat_w` | Relaxed qVol W set on `ecmQdot_W` (lumped) or sum-cell W (EW) (Java) | Overwritten at run start |
+| `ecm/voltageLog.csv` | `time_s,v_common_v` | ECM `V_common_V` from Python backend | Truncated when `step_id == 1` |
+
+Key implementation points:
+- `tempLog.csv` uses `tReport.getValue()` (VolumeAverageReport), NOT T_eff_K from ECM binary protocol
+- `appliedTotalHeatLog.csv` logs `qVol` (after ALPHA relaxation) in lumped mode, `totalW` (sum cell W) in EW mode
+- `voltageLog.csv` written by `_append_voltage_log()` in `ecm_coupler.py`; step_id==1 triggers truncate
+- Both Java loops (lumped + EW) open CSVs with overwrite at startup, close at loop end
+- EW loop now also creates `getOrCreateTReport(sim, region)` for the tempLog source
+- Provenance: `artifacts/logs/csv_output_provenance_20260525.md`
+
+---
+
+## STAR vs OF Lumped Comparison Notes (2026-05-25)
+
+- **dt difference (STAR=0.2s vs OF=0.1s) is NOT the cause of T discrepancy** — confirmed irrelevant by user.
+- `final.sim` was saved at the **final time** of the simulation (end state, not fresh t=0).
+  This means `ecmQdot_W` inside the .sim is the end-of-run value (~29W), NOT zero.
+  When STAR re-runs from t=0 IC using this .sim, **step 1 applies stale ~29W** before the first ECM call — causing immediate T elevation vs OF (which always starts from ecmQdot=0).
+- Heat injection mode for this run: **csvReload (FileTable / table setup)** — STAR writes (X,Y,Z,qVol_W_m3) CSV each step, loaded via `ECM_jellyRoll_Q_Table`.
+- `appliedTotalHeatLog.csv` logs ECM output W — NOT the actual domain-integrated heat (which is qVol × V_star_actual). Volume normalisation uses hardcoded `JELLY_ROLL_VOLUME_M3=2.36e-5` m³.
+
+---
+
+## STAR-CCM+ 10C Run Diagnostic (2026-05-25)
+
+**Run**: `in/starCCM_10C_experiment/` — 1107 steps, t=0–110.7 s, dt=0.1 s, 50 A, parallelBranchesSharedSOC, 10,475 cells, 18 zones.
+
+**CRITICAL FINDING from log — ecmQdot field is FROZEN:**
+- `ecmQdot Surface Integral 1 (W)` monitor = **26.56412 W for every single iteration of all 1107 timesteps** (one unique value)
+- `appliedHeat Monitor 2` = 33.31 W (frozen after step 1, only 2 unique values total)
+- ECM correctly computes heat rising 20 W → 33 W as cell warms, but CFD never sees this variation
+- **Direct cause**: `autoConfigureJellyRollEnergySource failed` at startup → energy source NOT wired to FileTable
+- **Effect**: CFD runs at constant ~26–27 W instead of time-varying 20→33 W → STAR-CCM+ cell runs cold vs OpenFOAM
+
+**WORKAROUND (one-time GUI, must be done before next run):**
+- jellyRoll physics continuum → Energy → User Volumetric Heat Source → method = Table (X,Y,Z) → `ECM_jellyRoll_Q_Table` → column `qVol_W_m3`
+- This wiring persists in the `.sim` file; the Java macro cannot do it programmatically on STAR 21.02.008
+
+**Other log findings (all benign):**
+- Stale cell map (160,313 → 10,475 cells): rebuilt correctly at startup, no impact
+- `ecm_runtime_diagnostics.csv` unit bug: logging artifact only, no simulation impact
+- ECM coupling itself: functioning correctly (I_sum=50.000 A, all 10,475 cells matched each step)
+
+**Comparison plot**: `artifacts/plots/starccm_vs_openfoam_10c_<STAMP>.pdf`
+**Comparison script**: `tools/plot_starccm_vs_openfoam_10c.py`
+**Reference OpenFOAM case**: `rev4/dist_3600_fulllog_iso25_exp10C_parallelBranches_dirKfix_20260524/`
+
+**Heat ratio analysis (2026-05-25):**
+- Script: `tools/plot_heat_ratio_star_vs_of.py`
+- Plot: `artifacts/plots/heat_ratio_star_vs_of_20260525_123706.png`
+- Result: Q_STAR / Q_OF  mean=**1.086**  (range 1.027–1.113, grows over time 0.5→263 s)
+- STAR-CCM+ applies ~8.6% more heat than OpenFOAM — systematic, growing bias
+- Candidate causes: (1) jellyRoll volume mismatch, (2) dt=0.5s vs 0.1s coarser ECM integration, (3) T-feedback: STAR runs hotter → lower R0 → more heat per step
 
 ---
 
