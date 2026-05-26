@@ -451,6 +451,12 @@ public class EcmCouplerMacro extends StarMacro {
         // --- lumped: use first (primary) region only ---
         Region region = coupledRegions.get(0);
 
+        // Determine once whether this is a fresh run (t≈0) or a continuation (t>0).
+        double _lumpedInitTime = tryGetPhysicalTimeFromStar(sim);
+        boolean freshStart = Double.isFinite(_lumpedInitTime) && _lumpedInitTime < 1e-9;
+        sim.println("[ECM] Run mode: " + (freshStart ? "FRESH (t=0)"
+            : "CONTINUATION (t=" + String.format("%.3f", _lumpedInitTime) + " s)"));
+
         // --- create or reuse VolumeAverageReport for Temperature ---
         VolumeAverageReport tReport = getOrCreateTReport(sim, coupledRegions);
         sim.println("[ECM] T report ready: " + tReport.getPresentationName());
@@ -483,23 +489,25 @@ public class EcmCouplerMacro extends StarMacro {
             if (parent != null && !parent.exists()) {
                 parent.mkdirs();
             }
-            diagnosticsCsv = new PrintWriter(new FileWriter(DIAGNOSTICS_CSV_FILE, false));
-            diagnosticsCsv.println(
-                "step,stepId,time_s,deltaT_s,T_eff_K,T_eff_C,current_A,qGen_W,"
-                + "cumulativeEnergy_J,deltaT_C"
-            );
+            diagnosticsCsv = new PrintWriter(new FileWriter(DIAGNOSTICS_CSV_FILE, !freshStart));
+            if (freshStart) {
+                diagnosticsCsv.println(
+                    "step,stepId,time_s,deltaT_s,T_eff_K,T_eff_C,current_A,qGen_W,"
+                    + "cumulativeEnergy_J,deltaT_C");
+            }
             diagnosticsCsv.flush();
         } catch (IOException e) {
             sim.println("[ECM] WARN: could not open diagnostics CSV: " + e.getMessage());
         }
 
         // --- open dedicated tempLog.csv (jellyRoll volume-average T, STAR monitor source) ---
+        // Fresh start: overwrite with header. Continuation: append (no duplicate header).
         PrintWriter tempLogCsv = null;
         try {
             File parent = TEMP_LOG_FILE.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            tempLogCsv = new PrintWriter(new FileWriter(TEMP_LOG_FILE, false));
-            tempLogCsv.println("time_s,temp_c");
+            tempLogCsv = new PrintWriter(new FileWriter(TEMP_LOG_FILE, !freshStart));
+            if (freshStart) { tempLogCsv.println("time_s,temp_c"); }
             tempLogCsv.flush();
         } catch (IOException e) {
             sim.println("[ECM] WARN: could not open tempLog.csv: " + e.getMessage());
@@ -510,22 +518,29 @@ public class EcmCouplerMacro extends StarMacro {
         try {
             File parent = APPLIED_HEAT_LOG_FILE.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            appliedHeatLogCsv = new PrintWriter(new FileWriter(APPLIED_HEAT_LOG_FILE, false));
-            appliedHeatLogCsv.println("time_s,applied_total_heat_w");
+            appliedHeatLogCsv = new PrintWriter(new FileWriter(APPLIED_HEAT_LOG_FILE, !freshStart));
+            if (freshStart) { appliedHeatLogCsv.println("time_s,applied_total_heat_w"); }
             appliedHeatLogCsv.flush();
         } catch (IOException e) {
             sim.println("[ECM] WARN: could not open appliedTotalHeatLog.csv: " + e.getMessage());
         }
 
-        // --- reset ECM state so Python starts at SOC=1 (full cell) ---
-        // Delete the persisted state file; Python will call state_defaults() and use
-        // q_ah_init=CAPACITY_AH sent in the first ecm_in.bin.
-        try {
-            if (Files.deleteIfExists(ECM_STATE_PATH.toPath())) {
-                sim.println("[ECM] Deleted stale ecm_state.json — ECM will start at SOC=1.");
+        // On fresh start: delete ecm_state.json so Python ECM begins at SOC=1.
+        // On continuation: preserve it so Python resumes from saved SOC / RC voltages.
+        if (freshStart) {
+            try {
+                if (Files.deleteIfExists(ECM_STATE_PATH.toPath())) {
+                    sim.println("[ECM] Fresh run (t=0): deleted ecm_state.json — ECM will start at SOC=1.");
+                }
+            } catch (IOException e) {
+                sim.println("[ECM] WARN: could not delete ecm_state.json: " + e.getMessage());
             }
-        } catch (IOException e) {
-            sim.println("[ECM] WARN: could not delete ecm_state.json: " + e.getMessage());
+        } else {
+            sim.println("[ECM] Continuation run: preserving ecm_state.json for ECM state resume.");
+            if (!ECM_STATE_PATH.exists()) {
+                sim.println("[ECM] WARN: ecm_state.json not found on continuation — "
+                    + "ECM will reinitialise at SOC=1.");
+            }
         }
 
         // --- coupling loop ---
@@ -816,6 +831,13 @@ public class EcmCouplerMacro extends StarMacro {
             sim.println("[ECM-EW] WARN: could not write cell map CSV: " + e.getMessage());
         }
 
+        // Determine once whether this is a fresh run (t≈0) or a continuation (t>0).
+        // Used for: ecm_mapping.csv deletion, ecm_state.json deletion, log file mode.
+        double _initPhysTime = tryGetPhysicalTimeFromStar(sim);
+        boolean freshStart = Double.isFinite(_initPhysTime) && _initPhysTime < 1e-9;
+        sim.println("[ECM-EW] Run mode: " + (freshStart ? "FRESH (t=0)" : "CONTINUATION (t="
+            + String.format("%.3f", _initPhysTime) + " s)"));
+
         // auto-regenerate ecm_mapping.csv on fresh start (t≈0) or when stale.
         // Fresh start: always delete and regenerate so regionIdx changes (e.g. from
         //   computeRegionIndicesFromFvRep) are reflected in the new zone mapping.
@@ -823,8 +845,6 @@ public class EcmCouplerMacro extends StarMacro {
         //   (cell count mismatch after re-mesh).
         // First run (no file): regenerate unconditionally.
         if (ECM_MAPPING_CSV_FILE != null) {
-            double _initPhysTime = tryGetPhysicalTimeFromStar(sim);
-            boolean freshStart = Double.isFinite(_initPhysTime) && _initPhysTime < 1e-9;
             if (freshStart && ECM_MAPPING_CSV_FILE.exists()) {
                 try {
                     Files.delete(ECM_MAPPING_CSV_FILE.toPath());
@@ -881,13 +901,22 @@ public class EcmCouplerMacro extends StarMacro {
             }
         }
 
-        // delete stale ECM state so Python starts at SOC=1
-        try {
-            if (Files.deleteIfExists(ECM_STATE_PATH.toPath())) {
-                sim.println("[ECM-EW] Deleted stale ecm_state.json.");
+        // On fresh start: delete ecm_state.json so Python ECM begins at SOC=1.
+        // On continuation: preserve it so Python resumes from the saved SOC / RC voltages.
+        if (freshStart) {
+            try {
+                if (Files.deleteIfExists(ECM_STATE_PATH.toPath())) {
+                    sim.println("[ECM-EW] Fresh run (t=0): deleted ecm_state.json — ECM will start at SOC=1.");
+                }
+            } catch (IOException e) {
+                sim.println("[ECM-EW] WARN: could not delete ecm_state.json: " + e.getMessage());
             }
-        } catch (IOException e) {
-            sim.println("[ECM-EW] WARN: could not delete ecm_state.json: " + e.getMessage());
+        } else {
+            sim.println("[ECM-EW] Continuation run: preserving ecm_state.json for ECM state resume.");
+            if (!ECM_STATE_PATH.exists()) {
+                sim.println("[ECM-EW] WARN: ecm_state.json not found on continuation — "
+                    + "ECM will reinitialise at SOC=1 (expected only on first continuation segment).");
+            }
         }
 
         // --- csvReload injection setup (one-time, before loop) ---
@@ -929,12 +958,13 @@ public class EcmCouplerMacro extends StarMacro {
         }
 
         // --- open dedicated tempLog.csv (STAR VolumeAverageReport source) ---
+        // Fresh start: overwrite (new header). Continuation: append (no header).
         PrintWriter tempLogCsv = null;
         try {
             File parent = TEMP_LOG_FILE.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            tempLogCsv = new PrintWriter(new FileWriter(TEMP_LOG_FILE, false));
-            tempLogCsv.println("time_s,temp_c");
+            tempLogCsv = new PrintWriter(new FileWriter(TEMP_LOG_FILE, !freshStart));
+            if (freshStart) { tempLogCsv.println("time_s,temp_c"); }
             tempLogCsv.flush();
         } catch (IOException e) {
             sim.println("[ECM-EW] WARN: could not open tempLog.csv: " + e.getMessage());
@@ -945,8 +975,8 @@ public class EcmCouplerMacro extends StarMacro {
         try {
             File parent = APPLIED_HEAT_LOG_FILE.getParentFile();
             if (parent != null && !parent.exists()) parent.mkdirs();
-            appliedHeatLogCsv = new PrintWriter(new FileWriter(APPLIED_HEAT_LOG_FILE, false));
-            appliedHeatLogCsv.println("time_s,applied_total_heat_w");
+            appliedHeatLogCsv = new PrintWriter(new FileWriter(APPLIED_HEAT_LOG_FILE, !freshStart));
+            if (freshStart) { appliedHeatLogCsv.println("time_s,applied_total_heat_w"); }
             appliedHeatLogCsv.flush();
         } catch (IOException e) {
             sim.println("[ECM-EW] WARN: could not open appliedTotalHeatLog.csv: " + e.getMessage());
