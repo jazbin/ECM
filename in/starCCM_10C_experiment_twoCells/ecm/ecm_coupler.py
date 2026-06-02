@@ -303,18 +303,37 @@ def _load_runtime_tables_for_region(r_idx: int):
     Results are cached by (params_path, cellprops_path) so repeated calls
     within one process are free.
     """
-    params_path = (
-        _find_runtime_csv(f"params_r{r_idx}.csv")
-        or _find_runtime_csv("params.csv")
-    )
-    cellprops_path = (
-        _find_runtime_csv(f"cellprops_r{r_idx}.csv")
-        or _find_runtime_csv("cellprops.csv")
-    )
+    per_params_path = _find_runtime_csv(f"params_r{r_idx}.csv")
+    params_path = per_params_path or _find_runtime_csv("params.csv")
+
+    per_cellprops_path = _find_runtime_csv(f"cellprops_r{r_idx}.csv")
+    cellprops_path = per_cellprops_path or _find_runtime_csv("cellprops.csv")
+
     key = (params_path, cellprops_path)
     cached = _TABLE_CACHE.get(key)
     if cached is not None:
         return cached
+
+    # Announce which files are used — LOUD if falling back to shared file.
+    if per_params_path:
+        sys.stderr.write(
+            f"[ECM-MR] region[{r_idx}] PARAMS: using per-region file: {params_path}\n"
+        )
+    else:
+        sys.stderr.write(
+            f"[ECM-MR] WARNING: REGION[{r_idx}] HAS NO PER-REGION params_r{r_idx}.csv — "
+            f"FALLING BACK TO SHARED params.csv: {params_path or 'NOT FOUND'}\n"
+        )
+
+    if per_cellprops_path:
+        sys.stderr.write(
+            f"[ECM-MR] region[{r_idx}] CELLPROPS: using per-region file: {cellprops_path}\n"
+        )
+    else:
+        sys.stderr.write(
+            f"[ECM-MR] WARNING: REGION[{r_idx}] HAS NO PER-REGION cellprops_r{r_idx}.csv — "
+            f"FALLING BACK TO SHARED cellprops.csv: {cellprops_path or 'NOT FOUND'}\n"
+        )
 
     params_df = pd.read_csv(params_path) if params_path else pd.DataFrame()
     cellprops_df = pd.read_csv(cellprops_path) if cellprops_path else pd.DataFrame()
@@ -322,12 +341,6 @@ def _load_runtime_tables_for_region(r_idx: int):
     ecm_lookup_cache = _ecm_build_step_cache(params_df) if _ECM_STEP_AVAILABLE else None
     cached = (params_df, cellprops_df, lookup_cache, ecm_lookup_cache)
     _TABLE_CACHE[key] = cached
-
-    # Log which files are actually being used (once per unique key).
-    sys.stderr.write(
-        f"[ecm_coupler] region[{r_idx}] params={params_path or 'none'}  "
-        f"cellprops={cellprops_path or 'none'}\n"
-    )
     return cached
 
 
@@ -2104,7 +2117,17 @@ def compute_q_out(h, inputs, keys, temps):
 
                         # Per-region current: ECM_CURRENT_R{N} overrides shared current_a.
                         r_current_env = os.environ.get(f"ECM_CURRENT_R{r}", "").strip()
-                        r_current = float(r_current_env) if r_current_env else current_a
+                        if r_current_env:
+                            r_current = float(r_current_env)
+                            sys.stderr.write(
+                                f"[ECM-MR] region[{r}] CURRENT: using ECM_CURRENT_R{r}={r_current:.3f} A\n"
+                            )
+                        else:
+                            r_current = current_a
+                            sys.stderr.write(
+                                f"[ECM-MR] WARNING: REGION[{r}] HAS NO ECM_CURRENT_R{r} ENV VAR — "
+                                f"FALLING BACK TO SHARED CURRENT {current_a:.3f} A\n"
+                            )
 
                         # Per-region electrical tables: params_r{N}.csv / cellprops_r{N}.csv.
                         r_params_df, r_cellprops_df, _r_lc, r_ecm_lc = \
