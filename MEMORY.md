@@ -2,20 +2,163 @@
 
 > This file lives in the repo. Claude should read and update it each session.
 > The global ~/.claude auto-memory file redirects here.
+>
+> **SESSION CLOSE RULE**: When the user writes "close session" (or any variant),
+> ALWAYS write the session log to `artifacts/logs/session_YYYYMMDD_HHMMSS.log`
+> BEFORE acknowledging. No exceptions. This is the FIRST thing to do on close.
 
 ---
+
+## Next session TODO
+
+### regionIdx fix — DONE 2026-06-10
+
+`buildMergedCellMapper()` now uses **nearest-centroid spatial assignment only** — no fallbacks.
+- Primary: read region centroids from `ecm_region_geometry.csv` (origin_x/y/z)
+- Fallback (within spatial path): k-means clustering with k=N on cell centroids
+- Hard abort (`throw Exception`) if spatial assignment fails — no silent wrong mapping
+- `computeRegionIndicesFromFvRep()` and `verifyAndCorrectRegionIdxOrdering()` are DEAD CODE
+- Synced to all 3 copies: `starccm_plugin/src/`, `starccm_plugin/package/src/`,
+  `artifacts/packs/ecm_coupler_starccm_client_20260610/src/`
+
+---
+
+- **Test `EcmCoSimPartner` without STAR-CCM+** (4 tests, all runnable in container):
+  1. Full compile to object files (`g++ -c`) — exercises template instantiation
+  2. `CellMapReader` unit test — load a real `ecm_cell_map.csv`, verify counts/values
+  3. **`EcmBinaryIo` cross-protocol round-trip** — C++ writes `ecm_in.bin`, Python
+     `ecm_io.py` reads it; Python writes `ecm_out.bin`, C++ reads it back. Most
+     important test: verifies byte layout compatibility before STAR integration.
+  4. Header byte-layout check — verify the 52-byte v2 header matches Python reference.
+
+---
+
+## Shell command formatting rule
+
+When giving the user shell commands to run manually, keep each line ≤ 100 chars.
+Break long paths and pipelines with backslash continuation. Example:
+
+```bash
+find "/long/path/here" \
+  -name "pattern" | head -20
+```
+
+Never put a long path + flags + pipe all on one line — the terminal wraps and
+breaks copy-paste.
+
+---
+
+## STAR-CCM+ Client Manual and Package
+
+- PDF manual: `/workspace/docs/STARCCM_CLIENT_MANUAL.pdf` (26 pages, v4 = 2026-06-09)
+- Build script: `/workspace/tools/build_manual_pdf.py`
+- Figures in `artifacts/plots/starccm_manual_*.png` (architecture, validation, extracted from internal doc)
+- `electrical_inputs.csv` is canonical name (renamed from `electrical_inputs_experimental_10C_discharge.csv`)
+- Validation: 10C = 50 A, 289 s, to ~20% SOC (NOT full discharge / NOT 70% SOC)
+- Timestep recommendation: dt ≤ 0.2 s; 0.25 s is sensitivity baseline only
+- Client package: `artifacts/packs/ecm_coupler_starccm_client_20260609.zip` (38 MB) — INCOMPLETE (missing ecm_step.py, gen_ecm_mapping.py, EcmCouplerMacro.jar)
+- **Corrected package**: `artifacts/packs/ecm_coupler_starccm_client_20260610.zip` (1.3 MB, no .sim included)
+  - Contains: EcmCouplerMacro.jar, setup.bat, src/, ecm/ (now includes ecm_step.py + gen_ecm_mapping.py), README.txt, MANUAL.pdf
+- Package template: `starccm_plugin/package/ecm/` — now contains ecm_step.py and gen_ecm_mapping.py (added 2026-06-10)
 
 ## Project Overview
 
 OpenFOAM ↔ ECM coupling framework for battery thermal simulation.
 STAR-CCM+ plugin in `starccm_plugin/`. OpenFOAM solver in `src/`, cases in `cases/`.
-Active STAR-CCM+ development case: `in/starCCM_10C_experiment_twoCells/` (2-cell variant, active since 2026-05-26). Single-cell original: `in/starCCM_10C_experiment/`.
+Active STAR-CCM+ development case: `in/starCCM_10C_experiment_twoCells/` — two-cell distributed run confirmed working. Single-cell original: `in/starCCM_10C_experiment/`. Distributed sim: `in/starCCM_10C_experiment_twoCells_distributed/final_distributed.sim`.
 
 **Rule — "analyze the Windows run":**
 1. Use **only** `in/starCCM_10C_experiment_twoCells/` — no other path.
 2. List **all** files in that directory.
 3. Find the **newest file** — its timestamp is the **baseline time**.
 4. Analyze **only** files within **3 hours** of that baseline. Everything older is ignored.
+
+---
+
+## STAR-CCM+ vs OpenFOAM temperature discrepancy — dt constraint
+
+**Root cause (confirmed 2026-05-26):** STAR dt=1s is too coarse for the ECM RC circuits.
+
+ECM RC time constants: τ₁ = R1·C1 ≈ 0.00149×1109 ≈ **1.65s**, τ₂ ≈ **2.5s**.
+Accuracy requires dt < τ/5 → **dt < ~0.3s**. At dt=1s: exp(-dt/τ₁)=0.55 → 45% of
+V_RC1 discarded each step → accumulated RC overpotential error → V_terminal ~0.14V low.
+
+**STAR-CCM+ 10C experiment boundary condition: NOT convective.** The 10C experiment
+STAR cases use the **same isothermal BC** as OpenFOAM. Do NOT write "STAR uses convective
+h=10" for these cases.
+
+**Voltage discrepancy (confirmed 2026-05-27):** If applied heats match but voltage differs,
+the culprit is dt RC integration error, NOT temperature and NOT an ECM bug.
+Temperature can only shift voltage by tens of mV; the ~0.27V STAR vs OF gap is purely dt.
+
+**Recommendation:** Run STAR at dt≤0.2s to match OF accuracy.
+
+---
+
+## Correct OF runs for 10C experimental comparison plots
+
+**DO NOT use** the `_dirKfix_20260524` OF cases — these used a wrong thermal conductivity
+fix that suppressed temperature artificially.
+
+**Use these instead:**
+- OF distributed: `rev4/dist_3600_fulllog_iso25_exp10C_hfix_20260511_074620` (287s, dt=0.1s)
+- OF lumped:      `rev4/dist_3600_fulllog_iso25_exp10C_trueLumped_20260512` (287s, dt=0.1s)
+
+**"dist_3600" folder naming**: folders tagged `exp10C` only ran for ~287s (the experimental
+duration), NOT 3600s. The "3600" prefix is just the base mesh case name — do not be misled.
+
+---
+
+## STAR distributed comparison plot — data sources (2026-05-27)
+
+Script: `tools/plot_star_distributed_vs_of_distributed_10c.py`
+Latest plot: `star_distributed_vs_of_distributed_10c_20260527_002415.pdf/png`
+
+**STAR distributed** — from `in/starCCM_10C_experiment_twoCells_distributed/log_distributed`
+  - Parser: `load_star_dist_from_log()` — reads `[ECM-py] [ecm_diag]` lines
+  - T_end=39.26°C, Q_end=37.95W, V_end=2.23V (dt=1s run → V degraded)
+  - `temperatureJellyRoll.csv` in this dir is **stale** (identical to lumped dir, md5 confirmed)
+
+**STAR lumped** — T from `in/starCCM_10C_experiment_twoCells/log` (via `load_star_log_T()`,
+  parses `[ECM] step=` lines, last stepId=1 run); V+Q from `ecm/voltageHistory.csv`
+  - T_end=36.28°C, V_end=2.36V
+
+**Open issue for next session:** STAR distributed voltage from `log_distributed` (dt=1s)
+is 2.23V — degraded by RC integration error. The old `ecm/voltageHistory.csv` in the
+distributed dir has a **better dt=0.2s run** (V_end=2.38V, T_end=38.38°C, 1502 rows).
+Decision needed: use hybrid (voltageHistory.csv for V+Q, log_distributed for T)
+or rerun STAR at dt≤0.2s.
+
+---
+
+## HARD RULE — File paths in Java/STAR-CCM+ code
+
+**Always use RELATIVE paths** when setting file references on STAR-CCM+ `FileTable` objects or any config written by Java/Python.
+- **Never** call `getAbsolutePath()`, `toAbsolutePath()`, or build an absolute path string for a table file reference.
+- Root cause (2026-05-26): `getOrCreateQInjectionTable()` and `setupWeightVisualization()` were calling `getAbsolutePath()` on `Q_TABLE_CSV_FILE` / `ZONE_WEIGHTS_CSV_FILE`, overwriting the relative path the user had set in the `.sim` file every run.
+- Fix: pass `Q_TABLE_CSV_PATH` / `ZONE_WEIGHTS_CSV_PATH` (the relative string constants) directly.
+- **Any use of an absolute path requires explicit double-confirmation from the user before proceeding.**
+
+---
+
+## Bug fix — overlap mapping destroyed by Python stale-check (fixed 2026-05-26)
+
+**Symptom:** elementWise (distributed) mode showed only N discrete heat levels (one per
+ECM zone) with hard steps at zone boundaries — no blending for boundary cells.
+
+**Root cause:** `_maybe_regen_mapping()` in `ecm/ecm_coupler.py` compared total rows in
+`ecm_mapping.csv` to cell count. Overlap-weighted mappings have >1 row per boundary cell
+(e.g. 30,137 rows for 21,552 cells), so the check always triggered, overwriting the
+correct Java-generated mapping with a flat 1-per-cell mapping.
+
+**Fix (all three copies updated):** Count unique `meshKey` values instead of total rows.
+```python
+n_unique_keys = len({row[_key_col] for row in csv.DictReader(open(mapping_path))})
+if n_cellmap != n_unique_keys:
+    needs_regen = True
+```
+Files: `ecm/ecm_coupler.py`, `in/starCCM_10C_experiment_twoCells/ecm/ecm_coupler.py`,
+`in/starCCM_10C_experiment_twoCells_distributed/ecm/ecm_coupler.py`
 
 ---
 
@@ -32,7 +175,7 @@ Read it before touching the source. Update it after every code change.
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `EcmCouplerMacro.java` | Main macro — lumped + elementWise coupling loops; multi-region support | 4042 |
+| `EcmCouplerMacro.java` | Main macro — lumped + elementWise + lumpedMultiRegion coupling; N-region support | ~5246 |
 | `EcmBinaryIO` (inner class, ~line 3200) | Binary I/O for ecm_in.bin / ecm_out.bin | — |
 | `CellMapper` (inner class, line 1807) | Loads cell-ID/centroid map; extracts T each step; regionIndices field | — |
 | `CurrentProfile` (inner class, line 3493) | Reads current_profile.csv; returns I(t) | — |
@@ -55,7 +198,61 @@ ecm/   — Python ECM backend + cgns_cell_map.py (co-located here, NOT in tools/
 ```
 - No `tools/` subfolder inside the project — workspace `tools/` is Linux-only
 - `EcmPrepAndRun.java` looks for `cgns_cell_map.py` at `<PROJECT_ROOT>/ecm/`
-- `deriveProjectRoot()` has NO hardcoded fallback — uses env var or file-relative path only
+- `resolveAndSetProjectRoot()` has NO hardcoded fallback — always auto-detects from macro file location
+  (parent of `src/` via `resolvePath("_")`); `ECM_PROJECT_ROOT` env var overrides. Bug fixed 2026-05-26:
+  old condition `|| PROJECT_ROOT.exists()` caused early-exit when an OLDER project dir existed on disk.
+  `ECM_MAPPING_CSV_FILE` also changed from `static final` to `static File` so it can be updated.
+
+### qVol scaling bug + stale mapping (fixed 2026-05-26)
+
+**Bug:** Temperature explosion to >1000°C within 5 timesteps on lumped single-cell run.
+
+**Root cause 1 — qVol shortcut:**
+`aggregate_ecm_temperatures` had a "pre-aggregated" shortcut:
+`if keys and len(keys) == len(temps) and all(k in ecm_to_mesh for k in keys)`
+In lumped mode, STAR sends key=0 (hardcoded in `buildLumpedInputBytes`). If key=0 is in
+`ecm_to_mesh` (it always is for any non-trivial mapping), the shortcut fires → `ecm_ids=[0]`
+→ only partition 0's volume used → qVol 17× too large.
+**Fix:** Added `len(keys) == len(ecm_to_mesh)` so shortcut only fires when caller provides
+exactly one temperature per ECM partition (OpenFOAM C++ path).
+
+**Root cause 2 — stale ecm_mapping.csv:**
+Lumped csvReload path called `buildMergedCellMapper` (which detects and fixes the in-memory
+CellMapper from T-table after re-mesh) but did NOT call `writeCellMapCsv`. So `ecm_cell_map.csv`
+stayed stale on disk → Python's mtime check never triggered regen → wrong partition volumes.
+**Fix (Java):** Added `writeCellMapCsv` call in lumped csvReload startup path, before Python starts.
+**Fix (Python):** Added count-mismatch check in `_maybe_regen_mapping`: if ecm_mapping.csv row
+count ≠ ecm_cell_map.csv row count, force regen regardless of mtime.
+
+### Lumped N=1 csvReload injection (fixed 2026-05-26)
+
+**Problem:** Switching `COUPLING_MODE` from `elementWise` to `lumped` left the STAR
+energy source wired to the FileTable (from elementWise setup). Old lumped code only set
+`ecmQdot_W` global parameter — which the .sim file never read. FileTable CSV was never
+updated → constant stale heat → temperature plateau.
+
+**Fix:** Lumped N=1 path now supports `INJECTION_MODE=csvReload` (the default):
+- At startup: builds `lumpedCellMapper` + retrieves `lumpedQTable` + calls
+  `autoConfigureJellyRollEnergySource()` — same wiring as elementWise.
+- Each step: fills `qUniform[n] = qVol`, calls `applyElementWiseHeatCsv()` →
+  writes (X,Y,Z,qVol) CSV and calls `FileTable.extract()`.
+- Fallback: if FileTable setup fails, reverts to `qParam.getQuantity().setValue(qVol)`.
+
+**Result:** `COUPLING_MODE` can be switched freely between `lumped` and `elementWise`
+without any manual reconfiguration inside the `.sim` file.
+
+### Lumped multi-region coupling (implemented 2026-05-26)
+
+`executeLumpedMultiRegion(sim, List<Region>)` — dispatched from `execute()` when:
+- `COUPLING_MODE == "lumped"` AND `INJECTION_MODE == "csvReload"` AND `regions.size() > 1`
+
+**How it works:** Sends standard N-cell elementWise binary frame with uniform T per region
+(T_avg[k] broadcast to all CFD cells in region k). Python runs normally (parallelBranchesSharedSOC_multiRegion).
+Java aggregates returned per-cell qVol → per-region Q[k] → under-relax → writes uniform
+`qVol[i] = Q[k]/V_region[k]` to injection CSV. One `VolumeAverageReport` per region
+(`ECM_T_avg_r0`, `ECM_T_avg_r1`, ...). Same table injection, same mapping, no Python changes.
+
+**To activate:** set `ECM_COUPLING_MODE=lumped` (everything else stays the same).
 
 ### Multi-JellyRoll region support (Option B — implemented 2026-05-26)
 
@@ -162,6 +359,144 @@ Binary protocol: Java → Python sends T [K] per cell; Python → Java sends qVo
 No W/m³→W conversion on Python side. No per-cell volume division on Java side. Uniform qVol
 per partition (OpenFOAM-equivalent). See 2026-05-26 hotspot fix notes.
 
+### Two-cell geometry (confirmed 2026-05-26d)
+
+jellyRoll_1 and jellyRoll_2 are **side-by-side in Y**, same axial (X) range [0.23, 65.34] mm:
+- jellyRoll_1: axis at (cy=−0.027 mm, cz=0.444 mm) ← world coords
+- jellyRoll_2: axis at (cy=49.882 mm, cz=0.552 mm)
+- Y-gap midpoint: 24.9 mm → clean split threshold
+- STL files: `in/starCCM_10C_experiment_twoCells/jellyRoll_1.stl`, `jellyRoll_2.stl`
+
+### PROJECT_ROOT path bug fixed (2026-05-26f — this session)
+
+**Root cause of Q injection failure in two-cell case:**
+- `resolveAndSetProjectRoot()` had a broken condition: `if (PROJECT_ROOT.exists()) return`
+- `C:\work\active\starCCM_10C_experiment` (single-cell dir) existed on disk → early-exit triggered
+- ECM wrote Q CSV to `starCCM_10C_experiment\ecm\ecm_qvol_injection.csv` (wrong dir)
+- STAR's FileTable resolved relative path `ecm/ecm_qvol_injection.csv` from the `.sim` file location
+  → read `starCCM_10C_experiment_twoCells\ecm\ecm_qvol_injection.csv` (stale 21,552-row single-cell data)
+- T table was NOT affected (XYZ Internal Table lives in STAR memory, not on disk)
+
+**Fix:** Removed hardcoded `PROJECT_ROOT_FALLBACK`. `resolveAndSetProjectRoot` now:
+1. Checks `System.getenv("ECM_PROJECT_ROOT")` — use it if explicitly set
+2. Otherwise always auto-detects: `resolvePath("_")` → parent (`src/`) → parent = project root
+3. Updates ALL derived File fields including `ECM_MAPPING_CSV_FILE` (was `static final`, now `static File`)
+
+**No separate T/Q tables needed** for two-region case. Combined single table works for both
+regions once the path and energy-source issues are resolved.
+
+### Arbitrary cylinder axis detection — PCA (2026-05-26, this session)
+
+**Problem:** Previous fix computed local radial from per-region centroid in Y,Z — but still
+hardcoded X as the axial direction. If cylinders have arbitrary orientation, this breaks.
+
+**Solution — fully implemented across all three files:**
+
+`gen_ecm_mapping.py`:
+- Added `_compute_cylinder_axis(xs,ys,zs)`: PCA via power iteration on 3×3 covariance matrix
+- Added `_read_geometry_csv(path)`: reads `ecm_region_geometry.csv` (STAR CS data)
+- Added `--geometry-csv` CLI argument
+- Per-cell: `axial = dot(pos-center, axis)`, `radial = |pos-center-axial*axis|`
+- Priority: geometry CSV → PCA fallback
+
+`ecm/ecm_coupler.py` — `_maybe_regen_mapping()`:
+- Added `_pca_cylinder_axis()` (same algorithm)
+- Added `_read_region_geometry_csv()`
+- Auto-reads `ecm_region_geometry.csv` from mapping dir or `ECM_REGION_GEOMETRY_CSV` env
+
+`starccm_plugin/src/EcmCouplerMacro.java` (~4835 lines):
+- New constant: `REGION_GEOMETRY_CSV_PATH` → `ecm/ecm_region_geometry.csv`
+- New methods: `writeRegionGeometryCsv()`, `extractCsOrigin()`, `extractCsAxis()`, `pcaCylinderAxis()`
+- `writeRegionGeometryCsv()` matches regions by name suffix (_1, _2) → STAR CS → PCA fallback
+- Called during `executeElementWise()` for N>1 regions after cell map is written
+- `regenEcmMapping()` passes `--geometry-csv` to Python if file exists
+- `runProcess()` and `PersistentEcmProcess.start()` pass `ECM_REGION_GEOMETRY_CSV` env
+
+**Verification:** PCA tested on actual 2-cell mesh; both regions correctly detect X-axis.
+Region 0: center (32.1, -0.0, -0.0) mm; Region 1: center (31.6, 49.9, 0.0) mm.
+
+### Two-cell jellyRoll_2 uniform heat fix (2026-05-26e — previous session)
+
+**Confirmed root cause from live log + files:**
+1. `computeRegionIndicesFromFvRep` fails: `FvRepresentation.getRegionCellCount(Region)` not found in STAR 2602.
+2. CSV fallback: previous CSV was all-zeros (from first run all-zeros fallback) → `isValidRegionIdx` would return false → stuck.
+3. `_maybe_regen_mapping()` in `ecm_coupler.py` processed ALL 8198 cells as one group using `r=sqrt(y²+z²)` from GLOBAL origin → jellyRoll_2 cells (Y~0.05 m) all appear at large r → all land in outer radial bin per axial slice → same zone → **uniform heat**.
+
+**Two fixes applied (this session):**
+
+**Fix 1 — Java `buildMergedCellMapper()` (`starccm_plugin/src/EcmCouplerMacro.java`, synced to all copies):**
+- Added `isValidRegionIdx(ri, nRegions)`: returns false if all-zeros for N>1 (stale CSV)
+- Added `computeRegionIndicesFromCentroids(sim, regions, merged)`: Y-bimodality fallback
+  - Computes Y range from merged CellMapper centroids
+  - Requires ≥20 mm Y separation (single-cylinder case safely ignored)
+  - Assigns regionIdx by Y < midpoint (=0) vs Y ≥ midpoint (=1)
+  - Prints "[ECM-EW] computeRegionIndicesFromCentroids: Y range=..." diagnostic
+- Branch logic in `buildMergedCellMapper()`: FvRep → valid CSV → centroid-Y → all-zeros
+
+**Fix 2 — Python `_maybe_regen_mapping()` (`ecm_coupler.py`, synced to workspace root):**
+- Now reads `regionIdx` column from cell_map.csv (if present)
+- Computes per-region centroid (Y,Z) = mean of cells in that region → local cylinder axis
+- Computes `r_local = sqrt((y-cy)²+(z-cz)²)` for each cell (correct per-region local radius)
+- Assigns zones PER REGION with offset: `zone_id = region_idx * n_axial * n_radial + ...`
+- Result: 36 total zones (18/region) for 2 physical cylinders; both get correct radial variation
+
+**Geometry confirmed:** jellyRoll_1 at Y≈0 (centroid -0.00003), jellyRoll_2 at Y≈0.050 m (centroid 0.04994). Y gap ≈ 50 mm → midpoint ≈ 25 mm. Both regions have local r range 0-10 mm.
+
+### Heat-injection diagnostic methods (added 2026-05-26, this session)
+
+Three diagnostic helpers added to `EcmCouplerMacro.java` (~line 1622) to debug why
+STAR "User Specified Energy Source" shows wrong values (-1.25e+05 to +6.44e+04 W/m³)
+while ECM writes correct qVol (~1.22e+06 W/m³):
+
+**DIAG-1 `diagProfileMethodType(sim, regions)` (~line 1622)**
+- Called once at startup after `autoConfigureJellyRollEnergySource` loop
+- Uses reflection to call `getMethod()` on each region's `VolumetricHeatSourceProfile`
+- Logs exact class name of active method (e.g. `XyzTabularScalarProfileMethod`)
+- Also logs table name and column if accessible
+- Log tag: `[ECM-DIAG1]`
+
+**DIAG-2 `diagQTableReadback(sim, fileTable, expectedQVol)` (~line 1702)**
+- Called inside `applyElementWiseHeatCsv()` after `fileTable.extract()`
+- Re-reads `Q_TABLE_CSV_FILE` from disk; logs nRows, min/max/mean of `qVol_W_m3` column
+- Compares vs `expectedQVol` array (what was written)
+- Logs FileTable name and absolute CSV path
+- Log tag: `[ECM-DIAG2]`
+- Reads CSV directly (avoids uncertain STAR in-memory FileTable row-access API)
+
+**DIAG-3 `getOrCreateEnergySourceReports` + `logEnergySourceReports` (~lines 1782, 1867)**
+- **DISABLED (stubbed) in STAR 2602**: `star.common.ReportManager` and `NeoObjectInterface` were
+  removed/moved in STAR 2602; `star.base.report.Report.getValue()` also removed.
+- `getOrCreateEnergySourceReports` now returns empty list immediately — `logEnergySourceReports` is a no-op.
+- `logEnergySourceReports` uses reflection for `getValue`/`getReportMonitorValue` (still compiles).
+- Log tag: `[ECM-DIAG3]` — will not appear in logs.
+
+**Diagnostic wiring in `executeElementWise()`:**
+- After autoConfigureJellyRollEnergySource loop → `diagProfileMethodType`, `getOrCreateEnergySourceReports`
+- After `applyElementWiseHeatCsv` call → `logEnergySourceReports`
+
+### STAR 2602 API incompatibilities (confirmed 2026-05-26)
+
+| Symbol | Status | Fix applied |
+|--------|--------|-------------|
+| `star.common.NeoObjectInterface` | **REMOVED** in STAR 2602 | Use reflection to call `getPresentationName()` |
+| `star.common.ReportManager` | **MOVED** (package changed) | DIAG-3 stubbed out; use `var` if re-enabling |
+| `star.base.report.Report.getValue()` | **REMOVED** | Use reflection: try `getValue` then `getReportMonitorValue` |
+| `TableManager.createTable(Class)` | Deprecated (warning only) | Still compiles; fix later |
+
+**Known open issue**: `autoConfigureJellyRollEnergySource` still fails (TypedObjectManager
+error) but heat IS manually wired in the .sim file (both jellyRolls have
+`EnergyUserVolumeSourceOption Selected=1`, `XyzTabularScalarProfileMethod → Table=229
+ECM_jellyRoll_Q_Table, column qVol_W_m3`). The diagnostics will reveal if STAR is
+actually reading the table correctly.
+
+**Fix required (one-time, in STAR GUI)**: Enable "User Volumetric Heat Source" in the
+physics continuum for BOTH jellyRoll_1 and jellyRoll_2 continua:
+`Physics > [jellyRoll_X continuum] > Energy > User Volume Source = Enabled`
+After enabling, re-run the macro — `autoConfigureJellyRollEnergySource` will auto-wire
+the `ECM_jellyRoll_Q_Table` FileTable to both continua's energy source profiles.
+One combined Q-table for both regions is sufficient (STAR's XYZ interpolation is
+coordinate-based and handles both continua independently from one CSV).
+
 ### Overlap-weighted mapping (implemented 2026-05-26)
 
 `ecm_mapping.csv` has **multiple rows per boundary cell** (weight = partial volume [m³]):
@@ -175,7 +510,7 @@ T aggregation also overlap-correct: `T_zone = Σ(w×T)/Σ(w)`. No Python changes
 
 Stale-mapping check counts **unique meshKey values** (not row count) to handle overlap rows.
 
-`ecm_zone_weights.csv`: X_m, Y_m, Z_m, w_zone_0…w_zone_17 (fractions [0,1], one row per cell).
+`ecm_zone_weights.csv`: X_m, Y_m, Z_m, **regionIdx**, w_zone_0…w_zone_N−1 (fractions [0,1]).
 `setupWeightVisualization(sim)` (line 1351): loads this as FileTable, creates 18
 `ECM_Zone_k_Weight` UserFieldFunctions → visible in Tools > Field Functions in STAR-CCM+.
 
@@ -246,9 +581,16 @@ Binary format: magic `ECMIOv1\0` + v2 header (52 bytes) + inputs section + N×(i
 ## Python ECM backend
 
 Three `ecm_coupler.py` copies — all must be kept in sync:
-- `in/starCCM_10C_experiment/ecm/ecm_coupler.py` — STAR-CCM+ copy (~1700 lines)
-- `rev4/python/ecm_coupler.py` — **actual OpenFOAM runtime copy** (~1677 lines)
-- `ecm/ecm_coupler.py` — simpler OpenFOAM copy (~1244 lines)
+- `in/starCCM_10C_experiment_twoCells/ecm/ecm_coupler.py` — **primary STAR-CCM+ copy** (~2700 lines, most advanced)
+- `rev4/python/ecm_coupler.py` — **actual OpenFOAM runtime copy**
+- `ecm/ecm_coupler.py` — workspace root copy (kept in sync with twoCells copy)
+
+### Per-region ECM params (added 2026-06-02)
+Multi-region `parallelBranchesSharedSOC` path now supports per-region overrides:
+- `params_r{N}.csv` — per-region OCV/R0/R1/C1/dUdT lookup (falls back to `params.csv`)
+- `cellprops_r{N}.csv` — per-region capacity/properties (falls back to `cellprops.csv`)
+- `ECM_CURRENT_R{N}` env var — per-region applied current (falls back to shared `current_a`)
+- All fallbacks print uppercase WARNING to stderr — never silent.
 
 `ecm_step.py` also exists in all three locations:
 - `in/starCCM_10C_experiment/ecm/ecm_step.py` — source of truth (1027 lines, client-supplied)
@@ -739,7 +1081,7 @@ For series config: all cells receive same `current_A` from shared electrical inp
   3. `Anialpha` is auto-generated by solver (no manual field needed) — do NOT write custom `alphaAni` file
 
 - **CONFIRMED INSIGNIFICANT — do not revisit:**
-  - Cap k, geometry, BCs, heat source, axis orientation — all confirmed matched.
+  - Cap k (**CONFIRMED CORRECT in sim via global params** `capAxialCond`=0.10, `capRadialCond`=0.01 W/mK → geometric mean 0.0215 — already correctly set), geometry, BCs, heat source, axis orientation — all confirmed matched.
 
 **STAR diagnostic traces (in/starCCM_10C_experiment/):**
 - `temp_variableCond.csv`  — const10W, aniso k (variableCond sim), SS ΔT=3.799°C — PRIMARY COMPARISON TARGET
@@ -832,6 +1174,98 @@ Key implementation points:
 - Result: Q_STAR / Q_OF  mean=**1.086**  (range 1.027–1.113, grows over time 0.5→263 s)
 - STAR-CCM+ applies ~8.6% more heat than OpenFOAM — systematic, growing bias
 - Candidate causes: (1) jellyRoll volume mismatch, (2) dt=0.5s vs 0.1s coarser ECM integration, (3) T-feedback: STAR runs hotter → lower R0 → more heat per step
+
+---
+
+## Two-Cell STAR-CCM+ Case — 2026-05-26 Session
+
+**Active case**: `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java` (4104 lines)
+Two jellyRoll regions: `jellyRoll_0`, `jellyRoll_1`. 36 ECM zones total (18 per cell).
+
+### New methods added (2026-05-26)
+
+| Method | Line | Purpose |
+|--------|------|---------|
+| `verifyAndCorrectRegionIdxOrdering()` | 1810 | Queries T-table Parts list via reflection; for 2-region case auto-corrects regionIndices[] in-place (swap 0↔1) if reversed |
+| `getTablePartNames()` | 1881 | Reflection helper: tries getObjects/getEObjects/getCollection/broad-scan to get ordered Parts list from a Table |
+
+Both called from `buildMergedCellMapper()` between `computeRegionIndicesFromFvRep()` and `setRegionIndices()`.
+
+### Auto-regen ecm_mapping.csv on fresh start
+
+Logic in `executeElementWise()` (hoisted before mapping block):
+```
+freshStart = tryGetPhysicalTimeFromStar(sim) < 1e-9
+if freshStart && file exists → delete (so stale 18-zone mapping cannot survive)
+if file absent → regenerate unconditionally (calls gen_ecm_mapping.py)
+if continuation && file exists → keep; only re-gen on cell-count mismatch
+```
+Log line: `[ECM-EW] Run mode: FRESH (t=0)` or `CONTINUATION (t=X s)`.
+
+### Continuation run support (both lumped + elementWise paths)
+
+- **ecm_state.json**: deleted only on `freshStart`; preserved on continuation (SOC/RC voltage retained)
+- **Log CSVs** (`tempLog.csv`, `appliedHeatLog.csv`, `diagnostics.csv`): opened with `new FileWriter(file, !freshStart)` — append on continuation, overwrite on fresh start; header only written when `freshStart`
+- Lumped path: `freshStart = _lumpedInitTime < 1e-9` (computed from new `_lumpedInitTime` var before log/state block)
+
+### User Volume Source wiring status
+
+- `autoConfigureJellyRollEnergySource` always fails (STAR 21.02.008 API limitation) — non-critical WARN
+- The FileTable → User Volume Source link IS manually set up and persisted in `final_2cells.sim`
+- Heat IS applied correctly: Q_total ~37–42 W per step confirmed in run log
+- No further GUI action needed for `final_2cells.sim`
+
+### Commits this session
+- `dfb5f2c` — Add T-table ordering verification and auto-correction for multi-region regionIdx
+- `25467c9` — Auto-delete and regenerate ecm_mapping.csv on fresh start (t=0)
+- `84b8ccb` — Support continuation runs: preserve ECM state and append to logs on t>0
+- `265f3a8` — Update README with elementWise multi-region, continuation, and auto-cleanup docs
+
+---
+
+## BUG — regionIdx misassignment in multi-region mapping (diagnosed 2026-06-10)
+
+**File:** `starccm_plugin/src/EcmCouplerMacro.java` → `buildMergedCellMapper()` →
+`computeRegionIndicesFromFvRep()`
+
+**Symptom (confirmed by client visual check):**
+- Q heat distribution does not align with expected ECM zone borders
+- Zone "borders" appear smeared/displaced — same zone index spans cells from BOTH jellyRolls
+- Observed in client run at `meeting/20260610/twoCells/final_2cells.sim`
+  (ECM-EW runs 10:50–11:13 BST 10 June 2026)
+
+**Root cause:**
+`computeRegionIndicesFromFvRep()` assumes STAR-CCM+'s `XyzInternalTable` rows are sorted
+region-by-region (all jellyRoll_1 first, then jellyRoll_2). STAR-CCM+ does NOT guarantee
+this — rows are interleaved by its internal FvRep ordering.
+
+The method assigns:
+- rows 0..49308  → regionIdx=0 (JR1)
+- rows 49309..96750 → regionIdx=1 (JR2)
+
+But ~1493 JR2 cells appear in the first 49308 rows, and ~3548 JR1 cells appear in the
+last 47442 rows, giving 9180 cells with wrong regionIdx.
+
+`gen_ecm_mapping.py` uses `regionIdx` to compute zone offset (`regionIdx × 18`). Wrong
+regionIdx → wrong zone assignment → JR2 cells get JR1 zone IDs and vice versa →
+zones span cells from both physical cells → borders appear displaced/wrapped.
+
+**Also observed:** early runs (10:24–10:31 BST) used lumped/LMR mode with
+`ecm_mapping.csv` absent → Python fell back to synthetic mapping (20 zones, uniform Q).
+
+**Fix (not yet implemented):**
+In `buildMergedCellMapper()`, change priority for N=2 regions: use
+`computeRegionIndicesFromCentroids()` (Y-midpoint split) as **primary**, not fallback.
+Centroid-based is always spatially correct; FvRep row-order assumption is not.
+After applying centroid-based, skip `verifyAndCorrectRegionIdxOrdering()` (as the
+existing NOTE comment already explains — block-swap logic is T-table-order-specific).
+
+**Data confirmation:**
+- `ecm_cell_map.csv`: 9180 cells with wrong regionIdx
+  - 4590 JR2 cells (Y > 25mm) labeled regionIdx=0
+  - 4590 JR1 cells (Y < 25mm) labeled regionIdx=1
+- 9 contiguous runs of wrong cells; cellIds span both JR1 and JR2 ranges
+- `ecm_zone_weights.csv` and `ecm_mapping.csv` derived from this → also wrong
 
 ---
 

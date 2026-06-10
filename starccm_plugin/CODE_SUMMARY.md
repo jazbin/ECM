@@ -1,8 +1,8 @@
 # EcmCouplerMacro — Code Summary
 
-**File:** `src/EcmCouplerMacro.java` (~4104 lines)
-**Also at:** `package/src/EcmCouplerMacro.java`, `in/starCCM_10C_experiment/src/EcmCouplerMacro.java`
-**Last updated:** 2026-05-26 (Add verifyAndCorrectRegionIdxOrdering() — mitigates silent T-table row-ordering assumption; auto-corrects swapped regionIdx for 2-region case)
+**File:** `src/EcmCouplerMacro.java` (~5246 lines)
+**Also at:** `package/src/EcmCouplerMacro.java`, `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java`
+**Last updated:** 2026-06-10 (regionIdx: replaced FvRep row-order assumption with nearest-centroid spatial assignment; k-means fallback; hard abort on failure)
 
 ---
 
@@ -12,23 +12,39 @@
 EcmCouplerMacro  (extends StarMacro)        line 33
 │
 ├── Static config constants                  lines 40–230  (incl. REGION_NAME_PATTERN, nRegionsForEnv)
-├── execute()                                line 348   ← STAR entry point (multi-region discovery)
-├── executeElementWise()                     line 780   ← distributed coupling loop (takes List<Region>)
-├── applyElementWiseHeat()                   line ~1160 ← globalParam injection (DEPRECATED, warns)
+├── execute()                                line 348   ← STAR entry point; dispatches to:
+│     • elementWise → executeElementWise()
+│     • lumped N>1 + csvReload → executeLumpedMultiRegion()  ← NEW
+│     • lumped N=1 or globalParam → inline lumped loop
+├── executeElementWise()                     line 793   ← distributed coupling loop (takes List<Region>)
+├── executeLumpedMultiRegion()               line ~1325 ← NEW: lumped T per region, uniform Q/region via table
+├── applyElementWiseHeat()                   line ~1545 ← globalParam injection (DEPRECATED, warns)
 ├── applyElementWiseHeatCsv()                line ~1190 ← csvReload injection (no per-cell vol division)
 ├── writeQVolInjectionCsv()                  line ~1235 ← writes X,Y,Z,qVol [W/m³] CSV directly
 ├── getOrCreateQInjectionTable()             line ~1270 ← FileTable setup
 ├── setupWeightVisualization()               line ~1370 ← load zone-weights table + create 18 UserFieldFunctions
-├── autoConfigureJellyRollEnergySource()     line ~1480 ← wires STAR energy source (looped over N regions)
-├── regenEcmMapping()                        line ~1540 ← auto-regenerate ecm_mapping.csv after re-mesh
+├── autoConfigureJellyRollEnergySource()     line ~1574 ← wires STAR energy source (looped over N regions)
+├── diagProfileMethodType()                  line ~1622 ← DIAG-1: log active method class on VolumetricHeatSourceProfile
+├── diagQTableReadback()                     line ~1702 ← DIAG-2: re-read Q CSV after extract(), log min/max/mean
+├── getOrCreateEnergySourceReports()         line ~1762 ← DIAG-3: create Min/Max/VolInt reports on energy source field
+├── logEnergySourceReports()                 line ~1852 ← DIAG-3 per-step: query and log energy-source reports
+├── regenEcmMapping()                        line ~1968 ← auto-regenerate ecm_mapping.csv after re-mesh (now passes --geometry-csv)
+├── writeRegionGeometryCsv()                 line ~2041 ← NEW: extract per-region CS origin+axis from STAR, PCA fallback
+├── extractCsOrigin()                        line ~2135 ← reflection helper for CS origin vector
+├── extractCsAxis()                          line ~2174 ← reflection helper for CS basis vector (axis)
+├── pcaCylinderAxis()                        line ~2230 ← PCA on centroids for axis detection (Java)
 ├── writeStepCsvFallback()                   line ~1585
 ├── writeCellMapCsv()                        line 1631  ← now writes regionIdx column
 ├── writeStepCsv()                           line 1654
-├── buildMergedCellMapper()                  line 1692  ← merges N regions; calls FvRep+verify
-├── computeRegionIndicesFromFvRep()          line 1760  ← FvRep cell-count → regionIdx (reliable, never stale)
-├── verifyAndCorrectRegionIdxOrdering()     line 1810  ← NEW: queries T-table Parts list; auto-corrects reversed regionIdx for N=2
-├── getTablePartNames()                      line 1881  ← NEW: reflection helper for T-table Parts order
-├── readRegionIndicesFromCsv()               line 1944  ← reads regionIdx column from cell map CSV (fallback)
+├── buildMergedCellMapper()                  line 2848  ← merges N regions; spatial-only (no fallback); throws on failure
+├── computeRegionIndicesNearestCentroid()    line 3114  ← PRIMARY: nearest-centroid; CSV origins → k-means; no row-order assumption
+├── validateRegionIdxWithFvRep()             line 3296  ← warn-only FvRep count check; never overrides spatial assignment
+├── computeRegionIndicesFromFvRep()          line 2907  ← DEAD (no longer called); kept for reference only
+├── verifyAndCorrectRegionIdxOrdering()      line 2957  ← DEAD (no longer called); assumed T-table block order (wrong)
+├── isValidRegionIdx()                       line 3035  ← checks regionIdx is not all-zeros for N>1
+├── computeRegionIndicesFromCentroids()      line 3061  ← DEAD (no longer called); Y-bimodality N=2 only
+├── getTablePartNames()                      line ~3340 ← reflection helper for T-table Parts order
+├── readRegionIndicesFromCsv()               line 3392  ← reads regionIdx column from cell map CSV
 │
 ├── CellMapper  (static nested class)        line 1807  (+ regionIndices field/accessor/setter)
 │   ├── create()                             line ~1860 ← calls extractVolumes() when volumes absent
@@ -106,7 +122,7 @@ Java system property set by `EcmPrepAndRun.java` (priority 2). Defaults shown.
 
 | Constant | Env var | Default | Notes |
 |---|---|---|---|
-| `PROJECT_ROOT_PATH` | `ECM_PROJECT_ROOT` | `C:\work\active\starCCM_10C_experiment` | Windows project root |
+| `PROJECT_ROOT_PATH` | `ECM_PROJECT_ROOT` | *(auto-detected from macro location: parent of `src/`)* | No hardcoded path; always derived at runtime from where the macro file lives |
 | `PYTHON_CMD` | `ECM_PYTHON_EXE` | `["py", "-3"]` | Falls back to `config.properties` |
 | `USE_PERSISTENT_PYTHON` | `ECM_USE_PERSISTENT_PYTHON` | `true` | Keep Python process alive between steps |
 | `REGION_NAME` | — | `"jellyRoll"` | Coupled STAR-CCM+ region (used for lumped mode) |
@@ -119,7 +135,7 @@ Java system property set by `EcmPrepAndRun.java` (priority 2). Defaults shown.
 | `ECM_TIMEOUT_S` | — | `60` | Max wait for ecm_out.bin [s] |
 | `FALLBACK_DELTA_T_S` | `ECM_FALLBACK_DELTA_T_S` | `1.0e-3` | Used if STAR API returns invalid dt |
 | `CURRENT_A` | `ECM_CURRENT_A` | `5.05` | Discharge current [A]; 1C for 2170 cell |
-| `CURRENT_PROFILE_PATH` | `ECM_CURRENT_PROFILE_CSV` | `ecm/electrical_inputs_from_validation.csv` | I(t) schedule CSV |
+| `CURRENT_PROFILE_PATH` | `ECM_CURRENT_PROFILE_CSV` | `ecm/electrical_inputs.csv` | I(t) schedule CSV |
 | `CAPACITY_AH` | `ECM_CAPACITY_AH` | `5.05` | Initial capacity [Ah]; SOC=1 at start |
 | `INITIAL_TIME_S` | `ECM_INITIAL_TIME_S` | `0.0` | Restart offset [s] |
 | `COUPLING_MODE` | `ECM_COUPLING_MODE` | `"elementWise"` | `"lumped"` or `"elementWise"` |
@@ -137,6 +153,9 @@ Java system property set by `EcmPrepAndRun.java` (priority 2). Defaults shown.
 | `ECM_N_REGIONS` | `ECM_N_REGIONS` | `1` | number of coupled jellyRoll regions; passed to Python; set from `nRegionsForEnv` |
 | `ZONE_WEIGHTS_CSV_PATH` | `ECM_ZONE_WEIGHTS_CSV` | `"ecm/ecm_zone_weights.csv"` | X,Y,Z,w_zone_0…w_zone_17 fractions — for visualization |
 | `ZONE_WEIGHTS_TABLE_NAME` | `ECM_ZONE_WEIGHTS_TABLE` | `"ECM_ZoneWeights_Table"` | STAR FileTable name for zone-weight visualization |
+| `ECM_N_PHYSICAL_REGIONS` | `ECM_N_PHYSICAL_REGIONS` | `2` | Physical battery cylinders → --n-regions arg for gen_ecm_mapping.py |
+| `ECM_REGION_CENTERS` | `ECM_REGION_CENTERS` | `"-0.000027,...;0.049882,..."` | Cylinder axis (y,z m) for local radial zone assignment |
+| `REGION_GEOMETRY_CSV_PATH` | `ECM_REGION_GEOMETRY_CSV` | `"ecm/ecm_region_geometry.csv"` | Per-region origin+axis CSV from STAR-CCM+ coordinate systems |
 | `TEMP_LOG_CSV_PATH` | `ECM_TEMP_LOG` | `"ecm/tempLog.csv"` | Dedicated T log (STAR VolumeAverageReport source) |
 | `APPLIED_HEAT_LOG_CSV_PATH` | `ECM_APPLIED_HEAT_LOG` | `"ecm/appliedTotalHeatLog.csv"` | Dedicated applied heat log (STAR-side W) |
 
@@ -207,13 +226,14 @@ are created automatically for scalar-scene visualization in STAR-CCM+.
    - `COUPLING_MODE == "elementWise"` → `executeElementWise(sim, coupledRegions)` and return
    - Otherwise → lumped coupling loop using `coupledRegions.get(0)` (first region only)
 
-### Lumped coupling loop (lines 292–531)
+### Lumped coupling loop — N=1 (lines ~485–820)
 
 Setup:
-- `getOrCreateTReport()` — `VolumeAverageReport` across **all coupled regions** (Parts updated on every startup, so adding new jellyRoll regions is automatic)
+- `getOrCreateTReport()` — `VolumeAverageReport` across **all coupled regions**
 - `getOrCreateQParam()` — `ScalarGlobalParameter("ecmQdot_W")`
+- If `INJECTION_MODE=csvReload`: `buildMergedCellMapper()` + `getOrCreateQInjectionTable()` + `autoConfigureJellyRollEnergySource()` — same FileTable wiring as elementWise, so the energy source in the `.sim` file does not need reconfiguration when switching modes
 - Open `ecm_debug.log` and `ecm_runtime_diagnostics.csv`
-- Delete stale `ecm_state.json` (ECM starts at SOC=1)
+- Delete stale `ecm_state.json` (fresh start only; ECM starts at SOC=1)
 - `CurrentProfile.load()` from CSV or constant `CURRENT_A`
 - Optionally start `PersistentEcmProcess`
 
@@ -221,19 +241,64 @@ Per-step sequence:
 ```
 iter.step(1)                              advance solver
 tEff = tReport.getValue()                 volume-average T [K]
-deltaT = getDeltaT(sim)                   timestep size [s]
-simTime = tryGetPhysicalTimeFromStar()    or accumulated fallback
+deltaT, simTime                           timestep and sim time
 currentA = currentProfile.currentAt(t)   interpolated from schedule
 inputBytes = EcmBinaryIO.buildLumpedInputBytes(stepId, tEff, ...)
 qGenW = persistent.exchange() or file I/O + runProcess()
 qVol = ALPHA*qGenW + (1-ALPHA)*qVolPrev  under-relaxation
-qParam.getQuantity().setValue(qVol)      push to STAR solver
+
+if INJECTION_MODE=csvReload:
+    qUniform[all cells] = qVol           uniform fill
+    applyElementWiseHeatCsv()            write CSV + FileTable.extract()
+else:
+    qParam.getQuantity().setValue(qVol)  globalParam fallback
+
 write diagnostics CSV row
 ```
 
+**Note on injection mode:** `csvReload` is the default and recommended mode. It writes a per-cell uniform (X,Y,Z,qVol) CSV and reloads the FileTable every step. This keeps the same energy-source wiring as `elementWise` mode, so switching between `lumped` and `elementWise` in the Java constants requires no manual reconfiguration inside the `.sim` file. The `globalParam` fallback only activates if FileTable setup fails.
+
 ---
 
-## executeElementWise() — distributed coupling loop (line 780)
+## executeLumpedMultiRegion() — lumped multi-region coupling (line ~1325)  ← NEW
+
+Called when `COUPLING_MODE == "lumped"` AND `regions.size() > 1`.
+
+**Concept:** "one T per cell, one Q per cell, uniform spatial distribution."
+Each physical battery cell gets its own `VolumeAverageReport` (`ECM_T_avg_r0`, `ECM_T_avg_r1`, …).
+The T values are broadcast uniformly to all CFD cells in that region, then sent to Python
+as a standard elementWise binary frame.  Python returns per-CFD-cell qVol using the same
+zone mapping as elementWise; these are then aggregated to a per-region total Q [W],
+under-relaxed, and written as uniform `qVol[i] = Q[k] / V_region[k]` into the injection CSV.
+
+**Setup (one-time, same as elementWise):**
+- `buildMergedCellMapper()` — same N-region mapper
+- `writeCellMapCsv()`, `writeRegionGeometryCsv()`
+- `regenEcmMapping()` — fresh-start delete + regen; stale-check on continuation
+- `ecm_state.json` delete on fresh start
+- Per-region `VolumeAverageReport[]` — one report per jellyRoll
+- `getOrCreateQInjectionTable()` + `autoConfigureJellyRollEnergySource()` for each region
+- Pre-compute `regionVolume[k]` (stable; summed from `cellMapper.volumes()`)
+
+**Per-step sequence:**
+```
+iter.step(1)
+tAvg[k] = tReports[k].getValue()           per-region volume-average T [K]
+temps[i] = tAvg[regionIdx[i]]              broadcast T to all cells in region
+ewInputBytes = buildElementWiseInputBytes() same N-cell binary as EW mode
+qVolMap = persistentProcess.exchangeElementWise() or file I/O + runProcess()
+qW[k] = Σ(qVolNew[i] * V[i])  for i in region k   aggregate to per-region Q [W]
+qWRelaxed[k] = α*qW[k] + (1-α)*qWPrev[k]           under-relax per region
+qVolUniform[i] = qWRelaxed[regionIdx[i]] / regionVolume[regionIdx[i]]
+applyElementWiseHeatCsv()                  write CSV + FileTable.extract()
+```
+
+**Fallback:** if `regIdx == null` (CellMapper couldn't assign regions), all cells fall to
+region 0 with a warning. Use elementWise mode if this happens.
+
+---
+
+## executeElementWise() — distributed coupling loop (line ~793)
 
 Takes `List<Region> regions` (sorted, all regions matching `REGION_NAME_PATTERN`).
 Sets `nRegionsForEnv = regions.size()` so Python receives `ECM_N_REGIONS`.
@@ -506,7 +571,7 @@ STAR-CCM+ solver
 | Python ECM heat distribution | `R0(T[i])`-weighted distribution implemented in `ecm_coupler.py` (falls back to uniform if `ecm_lookup_cache` is unavailable) |
 | `directFieldData` backend | Broken in STAR-CCM+ 2602 — confirmed by `TestJellyRollTemperatureExtraction.java` |
 | Persistent Python in elementWise | **Now supported** via `exchangeElementWise()` — pipe sends N-record frame, Python returns N-record response; file-based is automatic fallback on pipe error |
-| Multi-region first-run regionIdx | On first N>1 run without a `regionIdx`-column CSV, all cells are assigned region 0. After the macro writes `ecm_cell_map.csv` with `regionIdx`, re-run `gen_ecm_mapping.py` to get correct per-region zone offsets. |
+| Multi-region first-run regionIdx | FvRep getCellCount unavailable in STAR 2602. New fallback `computeRegionIndicesFromCentroids()` assigns regionIdx by Y-cluster midpoint (N=2 only, requires ≥20 mm Y separation). After regionIdx is correctly set in `ecm_cell_map.csv`, `_maybe_regen_mapping()` generates per-region zones (36 total for 2 regions). |
 | Multi-region `ecm_zone_weights.csv` | For N regions, the weights CSV has `N × n_zones` columns (`w_zone_0 … w_zone_{N*18-1}`). The STAR `setupWeightVisualization()` creates only 18 UFF entries (first region); extend manually for visualization of subsequent regions. |
 
 ---
@@ -515,11 +580,11 @@ STAR-CCM+ solver
 
 Any edit to `src/EcmCouplerMacro.java` must be mirrored to:
 - `starccm_plugin/package/src/EcmCouplerMacro.java`
-- `in/starCCM_10C_experiment/src/EcmCouplerMacro.java`
+- `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java`
 
 ```bash
 # Sync command:
 SRC=starccm_plugin/src/EcmCouplerMacro.java
 cp $SRC starccm_plugin/package/src/EcmCouplerMacro.java
-cp $SRC in/starCCM_10C_experiment/src/EcmCouplerMacro.java
+cp $SRC in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java
 ```
