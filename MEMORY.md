@@ -11,6 +11,272 @@
 
 ## Next session TODO
 
+1. **Anisotropic k in STAR-CCM+ .sim** — verify and correct AnisotropicThermalConductivityMethodWithValues setup in delivered .sim. Guide: STAR_CCM_ANISOTROPIC_THERMAL_CONDUCTIVITY_GUIDE.md.
+2. **Validation temperature sweep (10–60 °C)** — lumped and element-wise cases. Params.csv already covers multiple T points; needs a controlled campaign run. ~3–5 days.
+3. **Cell-size scaling methodology document** (21700 → 4680). STAR-CCM+ uses STEP geometry import (not STL). Writing task only. ~1–2 days.
+4. **Element-wise baseline re-run** post impedance-network fix before sweep campaign.
+5. **Verify pre-warm-up fix in STAR-CCM+** — run waterDomain_twoCells_rev3.sim and confirm EcmHeatJellyRolls.csv no longer shows jump at t=0.02→0.04 (EW mode, deltaT=0.02s). Previous run showed 22780→28961 W/m³ (+27%); fix should reduce to ~1-2%.
+
+---
+
+### Session 2026-07-02 — First-step qVol jump fixed in ALL coupling paths
+
+**Root cause (session 1):** `iter.step(1)` runs BEFORE the ECM is called → step 1 always
+uses stale `ecm_qvol_injection.csv` from prior run → jump at t=deltaT.
+Initial fix (commit 24e985d) only covered `executeLumpedMultiRegion`.
+
+**Remaining jump (session 2):** waterDomain test uses `elementWise` mode → `executeElementWise`
+had NO pre-warm-up → still got 22780→28961 W/m³ jump (+27%) between step 1 and step 2.
+The CSV was seeded with the previous STAR run's last ECM output (not IC-consistent).
+
+**Final fix (commit 8e49504):** pre-warm-up block added to ALL three coupling paths:
+- `executeElementWise()`: reads IC T via `tReport.getValue()`, calls ECM (stepId=0, deltaT=0),
+  applies via `applyElementWiseHeatCsv()`, seeds `qVolPrev[]`.
+- Inline lumped loop in `execute()`: same pattern using `buildLumpedInputBytes`.
+- `executeLumpedMultiRegion()`: already fixed in 24e985d.
+Guard: `freshStart` (continuation runs skip). All 5 copies synced.
+Expected result: ~1-2% residual jump (from T change during first iter.step vs IC T).
+
+---
+
+### Session 2026-06-17 (session 4) — ECM Extension Offer rewrite
+
+#### ECM Extension Offer — gen_offer_pdf.py (complete rewrite)
+File: `tools/gen_offer_pdf.py` → `artifacts/reports/ECM_EXTENSION_OFFER.pdf`
+
+Structure: itemised feature menu (Sections A–D) + recommended bundles + scope ownership statement.
+
+**Section A (U1–U8)** — STAR Usability, all Bojan-owned:
+U1 $400 | U2 $400 | U3 $700 | U4 $800 | U5 $1,000 | U6 $1,400 | U7 $600–900 | U8 $1,200
+U8 = Battery Assistant-style macro setup wizard (interactive dialog; moved FROM exclusions).
+Bundle U1–U8: **$3,200** (saves ~$3,300 vs individual).
+
+**Section B (M1–M3)** — Multi-Cell / Module:
+M1 $750 (zone-name refactor, small), M2 $900–1,200 (circuit interface, joint),
+M2b not-priced (circuit solver = backend scope), M3 $600–900 (smoke test).
+Bundle M1+M3: **$1,200** (was $1,500 — that was NOT a discount; fixed).
+
+**Section C (P1–P4)** — Backend Physics Support (Bojan role = interface/schema/smoke tests only):
+P1 $600–900 | P2 $500–800 | P3 $500–900 | P4 $800–1,200.
+Bundle: **$2,000** (saves ~$400–$1,800).
+
+**Section D (S1–S4)** — Abuse Interface (S4 = actual heat-release model, not-priced/backend):
+S1 $500 | S2 $900 | S3 $700–900 | S4 not-priced.
+Bundle S1+S3: **$1,800** (saves ~$300–$500).
+
+Key commercial points:
+- "Bojan/Helicon is not responsible for electrochemical accuracy claims for backend changes"
+- No ECM algorithm implementation implied in any physics-support item
+- Minimum custom order: $1,000
+- Bundle highlights show "If purchased separately: ~$X" inline
+
+---
+
+### Session 2026-06-17 (session 3) — Contract report refinement + ECM positioning
+
+#### Contract report — key changes
+- Contract wording column now uses **verbatim text** from pasted contract throughout
+- Item 1.2 removed (no direct contract line); thermal properties folded into 1.1
+- Section 3 collapsed from 3 items to 1 (single contract bullet)
+- Application files order corrected: **(a) element-wise, (b) lumped** — was swapped
+- All OpenFOAM references removed from implementation text
+- Item 7.1 notes block removed (had OpenFOAM mesh tools; STAR uses STEP not STL)
+- **Item 1.1 status: DONE → PARTIAL** — anisotropic k not confirmed in delivered .sim
+- Open items table: new row 1.1 (anisotropic k gap)
+
+#### Contract status summary (current)
+| Deliverable | Status |
+|---|---|
+| 3D cylindrical cell model (jellyRoll, shell, cap) | **PARTIAL** (aniso k unverified) |
+| Element-wise ECM coupling + impedance-network current distribution | DONE |
+| Lumped adaptor (volume-avg T in, volumetric heat out) | DONE |
+| Coupling scripts + cell property import | DONE |
+| Application file (a): element-wise electrothermal case | DONE |
+| Application file (b): lumped electrothermal case | DONE |
+| Ongoing applications support | DONE (ongoing) |
+| Re-validation 10–60 °C voltage response | PARTIAL |
+| Cell-size scaling methodology (21700 → 4680 outline) | NOT YET |
+
+#### Three-tier ECM positioning (confirmed correct framing)
+The key distinction is ECM *state* resolution, not just mesh:
+- **Native STAR 0D RCR**: accepts third-party OCV/RCR tables (not BDS-only); cell-level ECM state — one SOC history, one RC state per physical cell; simpler, fast
+- **Custom scripting**: same simple ECM table inputs; sub-cell ECM state — each zone has own SOC, RC state, local T, local R, local heat; intermediate option
+- **Native 3D electrochemistry (NTG/DISTNP)**: electrode-level data required; fundamentally different workflow; most detailed
+
+Do NOT say "STAR cannot do this natively" as absolute. Say: *"Based on documented workflows, we do not see a native UI-driven feature that runs multiple independent RCR ECM instances inside a single physical jelly roll with sub-cell SOC/RC state management."*
+
+This framing applied to: `gen_contract_vs_impl_pdf.py` item 2.1 note + `docs/STARCCM_FEATURE_GAP_ANALYSIS.md` section 2.1 positioning note.
+
+---
+
+### Session 2026-06-17 (session 1) — Gap analysis PDF polish (two sessions combined)
+
+#### Gap analysis PDF generators
+- **Internal**: `tools/gen_gap_analysis_pdf.py` → `artifacts/reports/STARCCM_FEATURE_GAP_ANALYSIS.pdf`
+- **Client**: `tools/gen_gap_analysis_pdf_client.py` → `artifacts/reports/STARCCM_FEATURE_GAP_ANALYSIS_CLIENT.pdf`
+- Both use `IdentityReport` from `src/pumpfoil/reporting/identity_report.py`
+- Content sourced from `docs/STARCCM_FEATURE_GAP_ANALYSIS.md` (31 gaps across 7 sections)
+
+#### Summary table — 6 columns
+Columns: `#`, `Category`, `Gap`, `Rating`, `Impl. status`, `Time needed` / `Time estimate`
+`split_closeable(text)` parses the markdown "Closeable?" cell into (status, time) pair.
+Client version triples time estimates via `triple_times()`.
+
+#### Closure priorities — 4 tiers + reference (covers all 31 gaps)
+- Tier 1: 9 quick-win items (existing arch)
+- Tier 2: 6 moderate-effort items (Java/Python extensions, some conditional on tab geometry)
+- Tier 3: 5 physics extensions (ecm_step.py); blue header color #1a5276
+- Tier 4: 6 out-of-scope items; red header
+- For reference: 5 already-addressed/N/A items
+
+#### Gap analysis source document facts
+`docs/STARCCM_FEATURE_GAP_ANALYSIS.md` — 31 gaps, 7 categories.
+(Cover metric currently says "28" — not yet corrected, low priority.)
+Sources: UserGuide_18.06.pdf, batteryModuleStarManual.pdf, STARCCM_CLIENT_MANUAL.pdf.
+
+---
+
+### Session 2026-06-16 — PDFs, STAR battery manual review, ecm_step.py analysis
+
+#### PDFs generated this session
+- `artifacts/reports/client_report.pdf` — 41 pages, 5.9 MB. Built by `tools/gen_client_pdf.py`.
+  Required `pip install fpdf2 matplotlib` (were missing). Uses DejaVu fonts from matplotlib TTF path.
+- `artifacts/reports/meeting_questions_20260616.pdf` — 12 kB. New script:
+  `tools/build_meeting_questions_20260616_pdf.py`. Built with reportlab (also required install).
+  Content: 2026-06-12 client run findings, 5 questions for client, pre-run checklist, open items.
+
+#### STAR-CCM+ battery module manual — read and analysed
+File: `docs/batteryModuleStarManual.pdf` (109 pages, STAR-CCM+ 2602).
+Extracted to `/tmp/battery_manual.txt` via pypdf (also required install).
+
+Key STAR battery module capabilities:
+- **0D path**: RCR table model + Thermal Runaway (Heat Release / Vent Gas / Mass Loss models)
+- **3D path**: requires `.tbm` file from Battery Design Studio + `batterysim` license;
+  e-cell mesh solves NTG/RCR/DISTNP electrochemistry spatially
+- **Battery modules**: N_Series × N_Parallel circuit topology, automatic circuit solver
+- **Field functions**: Battery Volumetric Heat, SOC, V_T, current density vectors per e-cell
+- **Electrical solver**: computes spatially varying current density, ohmic heat, polarisation heat
+- Aging/cycle-life is NOT in this manual — lives in Battery Design Studio / Amesim
+
+#### STAR 3D e-cell mesh ≠ our distributed ECM mode
+The 3D e-cell mesh is a **spatially resolved electrochemical solver**: each e-cell has own SOC,
+current density vector, voltage, heat — driven by electrode physics and tab geometry.
+Our `elementWise` / distributed mode is a **thermal mapping layer on top of a 0D RCR model**:
+one SOC, one voltage, one total heat — spatial variation comes only from temperature distribution,
+not from current distribution physics.
+This is why the "shared electrical state" baseline was accepted: giving each partition its own
+independent SOC (without a current distribution model) makes it a different electrical model,
+not a more refined version of the lumped baseline.
+
+#### What we can do WITHOUT modifying ecm_step.py — KEY FINDING
+
+`ecm_step.py` already has three entry points:
+1. `ecm_step()` — scalar or N-cell vector, 2RC, lambda_Q/lambda_R scaling
+2. `parallel_2rc_step()` — N parallel slices, **solves common terminal voltage via KVL/KCL**,
+   returns per-slice `I_BRANCH` from impedance differences. Supports `internal_iterations`.
+3. `multi_cell_parallel_step()` — M cells × n_parallel slices, shape (M, n_parallel)
+
+`parallel_2rc_step` already implements the impedance-network current distribution that is the
+main physics gap vs STAR's 3D e-cell. It solves:
+  `V_terminal` = common; `I_i = (V_terminal - u_cell_i) / R0_i`; `sum(I_i) = I_pack`
+Each slice gets a different current based on local (SOC_i, T_i) → R0_i.
+
+**The gap**: `ecm_coupler.py` calls `run_ecm_step_per_partition` which feeds full pack current
+`I_total` to every partition. `parallel_2rc_step` is imported but NOT used in the distributed
+thermal path.
+
+**The fix (all in ecm_coupler.py, no ecm_step.py changes)**:
+- Replace `run_ecm_step_per_partition` with a call to `parallel_2rc_step`, passing
+  per-partition temperatures as the slice temperature array.
+- Result: hot zones get less current (higher R0), cool zones more — physically correct.
+
+Other things doable without ecm_step.py changes:
+- Populate `E_OCV_ch_V` ≠ `E_OCV_dch_V` in params.csv → charge/discharge OCV asymmetry active
+- Set `internal_iterations > 1` at call site → tighter current-balance convergence
+- Use `lambda_Q` / `lambda_R` for per-region cell variation without separate params files
+- Per-partition initial SOC via initialization helpers
+
+ecm_step.py cannot do without modification: 3RC/Warburg, charge/discharge Ro asymmetry,
+max current clamping, aging, thermal runaway.
+
+#### Pending fixes — DONE 2026-06-16 (session 2)
+- **partitionstates impedance-network fix** — `run_ecm_step_per_partition` replaced by
+  `run_ecm_step_parallel_branches` in the `distributed_mode == "partitionstates"` path.
+  Hot zones now get less current (higher R0), cool zones more — closes the physics gap vs
+  STAR's 3D e-cell mesh. Mode label in diag: `"partitionStates_impedanceNetwork"`.
+  `run_ecm_step_per_partition` kept (still callable if needed) but no longer on the hot path.
+  Synced to client pack.
+- **V_common_V multi-region** — `combined_diag["V_common_V"]` now set to mean of per-region
+  voltages after the region loop (ecm_coupler.py line ~2265). Fixes voltageLog.csv zeros.
+  Synced to client pack copy.
+- **appliedTotalHeatLog.csv renamed to ecmHeatLog.csv** — reflects that it logs ECM-computed
+  heat set on the STAR parameter, not what STAR's solver integrated. Column header updated to
+  `ecm_heat_w`. Synced to package/src/, client pack, CODE_SUMMARY.md, README.txt.
+- **autoConfigureJellyRollEnergySource STAR 2602** — warning message updated to explicitly
+  mention STAR 2602 TypedObjectManager API change and that warning is BENIGN if pre-configured
+  in GUI. Javadoc updated. Synced to package/src/ and client pack.
+
+---
+
+### Docker launch infra — added 2026-06-13
+Three files added to workspace root: `Dockerfile.claude`, `entrypoint.claude.sh`, `runClaude.sh`.
+Key point: claude-code installed as non-root user into `~/.npm-global` so `npm i -g` updates
+work in-container. `runClaude.sh` prompts for update (or use `--update` flag).
+Dockerfile ENV NPM_CONFIG_PREFIX hardcoded to `/home/helios` — must edit + rebuild for other usernames.
+
+---
+
+### Client jellyRoll_2 cooling diagnosis — 2026-06-12
+
+**Finding**: ECM coupling works correctly for both batteries. jellyRoll_2 cools because:
+1. STAR thermal BCs give jellyRoll_2 ~3× stronger cooling than jellyRoll_1 (intrinsic CFD issue)
+2. Dead periods between macro restarts pushed jellyRoll_2 below the recovery threshold (~297K)
+3. Cold equilibrium ~286K = ECM heat (22W) balanced by strong convective cooling
+
+**Actions needed:**
+- Deploy equal-split fix to client: `n_per_region = 96751//2` bug in client's ecm_coupler.py
+  (correct sizes: 49309 / 47442; fix uses ECM_REGION_SIZES env var — already in repo)
+- Fix `autoConfigureJellyRollEnergySource` for STAR 2602 — TypedObjectManager API change;
+  both `region.get(EnergyUserVolumeSourceOption.class)` and `continuum.get()` fail
+- Rename `appliedTotalHeatLog.csv` → misleading name; it logs ECM-computed heat, not STAR-applied
+- Tell client: don't restart macro mid-run; check jellyRoll_2 thermal BCs in STAR GUI
+
+**Confirmed working:**
+- qvol_injection.csv: both regions non-zero (r0 mean 596 kW/m³, r1 mean 855 kW/m³)
+- FileTable readback (DIAG2) correct; EW-1 shows both batteries heating at dt=1s, fresh IC
+- autoConfigureJellyRollEnergySource failure is BENIGN if user pre-configured in GUI
+
+Meeting folder: `meeting/20260612/` — 20260612-LOG, 20260612-ecm/ folder, screenshot
+
+---
+
+### ecm_coupler.py hard failures — DONE 2026-06-10; fresh-run fix 2026-06-12
+
+Three silent fallbacks converted to hard failures:
+1. `ecm_step.py` missing → `ImportError` raised (was: mock backend with no log output)
+2. `ecm_mapping.csv` specified but absent → `FileNotFoundError` (was: synthetic mapping fallback)
+3. `ecm_state.json` absent on continuation run → `FileNotFoundError` (was: SOC silently reset to 1)
+Also: `ecm_state.json` JSON parse failure → `RuntimeError` (was: silent reset)
+
+**BUG FIXED 2026-06-12**: Java was deleting `ecm_state.json` on fresh start; Python treated absent
+file as fatal continuation error. Fix: Java now writes `{}` (empty JSON) instead of deleting.
+Python loads `{}`, all `.get(key, default)` calls return defaults → SOC=1 fresh state.
+Missing file still correctly errors on genuine continuation runs.
+Affects all 3 `freshStart` blocks in `EcmCouplerMacro.java` (ECM, ECM-EW, ECM-LMR paths).
+
+Canonical source: `starccm_plugin/package/ecm/ecm_coupler.py`
+Synced copy: `artifacts/packs/ecm_coupler_starccm_client_20260610/ecm/ecm_coupler.py`
+
+### 30-test suite runnable without STAR-CCM+ — DONE 2026-06-10
+
+`tools/test_ecm_no_star.py` — 30/30 passing
+- A: hard failure modes (3) — missing ecm_step.py, missing mapping, missing state on continuation
+- B: binary I/O round-trip (7) — v1/v2 headers, inputs dict, bad magic, truncation
+- C: pipe-binary end-to-end subprocess (8) — frameType, N, stepId, qVol, state written, multi-step
+- D: mock backend physics sanity (4) — qVol positive, uniform T, temperature sensitivity, SOC consumed
+Key: uses persistent `_ECM_TMPDIR`; `cellprops.csv` must come from `/workspace/Parallel_ECM/`
+(STAR format with `Qnom_Ah`), NOT `/workspace/cellprops.csv` (OpenFOAM format with `capacity_Ah`).
+
 ### regionIdx fix — DONE 2026-06-10
 
 `buildMergedCellMapper()` now uses **nearest-centroid spatial assignment only** — no fallbacks.
@@ -21,15 +287,49 @@
 - Synced to all 3 copies: `starccm_plugin/src/`, `starccm_plugin/package/src/`,
   `artifacts/packs/ecm_coupler_starccm_client_20260610/src/`
 
----
+### EcmCoSimPartner C++ Co-Sim API partner — v1.2 multi-region as of 2026-06-12
 
-- **Test `EcmCoSimPartner` without STAR-CCM+** (4 tests, all runnable in container):
-  1. Full compile to object files (`g++ -c`) — exercises template instantiation
-  2. `CellMapReader` unit test — load a real `ecm_cell_map.csv`, verify counts/values
-  3. **`EcmBinaryIo` cross-protocol round-trip** — C++ writes `ecm_in.bin`, Python
-     `ecm_io.py` reads it; Python writes `ecm_out.bin`, C++ reads it back. Most
-     important test: verifies byte layout compatibility before STAR integration.
-  4. Header byte-layout check — verify the 52-byte v2 header matches Python reference.
+`starccm_plugin/cosim/EcmCoSimPartner.cpp` — replaces CSV injection with STAR Co-Sim API.
+5 rounds of consultant review + multi-region refactor completed.
+Session logs: `artifacts/logs/session_20260611_000000.log`, `session_20260611_cosim_round45.log`
+
+**Confirmed correct against `/workspace/include/StarccmplusCoSimulationApiV8.h` + SpringMass.cpp:**
+- `registerOutgoingMesh(regionId)` — 1 arg; mesh type from `createContinuum`
+- `notifyOutgoingMeshReady(meshId)` — 1 arg with meshId; call once per region mesh
+- `getConditionValueProperties(coSimId, name, optionsId)` — 3 args; `getDouble` returns void (sentinel -1.0)
+- `fill(id, "FieldValues")` + `getDoubleArrayReferenceAtIndex(id, "FieldValues", 0, &ptr, &sz)` for T retrieval
+- `addDoubleArrayElement(id, "FieldValues", data, sz)` for outgoing qVol field
+- `setTimeStep(t, dt)` + `setCouplingTime(t+dt)` called per-step BEFORE `waitForIncomingFields()`
+- `waitForIncomingFields()` returns 0 = end-of-sim; non-zero = data available
+- No `waitForUpdate()` post-connect (SpringMass doesn't use it)
+- `StarccmplusMeshType`: only `SurfacePolyMesh` and `VolumePolyMesh` — NO ScatterPolyMesh
+
+**Multi-region support (v1.2) — 2026-06-12:**
+- Env vars: `ECM_N_REGIONS` (int), `ECM_REGION_NAMES` (comma-sep, e.g. `jellyRoll_1,jellyRoll_2`)
+- Default single-region name: `jellyRoll` (backward compat); multi-region default: `jellyRoll_0, jellyRoll_1, ...`
+- Cells reordered: all r=0 first, r=1 next — matches Python ECM_REGION_SIZES slicing
+- `g_regionCells[r]` → global indices; per-region mesh/T/qVol containers via `g_meshIdxByContainerId` etc.
+- Before `system(g_ecmCmd)`: sets `ECM_N_REGIONS` and `ECM_REGION_SIZES` via `setenv()`/`_putenv_s()`
+- `ecm_coupler.py` multi-region slicing fixed: reads `ECM_REGION_SIZES`, falls back to equal-slice
+
+**One remaining runtime risk (cannot resolve statically):**
+- VolumePolyMesh with N point-cells (0 faces) — STAR acceptance unverified
+- Logged as `gLog.warn()` at mesh fill time
+- Resolve by live STAR test with `INJECTION_MODE=coSim`
+
+**Bugs corrected (historical — do not re-apply):**
+- B4 was wrong: `addDoubleArrayElement` is correct for outgoing fields (NOT `addDoubleArray`)
+- F1/F2a/F2b/F3/F4 were wrong direction — all reverted to match actual headers
+
+Two-tier Logger: `info()` → screen+file, `verbose()` → file only, `warn()`/`error()` → both.
+Tests: `starccm_plugin/cosim/tests/` — 63/63 passing (no STAR required), incl. T5 (region reorder).
+Consultant pack: `artifacts/packs/cosim_review_20260611/` — in sync with source (v1.2).
+
+**Next steps:**
+- Test against live STAR-CCM+ with `INJECTION_MODE=coSim`, `ECM_N_REGIONS=2`,
+  `ECM_REGION_NAMES=jellyRoll_1,jellyRoll_2` and `final_2cells.sim`
+- If STAR rejects zero-face VolumePolyMesh: contact Siemens for scatter-point guidance
+- Add `INJECTION_MODE=coSim` branch to `EcmCouplerMacro.java` once mesh confirmed
 
 ---
 
@@ -56,9 +356,12 @@ breaks copy-paste.
 - `electrical_inputs.csv` is canonical name (renamed from `electrical_inputs_experimental_10C_discharge.csv`)
 - Validation: 10C = 50 A, 289 s, to ~20% SOC (NOT full discharge / NOT 70% SOC)
 - Timestep recommendation: dt ≤ 0.2 s; 0.25 s is sensitivity baseline only
-- Client package: `artifacts/packs/ecm_coupler_starccm_client_20260609.zip` (38 MB) — INCOMPLETE (missing ecm_step.py, gen_ecm_mapping.py, EcmCouplerMacro.jar)
-- **Corrected package**: `artifacts/packs/ecm_coupler_starccm_client_20260610.zip` (1.3 MB, no .sim included)
-  - Contains: EcmCouplerMacro.jar, setup.bat, src/, ecm/ (now includes ecm_step.py + gen_ecm_mapping.py), README.txt, MANUAL.pdf
+- Client package: `artifacts/packs/ecm_coupler_starccm_client_20260609.zip` (38 MB) — INCOMPLETE (missing ecm_step.py, gen_ecm_mapping.py)
+- **Corrected package**: `artifacts/packs/ecm_coupler_starccm_client_20260610.zip` (1.2 MB, no .sim included)
+  - Contains: README.txt, STARCCM_CLIENT_MANUAL.pdf, setup.bat, src/EcmCouplerMacro.java,
+    src/EcmBinaryIO.java, ecm/ecm_coupler.py, ecm/ecm_step.py, ecm/gen_ecm_mapping.py,
+    ecm/ecm_io.py, ecm/mock_ecm_backend.py, ecm/mock_model.py, ecm/params.csv,
+    ecm/electrical_inputs.csv, ecm/requirements-runtime.txt (15 files, NO JAR)
 - Package template: `starccm_plugin/package/ecm/` — now contains ecm_step.py and gen_ecm_mapping.py (added 2026-06-10)
 
 ## Project Overview
@@ -72,6 +375,31 @@ Active STAR-CCM+ development case: `in/starCCM_10C_experiment_twoCells/` — two
 2. List **all** files in that directory.
 3. Find the **newest file** — its timestamp is the **baseline time**.
 4. Analyze **only** files within **3 hours** of that baseline. Everything older is ignored.
+
+---
+
+## STAR-CCM+ client package — .java files only, NO JAR
+
+**Rule:** The client package must ship `.java` source files, NOT a pre-built `.jar`.
+
+STAR-CCM+ runs macros directly from `.java` source via its built-in Java compiler.
+The client loads `src/EcmCouplerMacro.java` through **Tools → Macros → Run Macro**
+and STAR compiles and executes it on the fly. A `.jar` is never needed and should
+not be included in the package.
+
+**Package must contain:**
+- `src/EcmCouplerMacro.java` — main macro (client loads this directly)
+- `src/EcmBinaryIO.java` — binary protocol helper (auto-compiled alongside the macro)
+- `ecm/` — Python ECM backend files
+- `setup.bat` — Windows Python setup helper
+- `README.txt` — setup guide
+
+**Package must NOT contain:**
+- `EcmCouplerMacro.jar` — remove from package; JAR is only for the internal build step
+- Any pre-compiled `.class` files
+
+The `build.sh` / `dist/` / `build/` tree is for internal development only and
+must not be shipped to the client.
 
 ---
 
