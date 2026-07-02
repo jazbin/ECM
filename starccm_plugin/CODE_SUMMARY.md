@@ -1,8 +1,8 @@
 # EcmCouplerMacro — Code Summary
 
-**File:** `src/EcmCouplerMacro.java` (~5246 lines)
+**File:** `src/EcmCouplerMacro.java` (~5400 lines)
 **Also at:** `package/src/EcmCouplerMacro.java`, `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java`
-**Last updated:** 2026-06-10 (regionIdx: replaced FvRep row-order assumption with nearest-centroid spatial assignment; k-means fallback; hard abort on failure)
+**Last updated:** 2026-07-02 (pre-warm-up ECM call in LMR mode: eliminates first-step qVol jump caused by IC temperature mismatch between ecm_qvol_injection.csv and STAR-CCM+ initial temperatures)
 
 ---
 
@@ -55,7 +55,8 @@ EcmCouplerMacro  (extends StarMacro)        line 33
 │   ├── getTemperaturesFromXyzTable()        line ~2200 ← PRIMARY (fast path)
 │   ├── buildTableToMapperMapping()          line ~2390 ← coord-hash row→mapper mapping
 │   ├── getTemperaturesFromXyzTableCsv()     line ~2430 ← slow CSV fallback
-│   ├── centroidHash()                       line ~2450
+│   ├── centroidHash()                       line ~2450  ← strict 0.01 mm (spot-check only)
+│   ├── centroidHashRelaxed()                line ~2460  ← 0.1 mm (full scan; tolerates CGNS–STAR diff)
 │   ├── getSeriesArray()                     line ~2480 ← bulk column read
 │   ├── safeToDouble()                       line ~2505
 │   ├── parseDouble()                        line ~2515
@@ -157,7 +158,7 @@ Java system property set by `EcmPrepAndRun.java` (priority 2). Defaults shown.
 | `ECM_REGION_CENTERS` | `ECM_REGION_CENTERS` | `"-0.000027,...;0.049882,..."` | Cylinder axis (y,z m) for local radial zone assignment |
 | `REGION_GEOMETRY_CSV_PATH` | `ECM_REGION_GEOMETRY_CSV` | `"ecm/ecm_region_geometry.csv"` | Per-region origin+axis CSV from STAR-CCM+ coordinate systems |
 | `TEMP_LOG_CSV_PATH` | `ECM_TEMP_LOG` | `"ecm/tempLog.csv"` | Dedicated T log (STAR VolumeAverageReport source) |
-| `APPLIED_HEAT_LOG_CSV_PATH` | `ECM_APPLIED_HEAT_LOG` | `"ecm/appliedTotalHeatLog.csv"` | Dedicated applied heat log (STAR-side W) |
+| `APPLIED_HEAT_LOG_CSV_PATH` | `ECM_APPLIED_HEAT_LOG` | `"ecm/ecmHeatLog.csv"` | ECM-computed heat log (relaxed W set on STAR parameter) |
 
 ### Derived file paths (lines ~247–253)
 
@@ -170,7 +171,7 @@ PROJECT_ROOT/ecm/ecm_cell_map.csv          ← one-time cell ID/centroid map (no
 PROJECT_ROOT/ecm/ecm_cell_step.csv         ← per-step T + qVol snapshot
 PROJECT_ROOT/ecm/ecm_qvol_injection.csv    ← csvReload injection CSV
 PROJECT_ROOT/ecm/tempLog.csv               ← dedicated T time-history (overwritten each run)
-PROJECT_ROOT/ecm/appliedTotalHeatLog.csv   ← dedicated applied heat time-history (overwritten each run)
+PROJECT_ROOT/ecm/ecmHeatLog.csv   ← ECM-computed heat time-history (overwritten each run)
 PROJECT_ROOT/ecm/voltageLog.csv            ← dedicated V_common time-history (Python side, overwritten each run)
 ```
 
@@ -179,7 +180,7 @@ PROJECT_ROOT/ecm/voltageLog.csv            ← dedicated V_common time-history (
 | File | Source | Side | Restart |
 |------|--------|------|---------|
 | `tempLog.csv` | STAR `VolumeAverageReport` on jellyRoll region | Java/STAR | Overwritten at run start |
-| `appliedTotalHeatLog.csv` | Relaxed qVol [W] set on `ecmQdot_W` (lumped) or sum of per-cell W (EW) | Java/STAR | Overwritten at run start |
+| `ecmHeatLog.csv` | ECM-computed heat [W] set on STAR parameter (lumped) or sum of per-cell W (EW) | Java/STAR | Overwritten at run start |
 | `voltageLog.csv` | `V_common_V` from ECM backend diag dict | Python/ECM | Truncated when `step_id == 1` |
 | `voltageHistory.csv` | Mixed diagnostic (voltage + Q + T_eff + n_partitions) | Python/ECM | Append; may accumulate across restarts |
 | `ecm_runtime_diagnostics.csv` | Mixed (lumped mode only): T_eff_K, qGen_W, cumE_J | Java/STAR | Overwritten at run start |
@@ -233,7 +234,7 @@ Setup:
 - `getOrCreateQParam()` — `ScalarGlobalParameter("ecmQdot_W")`
 - If `INJECTION_MODE=csvReload`: `buildMergedCellMapper()` + `getOrCreateQInjectionTable()` + `autoConfigureJellyRollEnergySource()` — same FileTable wiring as elementWise, so the energy source in the `.sim` file does not need reconfiguration when switching modes
 - Open `ecm_debug.log` and `ecm_runtime_diagnostics.csv`
-- Delete stale `ecm_state.json` (fresh start only; ECM starts at SOC=1)
+- Write `{}` to `ecm_state.json` (fresh start only; ECM loads empty dict → SOC=1 defaults)
 - `CurrentProfile.load()` from CSV or constant `CURRENT_A`
 - Optionally start `PersistentEcmProcess`
 
@@ -275,12 +276,31 @@ under-relaxed, and written as uniform `qVol[i] = Q[k] / V_region[k]` into the in
 - `buildMergedCellMapper()` — same N-region mapper
 - `writeCellMapCsv()`, `writeRegionGeometryCsv()`
 - `regenEcmMapping()` — fresh-start delete + regen; stale-check on continuation
-- `ecm_state.json` delete on fresh start
+- `ecm_state.json` written as `{}` on fresh start (not deleted)
 - Per-region `VolumeAverageReport[]` — one report per jellyRoll
 - `getOrCreateQInjectionTable()` + `autoConfigureJellyRollEnergySource()` for each region
 - Pre-compute `regionVolume[k]` (stable; summed from `cellMapper.volumes()`)
 
-**Per-step sequence:**
+**Pre-warm-up call (fresh starts only, before the coupling loop):**
+```
+tAvgInit[k] = tReports[k].getValue()         STAR initial temperatures (before any solve)
+ewInputBytes = buildElementWiseInputBytes(stepId=0, deltaT=0, ...)
+                                              probe call: no SoC advancement
+qVolMap = exchange ECM (persistent or file)
+aggregate → qWRelaxed → qVolUniform → applyElementWiseHeatCsv()
+                                              FileTable seeded before step 1
+qWPrev = wuQW; qVolPrev = wuQVolUniform      seed under-relaxation state
+```
+WHY this exists: the coupling loop runs `iter.step(1)` **before** calling the ECM, so the
+FileTable used during the first solver step comes from whatever was on disk at startup
+(`ecm_qvol_injection.csv`).  That file is typically produced by a prior OpenFOAM run at a
+different initial temperature than the STAR-CCM+ case, causing a sharp ~2× jump in applied
+ECM heat at t=deltaT.  The warm-up call reads STAR's actual initial temperatures, calls the
+ECM with `deltaT=0` (so ECM state/SoC is unchanged), and writes the result into the FileTable
+**before** `iter.step(1)` executes for the first real step.  Continuation runs skip the
+warm-up — their FileTable already holds correct values from the previous run's last step.
+
+**Per-step sequence (coupling loop, step ≥ 0):**
 ```
 iter.step(1)
 tAvg[k] = tReports[k].getValue()           per-region volume-average T [K]
@@ -306,7 +326,7 @@ Sets `nRegionsForEnv = regions.size()` so Python receives `ECM_N_REGIONS`.
 Setup:
 - `buildMergedCellMapper(sim, regions)` — N=1: delegates to `CellMapper.create()`; N>1: reads combined T-table, assigns regionIndices from FvRep cell counts (primary), falls back to CSV then all-zeros
 - `writeCellMapCsv()` — one-time write of (cellId, x, y, z, volume_m3, **regionIdx**)
-- Delete stale `ecm_state.json`
+- Write `{}` to `ecm_state.json` on fresh start (not deleted)
 - If `INJECTION_MODE == "csvReload"`:
   - `getOrCreateQInjectionTable()` — create/retrieve `FileTable(Q_TABLE_NAME)`
   - **Loop:** `autoConfigureJellyRollEnergySource(sim, jr, qInjectionTable)` for each region
@@ -421,8 +441,10 @@ Builds the `tableRowToMapperIndex[]` array (built once, cached).
 5. Log: matched/unmatched counts, first 3 samples
 ```
 
-The spot-check almost always confirms identity ordering (STAR and CellMapper enumerate
-the same region in the same mesh order), so the full scan is rarely needed.
+Always performs a **mandatory full coordinate scan** using `centroidHashRelaxed` (0.1 mm
+bins).  No spot-check, no identity shortcut — those were the source of the parallel-run
+mapping bug.  Scan runs **once at startup** and is cached; cost ~10 ms.  Throws on
+≥ 2% unmatched rows (wrong table / stale CSV) so failures are explicit, not silent.
 
 ### centroidHash() — line 1650
 
@@ -570,6 +592,7 @@ STAR-CCM+ solver
 | No C++ UserLibrary path yet | Proposed solution: mmap binary file + ucfunc native field function |
 | Python ECM heat distribution | `R0(T[i])`-weighted distribution implemented in `ecm_coupler.py` (falls back to uniform if `ecm_lookup_cache` is unavailable) |
 | `directFieldData` backend | Broken in STAR-CCM+ 2602 — confirmed by `TestJellyRollTemperatureExtraction.java` |
+| **First-step qVol jump (RESOLVED)** | Root cause: coupling loop runs `iter.step(1)` before the ECM is called, so step 1 always uses the pre-loaded `ecm_qvol_injection.csv`. When that file was generated by an OpenFOAM run at a different initial temperature (e.g. 20°C) than the STAR-CCM+ IC (e.g. 32.8°C), the ECM returns ~2× different heat at the second step → sharp monitor jump at t=deltaT. Fixed by the pre-warm-up ECM call (stepId=0, deltaT=0) that seeds the FileTable before the first `iter.step(1)`. Only runs on fresh starts. |
 | Persistent Python in elementWise | **Now supported** via `exchangeElementWise()` — pipe sends N-record frame, Python returns N-record response; file-based is automatic fallback on pipe error |
 | Multi-region first-run regionIdx | FvRep getCellCount unavailable in STAR 2602. New fallback `computeRegionIndicesFromCentroids()` assigns regionIdx by Y-cluster midpoint (N=2 only, requires ≥20 mm Y separation). After regionIdx is correctly set in `ecm_cell_map.csv`, `_maybe_regen_mapping()` generates per-region zones (36 total for 2 regions). |
 | Multi-region `ecm_zone_weights.csv` | For N regions, the weights CSV has `N × n_zones` columns (`w_zone_0 … w_zone_{N*18-1}`). The STAR `setupWeightVisualization()` creates only 18 UFF entries (first region); extend manually for visualization of subsequent regions. |
@@ -580,11 +603,11 @@ STAR-CCM+ solver
 
 Any edit to `src/EcmCouplerMacro.java` must be mirrored to:
 - `starccm_plugin/package/src/EcmCouplerMacro.java`
-- `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java`
+- `in/starCCM_10C_experiment_twoCells_distributed/src/EcmCouplerMacro.java`
 
 ```bash
-# Sync command:
-SRC=starccm_plugin/src/EcmCouplerMacro.java
+# Sync command (canonical source is in/testedVersion):
+SRC=in/testedVersion/src/EcmCouplerMacro.java
 cp $SRC starccm_plugin/package/src/EcmCouplerMacro.java
-cp $SRC in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java
+cp $SRC in/starCCM_10C_experiment_twoCells_distributed/src/EcmCouplerMacro.java
 ```
