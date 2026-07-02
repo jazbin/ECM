@@ -130,7 +130,7 @@ public class EcmCouplerMacro extends StarMacro {
      * If absent, the macro falls back to CURRENT_A.
      */
     private static final String CURRENT_PROFILE_PATH =
-        getEnvOrDefault("ECM_CURRENT_PROFILE_CSV", "ecm/electrical_inputs.csv");
+        getEnvOrDefault("ECM_CURRENT_PROFILE_CSV", "ecm/electrical_inputs_experimental_10C_discharge.csv");
 
     /**
      * Initial cell capacity [Ah] = starting q_ah for a fully-charged cell.
@@ -155,7 +155,7 @@ public class EcmCouplerMacro extends StarMacro {
      * distributed mode.
      */
     private static final String COUPLING_MODE =
-        getEnvOrDefault("ECM_COUPLING_MODE", "lumped");
+        getEnvOrDefault("ECM_COUPLING_MODE", "elementWise");
 
     /**
      * In elementWise mode: path (relative to PROJECT_ROOT) for the cell-map CSV
@@ -627,6 +627,92 @@ public class EcmCouplerMacro extends StarMacro {
         qParam.getQuantity().setValue(0.0);
         sim.println("[ECM] Reset ecmQdot_W to 0.0 W before coupling loop.");
 
+        // --- Pre-warm-up ECM call (lumped, fresh starts only) ---
+        // WHY: iter.step(1) runs BEFORE the ECM is called, so the first solver
+        // step always runs with Q=0 (reset above). That produces a one-step
+        // transient: step 1 has Q=0, step 2 has the first real ECM heat.
+        //
+        // Fix: probe the ECM at the STAR IC temperature (read via tReport.getValue())
+        // with stepId=0, deltaT=0 (no SoC advancement) and apply the result before
+        // the loop, so step 1 uses an IC-consistent heat source.
+        //
+        // Continuation runs are skipped (qVolPrev already holds last step value).
+        if (freshStart) {
+            sim.println("[ECM] Pre-warm-up: probing ECM at STAR IC temperature "
+                + "(stepId=0, deltaT=0 — no SoC advancement).");
+            double wuTAvg;
+            try {
+                wuTAvg = tReport.getValue();
+            } catch (Exception e) {
+                wuTAvg = Double.NaN;
+                sim.println("[ECM] WARN: pre-warm-up tReport.getValue() failed: " + e.getMessage());
+            }
+            if (Double.isFinite(wuTAvg)) {
+                sim.println(String.format("[ECM] Pre-warm-up IC T_avg=%.4f K (%.2f C)",
+                    wuTAvg, wuTAvg - 273.15));
+                double wuCurrent = currentProfile.currentAt(0.0);
+                byte[] wuInputBytes = null;
+                try {
+                    wuInputBytes = EcmBinaryIO.buildLumpedInputBytes(
+                        0L, wuTAvg, 0.0, 0.0, wuCurrent, 0.0);
+                } catch (IOException e) {
+                    sim.println("[ECM] WARN: pre-warm-up input build failed: " + e.getMessage()
+                        + " — step 1 will start with Q=0.");
+                }
+                if (wuInputBytes != null) {
+                    double wuQGenW = Double.NaN;
+                    if (persistentProcess != null) {
+                        try {
+                            wuQGenW = persistentProcess.exchange(sim, wuInputBytes, 0L, debugLog);
+                        } catch (IOException e) {
+                            sim.println("[ECM] WARN: pre-warm-up persistent exchange failed: "
+                                + e.getMessage() + " — falling back to file-based.");
+                            persistentProcess.close();
+                            persistentProcess = null;
+                        }
+                    }
+                    if ((Double.isNaN(wuQGenW) || !Double.isFinite(wuQGenW)) && persistentProcess == null) {
+                        try {
+                            EcmBinaryIO.writeBytes(ECM_IN_PATH, wuInputBytes);
+                            int wuExit = runProcess(sim, debugLog);
+                            if (wuExit == 0 && waitForFile(ECM_OUT_PATH, ECM_TIMEOUT_S)) {
+                                wuQGenW = EcmBinaryIO.readLumpedOutput(ECM_OUT_PATH, 0L);
+                            } else {
+                                sim.println("[ECM] WARN: pre-warm-up ECM call failed (exit=" + wuExit
+                                    + ") — step 1 will start with Q=0.");
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM] WARN: pre-warm-up file exchange failed: "
+                                + e.getMessage() + " — step 1 will start with Q=0.");
+                        }
+                    }
+                    if (Double.isFinite(wuQGenW) && !Double.isNaN(wuQGenW)) {
+                        sim.println(String.format("[ECM] Pre-warm-up Q=%.6e W. Seeding heat source.", wuQGenW));
+                        if ("csvReload".equalsIgnoreCase(INJECTION_MODE)
+                                && lumpedCellMapper != null && lumpedQTable != null) {
+                            double[] wuUniform = new double[lumpedCellMapper.n];
+                            Arrays.fill(wuUniform, wuQGenW);
+                            try {
+                                applyElementWiseHeatCsv(sim, lumpedCellMapper, wuUniform, lumpedQTable);
+                            } catch (IOException e) {
+                                sim.println("[ECM] WARN: pre-warm-up csvReload injection failed: "
+                                    + e.getMessage());
+                            }
+                        } else {
+                            qParam.getQuantity().setValue(wuQGenW);
+                        }
+                        qVolPrev = wuQGenW;
+                        sim.println("[ECM] Pre-warm-up complete: heat source seeded with IC-consistent Q."
+                            + " Jump at t=deltaT eliminated.");
+                    } else {
+                        sim.println("[ECM] WARN: pre-warm-up returned no valid Q — step 1 starts with Q=0.");
+                    }
+                }
+            } else {
+                sim.println("[ECM] WARN: pre-warm-up skipped — IC T not available from tReport.");
+            }
+        }
+
         for (int step = 0; step < N_STEPS; step++) {
 
             // 1. Advance solver one timestep
@@ -922,66 +1008,19 @@ public class EcmCouplerMacro extends StarMacro {
             + String.format("%.3f", _initPhysTime) + " s)")
             + (!Double.isFinite(_initPhysTime) ? "  [time query returned NaN — treating as fresh]" : ""));
 
-        // auto-regenerate ecm_mapping.csv on fresh start (t≈0) or when stale.
-        // Fresh start: always delete and regenerate so the current spatial regionIdx
-        //   assignment is reflected in the new zone mapping.
-        // Continuation run (t>0): keep existing mapping; only regenerate if stale
-        //   (cell count mismatch after re-mesh).
-        // First run (no file): regenerate unconditionally.
+        // Always regenerate from the current STAR mesh on macro startup.  Do not
+        // try to prove an old mapping is still usable: remeshing can preserve row
+        // count while changing ordering, centroids, volumes, or region labels.
         if (ECM_MAPPING_CSV_FILE != null) {
-            if (freshStart && ECM_MAPPING_CSV_FILE.exists()) {
-                try {
-                    Files.delete(ECM_MAPPING_CSV_FILE.toPath());
-                    sim.println("[ECM-EW] Fresh run (t=0): deleted ecm_mapping.csv "
-                        + "— will regenerate with current regionIdx.");
-                } catch (IOException ex) {
-                    sim.println("[ECM-EW] WARN: could not delete ecm_mapping.csv: "
-                        + ex.getMessage());
-                }
-            }
-
-            if (!ECM_MAPPING_CSV_FILE.exists()) {
-                // Absent (deleted above, or never generated) — regenerate now.
-                sim.println("[ECM-EW] ecm_mapping.csv not found — generating from ecm_cell_map.csv...");
-                try {
-                    regenEcmMapping(sim);
-                } catch (Exception e) {
-                    sim.println(e.getMessage());
-                    sim.println("[ECM-EW] Aborting elementWise coupling.");
-                    return;
-                }
-            } else {
-                // File exists on continuation run — check for staleness after re-mesh.
-                // With overlap-weighted mapping, row count > n_cells (boundary cells appear in
-                // multiple zones).  Count unique meshKey values instead of total rows.
-                java.util.HashSet<Integer> seenKeys = new java.util.HashSet<>();
-                try (BufferedReader br = new BufferedReader(new FileReader(ECM_MAPPING_CSV_FILE))) {
-                    br.readLine(); // skip header
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        int comma = line.indexOf(',');
-                        if (comma > 0) {
-                            try { seenKeys.add(Integer.parseInt(line.substring(0, comma).trim())); }
-                            catch (NumberFormatException ignored) {}
-                        }
-                    }
-                } catch (IOException e) {
-                    sim.println("[ECM-EW] FATAL: could not read ecm_mapping.csv: " + e.getMessage());
-                    return;
-                }
-                int mappedCells = seenKeys.size();
-                if (mappedCells != n) {
-                    sim.println(String.format(
-                        "[ECM-EW] ecm_mapping.csv covers %d unique cells but current mesh has %d "
-                        + "— stale. Auto-regenerating...", mappedCells, n));
-                    try {
-                        regenEcmMapping(sim);
-                    } catch (Exception e) {
-                        sim.println(e.getMessage());
-                        sim.println("[ECM-EW] Aborting elementWise coupling.");
-                        return;
-                    }
-                }
+            sim.println("[ECM-EW] Regenerating ecm_mapping.csv from current mesh every startup.");
+            try {
+                Files.deleteIfExists(ECM_MAPPING_CSV_FILE.toPath());
+                Files.deleteIfExists(ZONE_WEIGHTS_CSV_FILE.toPath());
+                regenEcmMapping(sim);
+            } catch (Exception e) {
+                sim.println(e.getMessage());
+                sim.println("[ECM-EW] Aborting elementWise coupling.");
+                return;
             }
         }
 
@@ -1082,6 +1121,115 @@ public class EcmCouplerMacro extends StarMacro {
 
         // previous qVol per cell (fallback when ECM call fails)
         double[] qVolPrev = new double[n];  // per-cell W from previous step (fallback)
+
+        // --- Pre-warm-up ECM call (elementWise, fresh starts only) ---
+        // WHY: iter.step(1) runs BEFORE the ECM is called, so the injection
+        // FileTable used for the first solver step comes from whatever was on disk
+        // at startup (ecm_qvol_injection.csv). Stale values → jump at t=deltaT.
+        //
+        // Fix: before the loop, probe the ECM at the STAR IC temperature (read via
+        // tReport.getValue()) with stepId=0, deltaT=0 (no SoC advancement) and
+        // write the result to the injection CSV so step 1 uses IC-consistent heat.
+        //
+        // Continuation runs are skipped — FileTable already holds correct values
+        // from the previous run's last step.
+        if (freshStart && "csvReload".equalsIgnoreCase(INJECTION_MODE) && qInjectionTable != null) {
+            sim.println("[ECM-EW] Pre-warm-up: probing ECM at STAR IC temperature "
+                + "(stepId=0, deltaT=0 — no SoC advancement).");
+            double wuTAvg;
+            try {
+                wuTAvg = tReport.getValue();
+            } catch (Exception e) {
+                wuTAvg = Double.NaN;
+                sim.println("[ECM-EW] WARN: pre-warm-up tReport.getValue() failed: " + e.getMessage());
+            }
+            if (Double.isFinite(wuTAvg)) {
+                sim.println(String.format("[ECM-EW] Pre-warm-up IC T_avg=%.4f K (%.2f C)",
+                    wuTAvg, wuTAvg - 273.15));
+                double[] wuTemps = new double[n];
+                Arrays.fill(wuTemps, wuTAvg);
+                double wuCurrent = currentProfile.currentAt(0.0);
+                byte[] wuInputBytes = null;
+                try {
+                    wuInputBytes = EcmBinaryIO.buildElementWiseInputBytes(
+                        0L, cellMapper.cellIds(), wuTemps, 0.0, 0.0, wuCurrent);
+                } catch (IOException e) {
+                    sim.println("[ECM-EW] WARN: pre-warm-up input build failed: " + e.getMessage()
+                        + " — step 1 will use stale injection file values.");
+                }
+                if (wuInputBytes != null) {
+                    Map<Integer, Double> wuQVolMap = null;
+                    if (persistentProcess != null) {
+                        try {
+                            wuQVolMap = persistentProcess.exchangeElementWise(
+                                sim, wuInputBytes, 0L, debugLog);
+                            if (wuQVolMap == null) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up persistent stepId mismatch"
+                                    + " — step 1 will use stale injection file values.");
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up persistent exchange failed: "
+                                + e.getMessage() + " — falling back to file-based.");
+                            persistentProcess.close();
+                            persistentProcess = null;
+                        }
+                    }
+                    if (wuQVolMap == null && persistentProcess == null) {
+                        try {
+                            EcmBinaryIO.writeBytes(ECM_IN_PATH, wuInputBytes);
+                            int wuExit = runProcess(sim, debugLog);
+                            if (wuExit != 0) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up ECM exited " + wuExit
+                                    + " — step 1 will use stale injection file values.");
+                            } else if (!waitForFile(ECM_OUT_PATH, ECM_TIMEOUT_S)) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up ecm_out.bin timeout"
+                                    + " — step 1 will use stale injection file values.");
+                            } else {
+                                wuQVolMap = EcmBinaryIO.readElementWiseOutput(ECM_OUT_PATH, 0L);
+                                if (wuQVolMap == null) {
+                                    sim.println("[ECM-EW] WARN: pre-warm-up output stepId mismatch"
+                                        + " — step 1 will use stale injection file values.");
+                                }
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up file exchange failed: "
+                                + e.getMessage() + " — step 1 will use stale injection file values.");
+                        }
+                    }
+                    if (wuQVolMap != null) {
+                        double[] wuQVolNew = new double[n];
+                        double wuTotalW = 0.0;
+                        double[] wuVols = cellMapper.volumes();
+                        double wuFallbackV = (n > 0) ? JELLY_ROLL_VOLUME_M3 / n : 0.0;
+                        int wuMatched = 0;
+                        for (Map.Entry<Integer, Double> entry : wuQVolMap.entrySet()) {
+                            int cid = entry.getKey();
+                            if (cid >= 0 && cid < n) {
+                                wuQVolNew[cid] = entry.getValue();
+                                double vi = (wuVols != null) ? wuVols[cid] : wuFallbackV;
+                                wuTotalW += wuQVolNew[cid] * vi;
+                                wuMatched++;
+                            }
+                        }
+                        sim.println(String.format(
+                            "[ECM-EW] Pre-warm-up: %d/%d cells matched. Q_total=%.6e W",
+                            wuMatched, n, wuTotalW));
+                        try {
+                            applyElementWiseHeatCsv(sim, cellMapper, wuQVolNew, qInjectionTable);
+                            qVolPrev = wuQVolNew;
+                            sim.println("[ECM-EW] Pre-warm-up complete: FileTable seeded with"
+                                + " IC-consistent qVol. Jump at t=deltaT eliminated.");
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up injection failed: "
+                                + e.getMessage()
+                                + " — step 1 will use stale injection file values.");
+                        }
+                    }
+                }
+            } else {
+                sim.println("[ECM-EW] WARN: pre-warm-up skipped — IC T not available from tReport.");
+            }
+        }
 
         long stepId = 0L;
         double accumulatedTime = INITIAL_TIME_S;
@@ -1427,52 +1575,17 @@ public class EcmCouplerMacro extends StarMacro {
         sim.println("[ECM-LMR] Run mode: " + (freshStart ? "FRESH (t=0)"
             : "CONTINUATION (t=" + String.format("%.3f", _initPhysTime) + " s)"));
 
-        // ecm_mapping.csv: delete on fresh start, regen if absent or stale
+        // Always regenerate from the current STAR mesh on macro startup.  Do not
+        // reuse old mapping files after any mesh/table change.
         if (ECM_MAPPING_CSV_FILE != null) {
-            if (freshStart && ECM_MAPPING_CSV_FILE.exists()) {
-                try {
-                    Files.delete(ECM_MAPPING_CSV_FILE.toPath());
-                    sim.println("[ECM-LMR] Fresh run: deleted ecm_mapping.csv — will regenerate.");
-                } catch (IOException ex) {
-                    sim.println("[ECM-LMR] WARN: could not delete ecm_mapping.csv: " + ex.getMessage());
-                }
-            }
-            if (!ECM_MAPPING_CSV_FILE.exists()) {
-                sim.println("[ECM-LMR] ecm_mapping.csv absent — generating...");
-                try {
-                    regenEcmMapping(sim);
-                } catch (Exception e) {
-                    sim.println("[ECM-LMR] FATAL: " + e.getMessage());
-                    return;
-                }
-            } else {
-                // stale check: count unique meshKey values
-                java.util.HashSet<Integer> seenKeys = new java.util.HashSet<>();
-                try (BufferedReader br = new BufferedReader(new FileReader(ECM_MAPPING_CSV_FILE))) {
-                    br.readLine(); // header
-                    String ln;
-                    while ((ln = br.readLine()) != null) {
-                        int c = ln.indexOf(',');
-                        if (c > 0) {
-                            try { seenKeys.add(Integer.parseInt(ln.substring(0, c).trim())); }
-                            catch (NumberFormatException ignored) {}
-                        }
-                    }
-                } catch (IOException e) {
-                    sim.println("[ECM-LMR] FATAL: could not read ecm_mapping.csv: " + e.getMessage());
-                    return;
-                }
-                if (seenKeys.size() != n) {
-                    sim.println(String.format(
-                        "[ECM-LMR] ecm_mapping.csv covers %d cells but mesh has %d — regenerating.",
-                        seenKeys.size(), n));
-                    try {
-                        regenEcmMapping(sim);
-                    } catch (Exception e) {
-                        sim.println("[ECM-LMR] FATAL: " + e.getMessage());
-                        return;
-                    }
-                }
+            sim.println("[ECM-LMR] Regenerating ecm_mapping.csv from current mesh every startup.");
+            try {
+                Files.deleteIfExists(ECM_MAPPING_CSV_FILE.toPath());
+                Files.deleteIfExists(ZONE_WEIGHTS_CSV_FILE.toPath());
+                regenEcmMapping(sim);
+            } catch (Exception e) {
+                sim.println("[ECM-LMR] FATAL: " + e.getMessage());
+                return;
             }
         }
 
@@ -1591,6 +1704,134 @@ public class EcmCouplerMacro extends StarMacro {
         double physicalTimeFromStar = tryGetPhysicalTimeFromStar(sim);
         if (Double.isFinite(physicalTimeFromStar) && physicalTimeFromStar >= 0.0) {
             accumulatedTime = physicalTimeFromStar;
+        }
+
+        // --- Pre-warm-up ECM call (fresh starts only) ---
+        // WHY: The coupling loop runs iter.step(1) BEFORE calling the ECM, so the
+        // FileTable that STAR uses during the first solver step always comes from
+        // whatever was on disk at startup (ecm_qvol_injection.csv).  That file is
+        // typically produced by a prior OpenFOAM run at a different initial
+        // temperature than the STAR-CCM+ case.  The temperature mismatch causes a
+        // sharp ~2× jump in applied ECM heat between t=0.2 and t=0.4:
+        //   t=0.2 step: uses stale pre-computed qVol from OF IC temperature
+        //   t=0.4 step: uses first real ECM call at STAR IC temperature → jump
+        // Fix: call the ECM once here with STAR's initial temperatures and
+        // deltaT=0 (so ECM state/SoC is not advanced), then write the result into
+        // the FileTable so step 1 starts from the correct qVol.
+        // Continuation runs are skipped — their FileTable already holds correct
+        // values from the previous run's last step.
+        if (freshStart) {
+            sim.println("[ECM-LMR] Pre-warm-up: calling ECM at STAR initial temperatures "
+                + "(stepId=0, deltaT=0 — no SoC advancement).");
+            double[] tAvgInit = new double[nR];
+            for (int k = 0; k < nR; k++) tAvgInit[k] = tReports[k].getValue();
+            double[] tempsInit = new double[n];
+            for (int i = 0; i < n; i++) {
+                int r = (regIdx != null && regIdx[i] >= 0 && regIdx[i] < nR) ? regIdx[i] : 0;
+                tempsInit[i] = tAvgInit[r];
+            }
+            StringBuilder wuTLog = new StringBuilder();
+            for (int k = 0; k < nR; k++) {
+                wuTLog.append(String.format(" T_r%d=%.4f K(%.2f C)", k, tAvgInit[k], tAvgInit[k] - 273.15));
+            }
+            sim.println("[ECM-LMR] Pre-warm-up initial temperatures:" + wuTLog);
+
+            double currentAtT0 = currentProfile.currentAt(0.0);
+            byte[] wuInputBytes = null;
+            try {
+                // stepId=0 is the probe/warm-up slot; actual loop starts at stepId=1.
+                // deltaT=0 ensures the ECM does not consume any charge capacity.
+                wuInputBytes = EcmBinaryIO.buildElementWiseInputBytes(
+                    0L, cellMapper.cellIds(), tempsInit, 0.0, 0.0, currentAtT0);
+            } catch (IOException e) {
+                sim.println("[ECM-LMR] WARN: pre-warm-up input build failed: " + e.getMessage()
+                    + " — step 1 will use stale injection file values.");
+            }
+
+            if (wuInputBytes != null) {
+                Map<Integer, Double> wuQVolMap = null;
+                if (persistentProcess != null) {
+                    try {
+                        wuQVolMap = persistentProcess.exchangeElementWise(
+                            sim, wuInputBytes, 0L, debugLog);
+                        if (wuQVolMap == null) {
+                            sim.println("[ECM-LMR] WARN: pre-warm-up persistent stepId mismatch"
+                                + " — step 1 will use stale injection file values.");
+                        }
+                    } catch (IOException e) {
+                        sim.println("[ECM-LMR] WARN: pre-warm-up persistent exchange failed: "
+                            + e.getMessage() + " — falling back to file-based.");
+                        persistentProcess.close();
+                        persistentProcess = null;
+                    }
+                }
+                if (wuQVolMap == null && persistentProcess == null) {
+                    try {
+                        Files.deleteIfExists(ECM_OUT_PATH.toPath());
+                        EcmBinaryIO.writeBytes(ECM_IN_PATH, wuInputBytes);
+                        int wuExit = runProcess(sim, debugLog);
+                        if (wuExit != 0) {
+                            sim.println("[ECM-LMR] WARN: pre-warm-up ECM exited " + wuExit
+                                + " — step 1 will use stale injection file values.");
+                        } else if (!waitForFile(ECM_OUT_PATH, ECM_TIMEOUT_S)) {
+                            sim.println("[ECM-LMR] WARN: pre-warm-up ecm_out.bin timeout"
+                                + " — step 1 will use stale injection file values.");
+                        } else {
+                            wuQVolMap = EcmBinaryIO.readElementWiseOutput(ECM_OUT_PATH, 0L);
+                            if (wuQVolMap == null) {
+                                sim.println("[ECM-LMR] WARN: pre-warm-up output stepId mismatch"
+                                    + " — step 1 will use stale injection file values.");
+                            }
+                        }
+                    } catch (IOException e) {
+                        sim.println("[ECM-LMR] WARN: pre-warm-up file exchange failed: "
+                            + e.getMessage() + " — step 1 will use stale injection file values.");
+                    }
+                }
+
+                if (wuQVolMap != null) {
+                    // Merge → aggregate → uniform per region → inject FileTable
+                    double[] wuQVolNew = Arrays.copyOf(qVolPrev, n);
+                    for (Map.Entry<Integer, Double> e : wuQVolMap.entrySet()) {
+                        int cid = e.getKey();
+                        if (cid >= 0 && cid < n) wuQVolNew[cid] = e.getValue();
+                    }
+                    double[] wuQW = new double[nR];
+                    for (int i = 0; i < n; i++) {
+                        int r = (regIdx != null && regIdx[i] >= 0 && regIdx[i] < nR) ? regIdx[i] : 0;
+                        double vi = (vols != null) ? vols[i] : fallbackVCell;
+                        wuQW[r] += wuQVolNew[i] * vi;
+                    }
+                    double[] wuQVolUniform = new double[n];
+                    double wuTotalW = 0.0;
+                    for (int i = 0; i < n; i++) {
+                        int r = (regIdx != null && regIdx[i] >= 0 && regIdx[i] < nR) ? regIdx[i] : 0;
+                        wuQVolUniform[i] = wuQW[r] / regionVolume[r];
+                        double vi = (vols != null) ? vols[i] : fallbackVCell;
+                        wuTotalW += wuQVolUniform[i] * vi;
+                    }
+                    StringBuilder wuQLog = new StringBuilder();
+                    for (int k = 0; k < nR; k++) {
+                        wuQLog.append(String.format("  Q_r%d=%.4f W (%.3e W/m3)",
+                            k, wuQW[k], wuQW[k] / regionVolume[k]));
+                    }
+                    sim.println(String.format(
+                        "[ECM-LMR] Pre-warm-up Q_total=%.6e W%s", wuTotalW, wuQLog));
+                    try {
+                        applyElementWiseHeatCsv(sim, cellMapper, wuQVolUniform, qInjectionTable);
+                        // Seed qWPrev/qVolPrev so step 1's under-relaxation starts
+                        // from the warm-up value rather than zero.
+                        qWPrev   = wuQW;
+                        qVolPrev = wuQVolUniform;
+                        sim.println("[ECM-LMR] Pre-warm-up complete: FileTable seeded with"
+                            + " IC-consistent qVol. Jump at t=deltaT eliminated.");
+                    } catch (IOException e) {
+                        sim.println("[ECM-LMR] WARN: pre-warm-up injection failed: "
+                            + e.getMessage()
+                            + " — step 1 will use stale injection file values.");
+                    }
+                }
+            }
         }
 
         for (int step = 0; step < N_STEPS; step++) {
@@ -1869,11 +2110,18 @@ public class EcmCouplerMacro extends StarMacro {
         double[] zs  = cellMapper.zCentroids();
 
         // Build full CSV in memory first (avoids many small writes; ~10 MB for 160k cells)
-        // Coordinate columns must be named X,Y,Z for STAR's setTabularXyzMethod auto-detection.
+        // Coordinate columns must be named X,Y,Z for STAR's setTabularXyzMethod
+        // auto-detection.  cellId/regionIdx are extra audit columns; STAR uses
+        // the named qVol_W_m3 profile column for the source value.
         StringBuilder sb = new StringBuilder(n * 64 + 32);
-        sb.append("X,Y,Z,qVol_W_m3\n");
+        sb.append("X,Y,Z,qVol_W_m3,cellId,regionIdx\n");
+        int[] ids = cellMapper.cellIds();
+        int[] ri = cellMapper.regionIndices();
         for (int i = 0; i < n; i++) {
-            sb.append(String.format("%.9e,%.9e,%.9e,%.6e\n", xs[i], ys[i], zs[i], qVolPerCell[i]));
+            sb.append(String.format("%.9e,%.9e,%.9e,%.6e,%d,%d\n",
+                xs[i], ys[i], zs[i], qVolPerCell[i],
+                ids != null ? ids[i] : i,
+                ri != null ? ri[i] : 0));
         }
 
         byte[] bytes = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -1949,7 +2197,7 @@ public class EcmCouplerMacro extends StarMacro {
             try {
                 if (Q_TABLE_CSV_FILE.getParentFile() != null) Q_TABLE_CSV_FILE.getParentFile().mkdirs();
                 Files.write(Q_TABLE_CSV_FILE.toPath(),
-                    "X,Y,Z,qVol_W_m3\n0.0,0.0,0.0,0.0\n"
+                    "X,Y,Z,qVol_W_m3,cellId,regionIdx\n0.0,0.0,0.0,0.0,0,0\n"
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 sim.println("[ECM-EW] Created injection CSV placeholder: "
                     + Q_TABLE_CSV_FILE.getAbsolutePath());
@@ -2421,9 +2669,9 @@ public class EcmCouplerMacro extends StarMacro {
 
     /**
      * Regenerate ecm_mapping.csv by running gen_ecm_mapping.py.
-     * Called automatically when a stale mapping file is detected after re-meshing.
+     * Called on every macro startup after the current ecm_cell_map.csv is written.
      * The freshly-written ecm_cell_map.csv is the input; ecm_mapping.csv is the output.
-     * Throws on any failure — the run must not proceed with a stale or missing mapping.
+     * Throws on any failure — the run must not proceed without a fresh mapping.
      */
     private void regenEcmMapping(Simulation sim) throws Exception {
         File genScript = new File(ECM_DIR, "gen_ecm_mapping.py");
@@ -2831,63 +3079,83 @@ public class EcmCouplerMacro extends StarMacro {
     /**
      * Build a CellMapper that covers all cells in the given list of regions.
      *
-     * <p>For N=1 this is a direct call to {@link CellMapper#create} — behaviour
-     * is bit-for-bit identical to the single-region path.
-     *
-     * <p>For N&gt;1 this reads the combined T-table (which must be configured in
-     * the STAR GUI to cover all jellyRoll regions), building a merged mapper
-     * with globally sequential cell IDs.  The {@code regionIndices} array is
-     * assigned by {@link #computeRegionIndicesNearestCentroid} — each cell is
-     * mapped to the nearest region centroid using spatial coordinates only (no
-     * assumption on T-table row ordering).  Throws if spatial assignment fails
-     * rather than falling back to a wrong mapping.
+     * <p>This always reads the current XYZ T-table (configured in STAR to cover
+     * the coupled jellyRoll region or regions) and never reuses an existing
+     * {@code ecm_cell_map.csv}.  The macro rewrites the cell map and regenerates
+     * ECM mapping files on every startup.
      *
      * @param sim     the running Simulation
      * @param regions sorted list of coupled regions (ascending name order)
      */
     private static CellMapper buildMergedCellMapper(Simulation sim, List<Region> regions)
             throws Exception {
-        if (regions.size() == 1) {
-            // N=1: exact backward-compatible path — no change at all
-            return CellMapper.create(sim, regions.get(0));
-        }
-
-        // N>1: use the combined T-table as the single source of truth
+        // Always use the current XYZ T-table as the source of truth.  Do not reuse
+        // ecm_cell_map.csv: a remesh can leave an old CSV with matching row count
+        // but stale centroids, volumes, or region labels.
         Table tTableRef = null;
-        int liveCount = -1;
         try {
             tTableRef = sim.getTableManager().getTable(T_TABLE_NAME);
             tTableRef.extract();
-            liveCount = tTableRef.getRowCount();
             sim.println(String.format(
-                "[ECM-EW] Multi-region: T-table '%s' has %d total rows across %d regions.",
-                T_TABLE_NAME, liveCount, regions.size()));
+                "[ECM-EW] T-table '%s' has %d total rows across %d region(s).",
+                T_TABLE_NAME, tTableRef.getRowCount(), regions.size()));
         } catch (Exception e) {
             throw new Exception(
-                "Multi-region CellMapper requires T-table '" + T_TABLE_NAME + "' covering all "
-                + regions.size() + " jellyRoll regions. Error: " + e.getMessage(), e);
+                "CellMapper requires T-table '" + T_TABLE_NAME + "' covering the coupled "
+                + "jellyRoll region(s). Error: " + e.getMessage(), e);
         }
 
-        // Build the merged mapper from the combined T-table
+        // Build the mapper from the current table and current volumes.
         CellMapper merged = CellMapper.createFromXyzTable(sim, tTableRef, regions.get(0));
         merged.extractVolumes(sim);
 
-        // ONLY valid path: nearest-centroid spatial assignment.
-        // Does NOT assume any T-table row ordering; works for N ≥ 2.
-        // Uses ecm_region_geometry.csv origins if available, otherwise k-means clustering.
-        // FvRep cell counts are used ONLY for post-assignment validation (warn, never override).
-        // If this fails, we ABORT — silent fallbacks produce silently wrong heat distributions.
-        int[] spatialRi = computeRegionIndicesNearestCentroid(sim, regions, merged);
-        if (spatialRi == null) {
-            throw new Exception(
-                "[ECM-EW] FATAL: spatial regionIdx assignment failed for " + regions.size()
-                + " regions. Cannot assign cells to regions without spatial data. "
-                + "Check that ecm_region_geometry.csv exists or that cell centroid data "
-                + "is available in the T-table (x_m, y_m, z_m columns required). "
-                + "Aborting — a silent fallback would produce wrong heat distributions.");
+        if (regions.size() == 1) {
+            merged.setRegionIndices(new int[merged.nCells()]);
+            sim.println(String.format(
+                "[ECM-EW] CellMapper: %d current cells, single region.", merged.nCells()));
+            return merged;
         }
-        merged.setRegionIndices(spatialRi);
-        validateRegionIdxWithFvRep(sim, regions, spatialRi);
+
+        // Prefer computing regionIdx from FvRepresentation cell counts (authoritative, never stale).
+        // Then verify the T-table row ordering matches the regions list, auto-correcting if reversed.
+        int[] computedRi = computeRegionIndicesFromFvRep(sim, regions, merged.nCells());
+        if (computedRi != null) {
+            verifyAndCorrectRegionIdxOrdering(sim, regions, merged, computedRi);
+            if (isSpatiallySeparatedRegionIdx(sim, merged, computedRi, regions.size(), "FvRep")) {
+                merged.setRegionIndices(computedRi);
+            } else {
+                sim.println("[ECM-EW] regionIdx: FvRep result failed spatial validation; "
+                    + "falling back to centroid clustering.");
+                int[] centroidRi = computeRegionIndicesFromCentroids(sim, regions, merged);
+                if (centroidRi != null) {
+                    merged.setRegionIndices(centroidRi);
+                    sim.println("[ECM-EW] regionIdx: replaced invalid FvRep/ordering labels "
+                        + "with Y-centroid clustering.");
+                } else {
+                    merged.setRegionIndices(computedRi);
+                    sim.println("[ECM-EW] WARN: centroid fallback failed; keeping FvRep regionIdx.");
+                }
+            }
+        } else {
+            // FvRep failed.  Fall back to Y-coordinate bimodality: assign cells
+            // to the nearest cylinder from current T-table centroids.
+            int[] centroidRi = computeRegionIndicesFromCentroids(sim, regions, merged);
+            if (centroidRi != null) {
+                // NOTE: do NOT call verifyAndCorrectRegionIdxOrdering here — the centroid
+                // assignment is coordinate-based (not T-table-block-based), so the verify
+                // function's block-swap logic would incorrectly re-map it.
+                merged.setRegionIndices(centroidRi);
+                sim.println("[ECM-EW] regionIdx: computed from Y-centroid clustering "
+                    + "(FvRep unavailable). "
+                    + "ecm_mapping.csv will be regenerated with correct per-region zones.");
+            } else {
+                merged.setRegionIndices(new int[merged.nCells()]);  // all zeros fallback
+                sim.println("[ECM-EW] WARN: regionIdx could not be computed — all cells assigned to "
+                    + "region 0. gen_ecm_mapping.py will treat all cells as one cylinder. "
+                    + "Re-run from t=0 after resolving FvRep/CSV issues; "
+                    + "ecm_mapping.csv will be auto-regenerated.");
+            }
+        }
 
         sim.println(String.format(
             "[ECM-EW] Merged CellMapper: %d total cells, %d regions.", merged.nCells(), regions.size()));
@@ -2955,66 +3223,67 @@ public class EcmCouplerMacro extends StarMacro {
      * @param regionIndices  array to correct in-place if ordering is reversed
      */
     private static void verifyAndCorrectRegionIdxOrdering(Simulation sim,
-            List<Region> regions, CellMapper merged, int[] regionIndices) {
+            List<Region> regions, CellMapper merged, int[] regionIndices) throws Exception {
 
         List<String> regionNames = new ArrayList<>();
         for (Region r : regions) regionNames.add(r.getPresentationName());
 
-        try {
-            Table tTable = sim.getTableManager().getTable(T_TABLE_NAME);
-            List<String> tablePartNames = getTablePartNames(sim, tTable);
+        Table tTable = sim.getTableManager().getTable(T_TABLE_NAME);
+        List<String> tablePartNames = getTablePartNames(sim, tTable);
 
-            if (tablePartNames == null) {
-                sim.println("[ECM-EW] verifyRegionOrder: cannot retrieve T-table Parts list via "
-                    + "reflection (API may differ in this STAR version). Skipping ordering "
-                    + "verification. Manually ensure T-table '" + T_TABLE_NAME
-                    + "' Parts are ordered: " + regionNames);
-                return;
+        if (tablePartNames == null) {
+            // Reflection could not read the Parts list — STAR API version difference.
+            // We cannot verify programmatically; warn clearly and require manual check.
+            sim.println("[ECM-EW] verifyRegionOrder: WARN: cannot retrieve T-table Parts list "
+                + "via reflection (STAR API version may differ). "
+                + "MANUAL CHECK REQUIRED: in STAR GUI confirm T-table '" + T_TABLE_NAME
+                + "' Parts are in this exact order: " + regionNames + ". "
+                + "Wrong order will silently misassign regionIdx and corrupt heat injection.");
+            return;
+        }
+
+        if (tablePartNames.size() != regions.size()) {
+            throw new Exception(
+                "[ECM-EW] verifyRegionOrder: T-table '" + T_TABLE_NAME + "' has "
+                + tablePartNames.size() + " Parts " + tablePartNames
+                + " but there are " + regions.size() + " coupled regions " + regionNames
+                + ". Configure the T-table Parts to contain exactly these regions: "
+                + regionNames);
+        }
+
+        if (tablePartNames.equals(regionNames)) {
+            sim.println("[ECM-EW] verifyRegionOrder: T-table Parts order VERIFIED — "
+                + "matches coupled regions list " + regionNames + ".");
+            return;
+        }
+
+        // Ordering mismatch detected.
+        if (regions.size() == 2
+                && tablePartNames.get(0).equals(regionNames.get(1))
+                && tablePartNames.get(1).equals(regionNames.get(0))) {
+            // Simple 2-region reversal — auto-correct in-place.
+            int cnt0 = 0;
+            for (int ri : regionIndices) if (ri == 0) cnt0++;
+            sim.println("[ECM-EW] verifyRegionOrder: T-table Parts are REVERSED: "
+                + tablePartNames + " vs expected " + regionNames + ". "
+                + "AUTO-CORRECTING regionIdx (swapping 0↔1). "
+                + "group[0] had " + cnt0 + " rows, group[1] had "
+                + (regionIndices.length - cnt0) + " rows.");
+            for (int i = 0; i < regionIndices.length; i++) {
+                regionIndices[i] = 1 - regionIndices[i];
             }
-
-            if (tablePartNames.size() != regions.size()) {
-                sim.println("[ECM-EW] verifyRegionOrder: T-table has " + tablePartNames.size()
-                    + " Parts but " + regions.size()
-                    + " coupled regions — cannot verify ordering.");
-                return;
-            }
-
-            if (tablePartNames.equals(regionNames)) {
-                sim.println("[ECM-EW] verifyRegionOrder: T-table Parts order VERIFIED — "
-                    + "matches regions list " + regionNames + ".");
-                return;
-            }
-
-            // Ordering mismatch detected
-            if (regions.size() == 2
-                    && tablePartNames.get(0).equals(regionNames.get(1))
-                    && tablePartNames.get(1).equals(regionNames.get(0))) {
-                // Simple 2-region reversal — auto-correct in-place
-                int cnt0 = 0;
-                for (int ri : regionIndices) if (ri == 0) cnt0++;
-                sim.println("[ECM-EW] verifyRegionOrder: T-table Parts are REVERSED: "
-                    + tablePartNames + " vs expected " + regionNames + ". "
-                    + "AUTO-CORRECTING regionIdx (swapping 0↔1). "
-                    + "group[0] had " + cnt0 + " rows, group[1] had "
-                    + (regionIndices.length - cnt0) + " rows.");
-                for (int i = 0; i < regionIndices.length; i++) {
-                    regionIndices[i] = 1 - regionIndices[i];
-                }
-                sim.println("[ECM-EW] verifyRegionOrder: regionIdx CORRECTED. "
-                    + "ecm_mapping.csv will be auto-deleted and regenerated on "
-                    + "fresh-start runs (t=0).");
-            } else {
-                sim.println("[ECM-EW] verifyRegionOrder: WARN: T-table Parts "
-                    + tablePartNames + " do not match regions list " + regionNames
-                    + " in any simple 2-region swap. regionIdx may be incorrect. "
-                    + "In STAR GUI, set T-table '" + T_TABLE_NAME
-                    + "' Parts to: " + regionNames + " and re-run from t=0 "
-                    + "(ecm_mapping.csv will be auto-regenerated).");
-            }
-
-        } catch (Exception e) {
-            sim.println("[ECM-EW] verifyRegionOrder: exception during verification: "
-                + e.getMessage() + " — proceeding without ordering check.");
+            sim.println("[ECM-EW] verifyRegionOrder: regionIdx CORRECTED. "
+                + "ecm_mapping.csv will be auto-deleted and regenerated on "
+                + "fresh-start runs (t=0).");
+        } else {
+            // Cannot auto-correct: N > 2 or non-trivial permutation.
+            throw new Exception(
+                "[ECM-EW] verifyRegionOrder: T-table Parts order " + tablePartNames
+                + " does not match coupled regions list " + regionNames
+                + " and cannot be auto-corrected (N=" + regions.size() + " regions). "
+                + "In the STAR GUI set T-table '" + T_TABLE_NAME
+                + "' Parts to exactly: " + regionNames
+                + " (same order), then delete ecm_cell_map.csv and re-run from t=0.");
         }
     }
 
@@ -3038,6 +3307,67 @@ public class EcmCouplerMacro extends StarMacro {
             if (r != 0) return true;   // at least one cell assigned to a non-zero region
         }
         return false;  // all zeros → stale/uninitialised CSV
+    }
+
+    /**
+     * Sanity-check 2-region labels against the actual centroid positions.
+     *
+     * <p>The two-cell test cases used here are physically separated mainly in Y.
+     * A valid {@code regionIdx} therefore has region 0 almost entirely on one
+     * side of the global Y midpoint and region 1 almost entirely on the other.
+     * This catches stale/corrupt {@code ecm_cell_map.csv} files whose row count
+     * matches the current mesh but whose region labels alternate through both
+     * physical jelly-rolls after a remesh.
+     */
+    private static boolean isSpatiallySeparatedRegionIdx(Simulation sim, CellMapper merged,
+            int[] regionIdx, int nRegions, String source) {
+        if (nRegions != 2 || regionIdx == null || regionIdx.length != merged.nCells()) {
+            return true;
+        }
+
+        double[] ys = merged.yCentroids();
+        if (ys == null || ys.length == 0) return true;
+
+        double yMin = Double.MAX_VALUE, yMax = -Double.MAX_VALUE;
+        for (double y : ys) {
+            if (y < yMin) yMin = y;
+            if (y > yMax) yMax = y;
+        }
+        double yRange = yMax - yMin;
+        if (yRange < 0.020) {
+            // Not a side-by-side two-cell geometry; do not reject labels here.
+            return true;
+        }
+
+        double yMid = 0.5 * (yMin + yMax);
+        int[][] counts = new int[2][2]; // [regionIdx][side: 0=low-Y, 1=high-Y]
+        int invalid = 0;
+        for (int i = 0; i < regionIdx.length; i++) {
+            int ri = regionIdx[i];
+            if (ri < 0 || ri >= 2) {
+                invalid++;
+                continue;
+            }
+            int side = (ys[i] < yMid) ? 0 : 1;
+            counts[ri][side]++;
+        }
+
+        int r0 = counts[0][0] + counts[0][1];
+        int r1 = counts[1][0] + counts[1][1];
+        double purity0 = (r0 > 0) ? Math.max(counts[0][0], counts[0][1]) / (double) r0 : 0.0;
+        double purity1 = (r1 > 0) ? Math.max(counts[1][0], counts[1][1]) / (double) r1 : 0.0;
+        boolean valid = invalid == 0 && purity0 >= 0.90 && purity1 >= 0.90
+            && counts[0][0] != counts[1][0];
+
+        sim.println(String.format(
+            "[ECM-EW] regionIdx spatial check (%s): yRange=%.4f m yMid=%.4f m "
+            + "r0(low=%d high=%d purity=%.3f) r1(low=%d high=%d purity=%.3f) invalid=%d "
+            + "=> %s",
+            source, yRange, yMid,
+            counts[0][0], counts[0][1], purity0,
+            counts[1][0], counts[1][1], purity1,
+            invalid, valid ? "OK" : "REJECT"));
+        return valid;
     }
 
     /**
@@ -3099,233 +3429,6 @@ public class EcmCouplerMacro extends StarMacro {
         return ri;
     }
 
-    /**
-     * Assign per-cell regionIdx using nearest-centroid (spatial) logic.
-     *
-     * For each region r the centroid is obtained from:
-     *   (a) ecm_region_geometry.csv origin column, if the file exists and covers all regions;
-     *   (b) k-means clustering of all cell centroids with k = regions.size().
-     *
-     * Each cell is then assigned to the region whose centroid is closest (Euclidean distance).
-     * This method makes NO assumption about T-table row ordering.
-     *
-     * @return regionIdx array (length = merged.nCells()), or null if data is entirely absent
-     */
-    private static int[] computeRegionIndicesNearestCentroid(Simulation sim,
-            List<Region> regions, CellMapper merged) {
-        int k = regions.size();
-        double[] xs = merged.xCentroids();
-        double[] ys = merged.yCentroids();
-        double[] zs = merged.zCentroids();
-        if (xs == null || ys == null || zs == null || xs.length == 0) {
-            sim.println("[ECM-EW] computeRegionIndicesNearestCentroid: no centroid data in CellMapper.");
-            return null;
-        }
-        int n = xs.length;
-        double[][] centers = new double[k][3];
-
-        // --- (a) Try to load centroids from ecm_region_geometry.csv ---
-        boolean centersLoaded = false;
-        if (REGION_GEOMETRY_CSV_FILE.exists()) {
-            try {
-                boolean[] seen = new boolean[k];
-                try (java.io.BufferedReader br = new java.io.BufferedReader(
-                        new java.io.FileReader(REGION_GEOMETRY_CSV_FILE))) {
-                    String hdr = br.readLine();
-                    if (hdr == null) throw new Exception("empty file");
-                    String[] cols = hdr.split(",");
-                    int iRIdx = -1, iOx = -1, iOy = -1, iOz = -1;
-                    for (int c = 0; c < cols.length; c++) {
-                        String col = cols[c].trim().toLowerCase();
-                        if (col.equals("regionidx"))   iRIdx = c;
-                        else if (col.equals("origin_x")) iOx = c;
-                        else if (col.equals("origin_y")) iOy = c;
-                        else if (col.equals("origin_z")) iOz = c;
-                    }
-                    if (iRIdx < 0 || iOx < 0 || iOy < 0 || iOz < 0)
-                        throw new Exception("missing columns (need regionIdx,origin_x,origin_y,origin_z)");
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        String[] parts = line.split(",");
-                        if (parts.length <= Math.max(Math.max(iRIdx, iOx), Math.max(iOy, iOz))) continue;
-                        int r = Integer.parseInt(parts[iRIdx].trim());
-                        if (r >= 0 && r < k) {
-                            centers[r][0] = Double.parseDouble(parts[iOx].trim());
-                            centers[r][1] = Double.parseDouble(parts[iOy].trim());
-                            centers[r][2] = Double.parseDouble(parts[iOz].trim());
-                            seen[r] = true;
-                        }
-                    }
-                }
-                boolean allSeen = true;
-                for (boolean s : seen) if (!s) { allSeen = false; break; }
-                if (allSeen) {
-                    centersLoaded = true;
-                    StringBuilder sb = new StringBuilder(
-                        "[ECM-EW] regionIdx: loaded centroids from "
-                        + REGION_GEOMETRY_CSV_FILE.getName() + ":");
-                    for (int r = 0; r < k; r++)
-                        sb.append(String.format(" r%d=(%.4f,%.4f,%.4f)",
-                            r, centers[r][0], centers[r][1], centers[r][2]));
-                    sim.println(sb.toString());
-                } else {
-                    sim.println("[ECM-EW] WARN: ecm_region_geometry.csv does not cover all "
-                        + k + " regions — falling back to k-means.");
-                }
-            } catch (Exception e) {
-                sim.println("[ECM-EW] WARN: could not read ecm_region_geometry.csv ("
-                    + e.getMessage() + ") — falling back to k-means.");
-            }
-        }
-
-        // --- (b) k-means fallback (no assumption on row order; works for any N ≥ 2) ---
-        if (!centersLoaded) {
-            sim.println("[ECM-EW] regionIdx: running k-means (k=" + k + ") on "
-                + n + " cell centroids.");
-            // Find the axis with the largest spread for seed initialisation
-            double xMin = Double.MAX_VALUE, xMax = -Double.MAX_VALUE;
-            double yMin = Double.MAX_VALUE, yMax = -Double.MAX_VALUE;
-            double zMin = Double.MAX_VALUE, zMax = -Double.MAX_VALUE;
-            for (int i = 0; i < n; i++) {
-                if (xs[i] < xMin) xMin = xs[i]; if (xs[i] > xMax) xMax = xs[i];
-                if (ys[i] < yMin) yMin = ys[i]; if (ys[i] > yMax) yMax = ys[i];
-                if (zs[i] < zMin) zMin = zs[i]; if (zs[i] > zMax) zMax = zs[i];
-            }
-            double xRange = xMax - xMin, yRange = yMax - yMin, zRange = zMax - zMin;
-            if (Math.max(Math.max(xRange, yRange), zRange) < 1e-6) {
-                sim.println("[ECM-EW] computeRegionIndicesNearestCentroid: cell centroid spread "
-                    + "< 1 µm — cannot cluster into " + k + " regions.");
-                return null;
-            }
-            // Sort indices along the widest axis; pick k evenly-spaced seeds
-            final double[] seedAxis = (xRange >= yRange && xRange >= zRange) ? xs
-                                    : (yRange >= zRange) ? ys : zs;
-            Integer[] sortIdx = new Integer[n];
-            for (int i = 0; i < n; i++) sortIdx[i] = i;
-            java.util.Arrays.sort(sortIdx,
-                (a, b) -> Double.compare(seedAxis[a], seedAxis[b]));
-            for (int r = 0; r < k; r++) {
-                int si = sortIdx[(int)((long) r * (n - 1) / (k - 1))];
-                centers[r][0] = xs[si];
-                centers[r][1] = ys[si];
-                centers[r][2] = zs[si];
-            }
-
-            int[] ri = new int[n];
-            for (int iter = 0; iter < 50; iter++) {
-                // assignment
-                boolean changed = false;
-                for (int i = 0; i < n; i++) {
-                    double minD2 = Double.MAX_VALUE;
-                    int best = 0;
-                    for (int r = 0; r < k; r++) {
-                        double dx = xs[i]-centers[r][0], dy = ys[i]-centers[r][1],
-                               dz = zs[i]-centers[r][2];
-                        double d2 = dx*dx + dy*dy + dz*dz;
-                        if (d2 < minD2) { minD2 = d2; best = r; }
-                    }
-                    if (ri[i] != best) { ri[i] = best; changed = true; }
-                }
-                if (!changed && iter > 0) {
-                    sim.println("[ECM-EW] k-means converged at iteration " + iter + ".");
-                    break;
-                }
-                // update
-                double[][] newC = new double[k][3];
-                int[] cnt = new int[k];
-                for (int i = 0; i < n; i++) {
-                    newC[ri[i]][0] += xs[i]; newC[ri[i]][1] += ys[i]; newC[ri[i]][2] += zs[i];
-                    cnt[ri[i]]++;
-                }
-                for (int r = 0; r < k; r++) {
-                    if (cnt[r] > 0) {
-                        centers[r][0] = newC[r][0]/cnt[r];
-                        centers[r][1] = newC[r][1]/cnt[r];
-                        centers[r][2] = newC[r][2]/cnt[r];
-                    }
-                }
-            }
-
-            // Reject degenerate result (any empty cluster means data has fewer distinct groups than k)
-            int[] clusterCounts = new int[k];
-            for (int i = 0; i < n; i++) clusterCounts[ri[i]]++;
-            for (int r = 0; r < k; r++) {
-                if (clusterCounts[r] == 0) {
-                    sim.println("[ECM-EW] computeRegionIndicesNearestCentroid: k-means produced "
-                        + "empty cluster for r=" + r + " — spatial data may not contain "
-                        + k + " distinct regions.");
-                    return null;
-                }
-            }
-            StringBuilder sb = new StringBuilder("[ECM-EW] regionIdx: k-means result:");
-            for (int r = 0; r < k; r++)
-                sb.append(String.format(" r%d=(%d cells, center=(%.4f,%.4f,%.4f))",
-                    r, clusterCounts[r], centers[r][0], centers[r][1], centers[r][2]));
-            sim.println(sb.toString());
-            return ri;
-        }
-
-        // --- nearest-centroid assignment using centers loaded from CSV ---
-        int[] ri = new int[n];
-        for (int i = 0; i < n; i++) {
-            double minD2 = Double.MAX_VALUE;
-            int best = 0;
-            for (int r = 0; r < k; r++) {
-                double dx = xs[i]-centers[r][0], dy = ys[i]-centers[r][1],
-                       dz = zs[i]-centers[r][2];
-                double d2 = dx*dx + dy*dy + dz*dz;
-                if (d2 < minD2) { minD2 = d2; best = r; }
-            }
-            ri[i] = best;
-        }
-        int[] clusterCounts = new int[k];
-        for (int i = 0; i < n; i++) clusterCounts[ri[i]]++;
-        StringBuilder sb = new StringBuilder(
-            "[ECM-EW] regionIdx: nearest-centroid (CSV origins) assignment:");
-        for (int r = 0; r < k; r++)
-            sb.append(String.format(" r%d=%d cells", r, clusterCounts[r]));
-        sim.println(sb.toString());
-        return ri;
-    }
-
-    /**
-     * Compare a spatial regionIdx assignment against FvRepresentation cell counts.
-     * Emits a WARNING for any mismatch but does NOT modify the regionIdx array.
-     * (FvRep row order is not reliable; spatial assignment stands regardless.)
-     */
-    private static void validateRegionIdxWithFvRep(Simulation sim,
-            List<Region> regions, int[] ri) {
-        try {
-            FvRepresentation fvRep = CellMapper.getFvRepresentation(sim);
-            for (int rIdx = 0; rIdx < regions.size(); rIdx++) {
-                int fvCnt;
-                try {
-                    Method mCnt = fvRep.getClass().getMethod("getCellCount", Region.class);
-                    fvCnt = ((Number) mCnt.invoke(fvRep, regions.get(rIdx))).intValue();
-                } catch (NoSuchMethodException e1) {
-                    Method mCnt = fvRep.getClass().getMethod("getRegionCellCount", Region.class);
-                    fvCnt = ((Number) mCnt.invoke(fvRep, regions.get(rIdx))).intValue();
-                }
-                int spatialCnt = 0;
-                for (int v : ri) if (v == rIdx) spatialCnt++;
-                if (fvCnt != spatialCnt) {
-                    sim.println(String.format(
-                        "[ECM-EW] WARN regionIdx validation '%s' (r%d): "
-                        + "spatial=%d cells, FvRep=%d cells (delta=%d). "
-                        + "FvRep row-order is unreliable; spatial assignment stands.",
-                        regions.get(rIdx).getPresentationName(), rIdx,
-                        spatialCnt, fvCnt, Math.abs(spatialCnt - fvCnt)));
-                } else {
-                    sim.println(String.format(
-                        "[ECM-EW] regionIdx validation '%s' (r%d): %d cells — OK.",
-                        regions.get(rIdx).getPresentationName(), rIdx, spatialCnt));
-                }
-            }
-        } catch (Exception e) {
-            sim.println("[ECM-EW] regionIdx FvRep validation unavailable: " + e.getMessage());
-        }
-    }
-
     private static List<String> getTablePartNames(Simulation sim, Table table) {
         try {
             Method getParts = table.getClass().getMethod("getParts");
@@ -3382,48 +3485,6 @@ public class EcmCouplerMacro extends StarMacro {
             sim.println("[ECM-EW] getTablePartNames: reflection failed (" + e.getMessage() + ")");
             return null;
         }
-    }
-
-    /**
-     * Read the optional {@code regionIdx} column from an existing
-     * {@code ecm_cell_map.csv}.  Returns {@code null} if the column is absent.
-     * Returns {@code null} if the row count does not match {@code expectedCount}.
-     */
-    private static int[] readRegionIndicesFromCsv(File csvFile, int expectedCount)
-            throws IOException {
-        List<Integer> result = new ArrayList<>();
-        int regionIdxCol = -1;
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            String header = br.readLine();
-            if (header == null) return null;
-            String[] hCols = header.split(",", -1);
-            for (int ci = 0; ci < hCols.length; ci++) {
-                if (hCols[ci].trim().equalsIgnoreCase("regionIdx")) {
-                    regionIdxCol = ci;
-                    break;
-                }
-            }
-            if (regionIdxCol < 0) return null;  // column absent
-            String line;
-            while ((line = br.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty()) continue;
-                String[] parts = line.split(",", -1);
-                if (regionIdxCol < parts.length) {
-                    try {
-                        result.add(Integer.parseInt(parts[regionIdxCol].trim()));
-                    } catch (NumberFormatException ignored) {
-                        result.add(0);
-                    }
-                } else {
-                    result.add(0);
-                }
-            }
-        }
-        if (result.size() != expectedCount) return null;  // stale CSV
-        int[] arr = new int[result.size()];
-        for (int i = 0; i < arr.length; i++) arr[i] = result.get(i);
-        return arr;
     }
 
     // =========================================================================
@@ -3803,18 +3864,15 @@ public class EcmCouplerMacro extends StarMacro {
                 sim.println("[ECM] WARN: FvRep volume extraction failed: " + e.getMessage());
             }
 
-            // ── Path C: uniform fallback ──────────────────────────────────────────────
-            sim.println("[ECM] WARN: Using uniform cell volume estimate.");
-            sim.println("[ECM]   Zone volumes are proportional to cell count, not mesh geometry.");
-            sim.println("[ECM]   Fix: add 'Cell Volume' scalar to XYZ T table '"
-                + T_TABLE_NAME + "' in STAR GUI.");
-            double uv = JELLY_ROLL_VOLUME_M3 / Math.max(n, 1);
-            double[] vols = new double[n];
-            Arrays.fill(vols, uv);
-            this.volumes = vols;
-            sim.println(String.format(
-                "[ECM] CellMapper volumes (uniform): %.4e m3/cell (%d cells, total=%.4e m3)",
-                uv, n, JELLY_ROLL_VOLUME_M3));
+            // ── Path C: no fallback — fail hard ──────────────────────────────────────
+            // Uniform cell volumes are wrong for non-uniform meshes and corrupt the
+            // per-zone heat balance in elementWise mode.  There is no safe default.
+            throw new RuntimeException(
+                "[ECM] FATAL: Cell volume extraction failed via both T-table column and FvRep. "
+                + "Cannot proceed with unknown cell volumes — uniform fallback is not safe "
+                + "for elementWise heat injection.\n"
+                + "Fix: in the STAR-CCM+ GUI, add 'Cell Volume' as a scalar to the XYZ "
+                + "Internal Table '" + T_TABLE_NAME + "' and re-run.");
         }
 
         /**
@@ -3912,29 +3970,32 @@ public class EcmCouplerMacro extends StarMacro {
                     + "Table may be configured on wrong region.", rows, n));
             }
 
-            // --- identify T column (cached after first call) ---
-            if (tColumnIndex < 0) {
-                sim.println(String.format(
-                    "[ECM-EW] [xyzTableInMemory] First call: identifying columns. rows=%d cols=%d",
-                    rows, cols));
-                for (int c = 0; c < cols; c++) {
-                    String colName = safeGetColumnName(table, c);
-                    sim.println("[ECM-EW]   col " + c + ": \"" + colName + "\"");
-                    String lower = colName.toLowerCase().trim();
-                    if (lower.contains("temp") || lower.equals("statictemperature")) {
-                        tColumnIndex = c;
-                    }
-                }
-                if (tColumnIndex < 0) {
-                    // Fallback: use last column
-                    tColumnIndex = cols - 1;
-                    sim.println("[ECM-EW] WARN: T column not found by name; using last column ("
-                        + tColumnIndex + ": \"" + safeGetColumnName(table, tColumnIndex) + "\")");
-                } else {
-                    sim.println("[ECM-EW] T column identified: col=" + tColumnIndex
-                        + " \"" + safeGetColumnName(table, tColumnIndex) + "\"");
+            // --- identify T column every call (not cached) ---
+            // Re-identifying each step costs one O(cols) loop (~5–10 cols) — negligible.
+            // Caching was fragile: if the user adds a column to the T-table mid-session
+            // the cached index would silently read the wrong column for all subsequent steps.
+            int newTCol = -1;
+            for (int c = 0; c < cols; c++) {
+                String colName = safeGetColumnName(table, c);
+                String lower = colName.toLowerCase().trim();
+                if (lower.contains("temp") || lower.equals("statictemperature")) {
+                    newTCol = c;
                 }
             }
+            if (newTCol < 0) {
+                throw new Exception(String.format(
+                    "T column not found in XYZ table '%s' (cols=%d). "
+                    + "Ensure the table includes a 'Temperature' or 'StaticTemperature' scalar. "
+                    + "Column names seen: %s",
+                    T_TABLE_NAME, cols, columnNames(table, cols)));
+            }
+            if (tColumnIndex != newTCol) {
+                // Log on first identification or if column position shifted.
+                sim.println(String.format(
+                    "[ECM-EW] T column: col=%d \"%s\" (cols=%d)",
+                    newTCol, safeGetColumnName(table, newTCol), cols));
+            }
+            tColumnIndex = newTCol;
 
             // --- build row→mapper mapping (cached after first call) ---
             if (tableRowToMapperIndex == null) {
@@ -3992,83 +4053,92 @@ public class EcmCouplerMacro extends StarMacro {
          * If X/Y/Z columns are not identifiable, falls back to direct (identity) mapping
          * with a warning (valid only if table row order matches CellMapper order).
          */
+        /**
+         * Build the table-row → CellMapper-index mapping once at startup.
+         *
+         * Always performs a full coordinate scan using the relaxed 0.1 mm centroid hash.
+         * No spot-check or identity shortcut — those shortcuts were the source of the
+         * parallel-run mapping bug (table.extract() returns rows in partition order, not
+         * serial/CSV order; identity is wrong in parallel).  The full scan runs once and
+         * is cached; the ~10 ms cost is negligible.
+         *
+         * Hash tolerance 0.1 mm absorbs the ~10–50 µm difference between CGNS vertex-mean
+         * centroids (ecm_cell_map.csv) and STAR volumetric centroids (XYZ T-table), while
+         * still uniquely distinguishing cells on a ≥ 1 mm mesh.
+         *
+         * Fails hard (throws) if X/Y/Z columns cannot be identified, because proceeding
+         * with a wrong mapping is worse than stopping with a clear error.
+         */
         private int[] buildTableToMapperMapping(Simulation sim, Table table,
                 int rows, int cols) throws Exception {
 
-            // identify X, Y, Z columns
+            // Identify X, Y, Z columns by name.
             int xCol = -1, yCol = -1, zCol = -1;
             for (int c = 0; c < cols; c++) {
                 String lower = safeGetColumnName(table, c).toLowerCase().trim();
-                if (lower.equals("x") || lower.startsWith("x ") || lower.equals("x(m)")) xCol = c;
+                if      (lower.equals("x") || lower.startsWith("x ") || lower.equals("x(m)")) xCol = c;
                 else if (lower.equals("y") || lower.startsWith("y ") || lower.equals("y(m)")) yCol = c;
                 else if (lower.equals("z") || lower.startsWith("z ") || lower.equals("z(m)")) zCol = c;
             }
-
             if (xCol < 0 || yCol < 0 || zCol < 0) {
-                // Column naming ambiguous — assume first three columns are X, Y, Z
                 if (cols >= 3) {
                     xCol = 0; yCol = 1; zCol = 2;
                     sim.println("[ECM-EW] WARN: X/Y/Z columns not found by name; "
                         + "assuming col 0=X, 1=Y, 2=Z for mapping.");
                 } else {
-                    // No coordinate columns — use identity mapping with warning
-                    sim.println("[ECM-EW] WARN: Cannot identify X/Y/Z columns (cols=" + cols + "). "
-                        + "Using DIRECT INDEX MAPPING (assumes table row order == CellMapper order).");
-                    sim.println("[ECM-EW]   This assumption should be verified. "
-                        + "Mismatch will cause incorrect per-cell temperature assignment.");
-                    int[] direct = new int[rows];
-                    for (int i = 0; i < rows; i++) direct[i] = i;
-                    return direct;
+                    throw new Exception(
+                        "Cannot build T-table row→mapper mapping: X/Y/Z columns not found "
+                        + "and table has fewer than 3 columns (cols=" + cols + "). "
+                        + "Ensure the XYZ T-table includes Position columns.");
                 }
             }
 
-            // Build centroid hash map from CellMapper
-            java.util.HashMap<Long, Integer> centMap = new java.util.HashMap<>(n * 2);
-            for (int i = 0; i < n; i++) {
-                centMap.put(centroidHash(x[i], y[i], z[i]), i);
-            }
-
-            // Bulk-read X, Y, Z columns once (~4ms each for 160k cells via getSeries).
-            // This replaces the old O(N) per-row getValueAt() loop used for coordinate matching.
+            // Bulk-read table coordinates once (~4 ms each for 160k cells).
             double[] tableX = getSeriesArray(sim, table, xCol);
             double[] tableY = getSeriesArray(sim, table, yCol);
             double[] tableZ = getSeriesArray(sim, table, zCol);
 
-            // --- Fast path: spot-check ~200 evenly-spaced rows to detect identity ordering.
-            // The XYZ table and CellMapper both enumerate the same region in the same mesh
-            // order, so in practice table row r always maps to mapper index r.
-            int SPOT_N = Math.min(200, rows);
-            int stride  = Math.max(1, rows / SPOT_N);
-            boolean identityOrdered = true;
-            for (int r = 0; r < rows && identityOrdered; r += stride) {
-                Long key = centroidHash(tableX[r], tableY[r], tableZ[r]);
-                Integer mapperIdx = centMap.get(key);
-                if (mapperIdx == null || mapperIdx.intValue() != r) {
-                    identityOrdered = false;
+            // Build relaxed centroid map from CellMapper (CSV/CGNS) coordinates.
+            // 0.1 mm bins tolerate CGNS-vs-STAR centroid difference; unique for ≥1 mm cells.
+            java.util.HashMap<Long, Integer> centMap = new java.util.HashMap<>(n * 2);
+            for (int i = 0; i < n; i++) {
+                centMap.put(centroidHashRelaxed(x[i], y[i], z[i]), i);
+            }
+
+            // Full scan: match every table row to its CellMapper index by coordinate.
+            // Any miss is a hard error — on a correctly configured mesh every row must match.
+            int[] mapping = new int[rows];
+            int nMissed = 0;
+            int firstMissedRow = -1;
+            for (int r = 0; r < rows; r++) {
+                Integer mi = centMap.get(centroidHashRelaxed(tableX[r], tableY[r], tableZ[r]));
+                if (mi != null) {
+                    mapping[r] = mi;
+                } else {
+                    nMissed++;
+                    if (firstMissedRow < 0) firstMissedRow = r;
                 }
             }
 
-            if (identityOrdered) {
-                sim.println(String.format(
-                    "[ECM-EW] Identity mapping confirmed via spot-check (%d samples, stride=%d). "
-                    + "Using direct row→index mapping (skipped full %d-row coordinate scan).",
-                    SPOT_N, stride, rows));
-                int[] direct = new int[rows];
-                for (int i = 0; i < rows; i++) direct[i] = i;
-                return direct;
+            if (nMissed > 0) {
+                throw new Exception(String.format(
+                    "T-table row→mapper mapping failed: %d/%d rows unmatched "
+                    + "even at 0.1 mm coordinate tolerance (first miss: row %d, "
+                    + "table coords=[%.6f, %.6f, %.6f]). "
+                    + "Possible causes: wrong T-table region, mesh replaced without "
+                    + "regenerating ecm_cell_map.csv, or centroids differ by > 0.1 mm. "
+                    + "Delete ecm_cell_map.csv and re-run to trigger automatic rebuild.",
+                    nMissed, rows, firstMissedRow,
+                    firstMissedRow >= 0 ? tableX[firstMissedRow] : 0.0,
+                    firstMissedRow >= 0 ? tableY[firstMissedRow] : 0.0,
+                    firstMissedRow >= 0 ? tableZ[firstMissedRow] : 0.0));
             }
 
-            // Spot-check did not confirm identity ordering. For static meshes this is caused
-            // by ecm_cell_map.csv using CGNS vertex-mean centroids while the XYZ table uses
-            // STAR volumetric centroids (differ >10 µm for polyhedral cells). Both sources
-            // enumerate the region in the same STAR internal cell order, so identity mapping
-            // is correct. Skip the full coordinate scan and return identity directly.
             sim.println(String.format(
-                "[ECM-EW] Using identity mapping (table row r → CellMapper index r, %d cells).",
+                "[ECM-EW] T-table row→mapper mapping built: all %d rows matched "
+                + "(0.1 mm coordinate scan). Correct for serial and parallel runs.",
                 rows));
-            int[] direct = new int[rows];
-            for (int i = 0; i < rows; i++) direct[i] = i;
-            return direct;
+            return mapping;
         }
 
         /**
@@ -4173,12 +4243,31 @@ public class EcmCouplerMacro extends StarMacro {
             return temps;
         }
 
-        /** Stable spatial hash for centroid lookup. Resolution: 0.01 mm = 1e-5 m. */
+        /** Stable spatial hash for centroid lookup. Resolution: 0.01 mm = 1e-5 m.
+         *  Used for the identity spot-check (strict). */
         private static long centroidHash(double cx, double cy, double cz) {
             long ix = Math.round(cx / 1e-5);
             long iy = Math.round(cy / 1e-5);
             long iz = Math.round(cz / 1e-5);
             // Large co-prime multipliers to avoid collisions in cylindrical geometry
+            return ix * 1_000_003_001L + iy * 1_000_003L + iz;
+        }
+
+        /**
+         * Relaxed spatial hash for centroid lookup. Resolution: 0.1 mm = 1e-4 m.
+         *
+         * Used when matching CGNS vertex-mean centroids (from ecm_cell_map.csv) against
+         * STAR volumetric centroids (from XYZ T-table).  The two centroid values for the
+         * same physical cell can differ by up to ~50 µm; 0.1 mm bins absorb that
+         * difference while still uniquely identifying cells on a ≥ 1 mm mesh.
+         * Also required in parallel runs where the table row order differs from the
+         * CSV cell order — the coordinate scan must successfully match every table row
+         * to the correct CellMapper entry regardless of global ordering.
+         */
+        private static long centroidHashRelaxed(double cx, double cy, double cz) {
+            long ix = Math.round(cx / 1e-4);
+            long iy = Math.round(cy / 1e-4);
+            long iz = Math.round(cz / 1e-4);
             return ix * 1_000_003_001L + iy * 1_000_003L + iz;
         }
 
@@ -4267,6 +4356,16 @@ public class EcmCouplerMacro extends StarMacro {
 
         private static String safeGetColumnName(Table table, int col) {
             try { return table.getColumnName(col); } catch (Exception e) { return "<col" + col + ">"; }
+        }
+
+        /** Returns a bracketed list of all column names — used in error messages. */
+        private static String columnNames(Table table, int cols) {
+            StringBuilder sb = new StringBuilder("[");
+            for (int c = 0; c < cols; c++) {
+                if (c > 0) sb.append(", ");
+                sb.append('"').append(safeGetColumnName(table, c)).append('"');
+            }
+            return sb.append(']').toString();
         }
 
         private static Object safeGetValueAt(Table table, int row, int col) {

@@ -2,7 +2,7 @@
 
 **File:** `src/EcmCouplerMacro.java` (~5400 lines)
 **Also at:** `package/src/EcmCouplerMacro.java`, `in/starCCM_10C_experiment_twoCells/src/EcmCouplerMacro.java`
-**Last updated:** 2026-07-02 (pre-warm-up ECM call in LMR mode: eliminates first-step qVol jump caused by IC temperature mismatch between ecm_qvol_injection.csv and STAR-CCM+ initial temperatures)
+**Last updated:** 2026-07-02 (pre-warm-up ECM call added to ALL three coupling paths: elementWise, lumped inline, and LMR. Each path reads IC temperature via tReport.getValue() before iter.step(1) and calls ECM with stepId=0/deltaT=0 to seed the heat source with IC-consistent values, eliminating the first-step qVol jump.)
 
 ---
 
@@ -16,8 +16,8 @@ EcmCouplerMacro  (extends StarMacro)        line 33
 │     • elementWise → executeElementWise()
 │     • lumped N>1 + csvReload → executeLumpedMultiRegion()  ← NEW
 │     • lumped N=1 or globalParam → inline lumped loop
-├── executeElementWise()                     line 793   ← distributed coupling loop (takes List<Region>)
-├── executeLumpedMultiRegion()               line ~1325 ← NEW: lumped T per region, uniform Q/region via table
+├── executeElementWise()                     line ~867  ← distributed coupling loop; pre-warm-up at ~line 1125
+├── executeLumpedMultiRegion()               line ~1510 ← lumped T per region, uniform Q/region via table; pre-warm-up at ~line 1709
 ├── applyElementWiseHeat()                   line ~1545 ← globalParam injection (DEPRECATED, warns)
 ├── applyElementWiseHeatCsv()                line ~1190 ← csvReload injection (no per-cell vol division)
 ├── writeQVolInjectionCsv()                  line ~1235 ← writes X,Y,Z,qVol [W/m³] CSV directly

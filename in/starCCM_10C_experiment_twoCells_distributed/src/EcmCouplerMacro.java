@@ -627,6 +627,92 @@ public class EcmCouplerMacro extends StarMacro {
         qParam.getQuantity().setValue(0.0);
         sim.println("[ECM] Reset ecmQdot_W to 0.0 W before coupling loop.");
 
+        // --- Pre-warm-up ECM call (lumped, fresh starts only) ---
+        // WHY: iter.step(1) runs BEFORE the ECM is called, so the first solver
+        // step always runs with Q=0 (reset above). That produces a one-step
+        // transient: step 1 has Q=0, step 2 has the first real ECM heat.
+        //
+        // Fix: probe the ECM at the STAR IC temperature (read via tReport.getValue())
+        // with stepId=0, deltaT=0 (no SoC advancement) and apply the result before
+        // the loop, so step 1 uses an IC-consistent heat source.
+        //
+        // Continuation runs are skipped (qVolPrev already holds last step value).
+        if (freshStart) {
+            sim.println("[ECM] Pre-warm-up: probing ECM at STAR IC temperature "
+                + "(stepId=0, deltaT=0 — no SoC advancement).");
+            double wuTAvg;
+            try {
+                wuTAvg = tReport.getValue();
+            } catch (Exception e) {
+                wuTAvg = Double.NaN;
+                sim.println("[ECM] WARN: pre-warm-up tReport.getValue() failed: " + e.getMessage());
+            }
+            if (Double.isFinite(wuTAvg)) {
+                sim.println(String.format("[ECM] Pre-warm-up IC T_avg=%.4f K (%.2f C)",
+                    wuTAvg, wuTAvg - 273.15));
+                double wuCurrent = currentProfile.currentAt(0.0);
+                byte[] wuInputBytes = null;
+                try {
+                    wuInputBytes = EcmBinaryIO.buildLumpedInputBytes(
+                        0L, wuTAvg, 0.0, 0.0, wuCurrent, 0.0);
+                } catch (IOException e) {
+                    sim.println("[ECM] WARN: pre-warm-up input build failed: " + e.getMessage()
+                        + " — step 1 will start with Q=0.");
+                }
+                if (wuInputBytes != null) {
+                    double wuQGenW = Double.NaN;
+                    if (persistentProcess != null) {
+                        try {
+                            wuQGenW = persistentProcess.exchange(sim, wuInputBytes, 0L, debugLog);
+                        } catch (IOException e) {
+                            sim.println("[ECM] WARN: pre-warm-up persistent exchange failed: "
+                                + e.getMessage() + " — falling back to file-based.");
+                            persistentProcess.close();
+                            persistentProcess = null;
+                        }
+                    }
+                    if ((Double.isNaN(wuQGenW) || !Double.isFinite(wuQGenW)) && persistentProcess == null) {
+                        try {
+                            EcmBinaryIO.writeBytes(ECM_IN_PATH, wuInputBytes);
+                            int wuExit = runProcess(sim, debugLog);
+                            if (wuExit == 0 && waitForFile(ECM_OUT_PATH, ECM_TIMEOUT_S)) {
+                                wuQGenW = EcmBinaryIO.readLumpedOutput(ECM_OUT_PATH, 0L);
+                            } else {
+                                sim.println("[ECM] WARN: pre-warm-up ECM call failed (exit=" + wuExit
+                                    + ") — step 1 will start with Q=0.");
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM] WARN: pre-warm-up file exchange failed: "
+                                + e.getMessage() + " — step 1 will start with Q=0.");
+                        }
+                    }
+                    if (Double.isFinite(wuQGenW) && !Double.isNaN(wuQGenW)) {
+                        sim.println(String.format("[ECM] Pre-warm-up Q=%.6e W. Seeding heat source.", wuQGenW));
+                        if ("csvReload".equalsIgnoreCase(INJECTION_MODE)
+                                && lumpedCellMapper != null && lumpedQTable != null) {
+                            double[] wuUniform = new double[lumpedCellMapper.n];
+                            Arrays.fill(wuUniform, wuQGenW);
+                            try {
+                                applyElementWiseHeatCsv(sim, lumpedCellMapper, wuUniform, lumpedQTable);
+                            } catch (IOException e) {
+                                sim.println("[ECM] WARN: pre-warm-up csvReload injection failed: "
+                                    + e.getMessage());
+                            }
+                        } else {
+                            qParam.getQuantity().setValue(wuQGenW);
+                        }
+                        qVolPrev = wuQGenW;
+                        sim.println("[ECM] Pre-warm-up complete: heat source seeded with IC-consistent Q."
+                            + " Jump at t=deltaT eliminated.");
+                    } else {
+                        sim.println("[ECM] WARN: pre-warm-up returned no valid Q — step 1 starts with Q=0.");
+                    }
+                }
+            } else {
+                sim.println("[ECM] WARN: pre-warm-up skipped — IC T not available from tReport.");
+            }
+        }
+
         for (int step = 0; step < N_STEPS; step++) {
 
             // 1. Advance solver one timestep
@@ -1035,6 +1121,115 @@ public class EcmCouplerMacro extends StarMacro {
 
         // previous qVol per cell (fallback when ECM call fails)
         double[] qVolPrev = new double[n];  // per-cell W from previous step (fallback)
+
+        // --- Pre-warm-up ECM call (elementWise, fresh starts only) ---
+        // WHY: iter.step(1) runs BEFORE the ECM is called, so the injection
+        // FileTable used for the first solver step comes from whatever was on disk
+        // at startup (ecm_qvol_injection.csv). Stale values → jump at t=deltaT.
+        //
+        // Fix: before the loop, probe the ECM at the STAR IC temperature (read via
+        // tReport.getValue()) with stepId=0, deltaT=0 (no SoC advancement) and
+        // write the result to the injection CSV so step 1 uses IC-consistent heat.
+        //
+        // Continuation runs are skipped — FileTable already holds correct values
+        // from the previous run's last step.
+        if (freshStart && "csvReload".equalsIgnoreCase(INJECTION_MODE) && qInjectionTable != null) {
+            sim.println("[ECM-EW] Pre-warm-up: probing ECM at STAR IC temperature "
+                + "(stepId=0, deltaT=0 — no SoC advancement).");
+            double wuTAvg;
+            try {
+                wuTAvg = tReport.getValue();
+            } catch (Exception e) {
+                wuTAvg = Double.NaN;
+                sim.println("[ECM-EW] WARN: pre-warm-up tReport.getValue() failed: " + e.getMessage());
+            }
+            if (Double.isFinite(wuTAvg)) {
+                sim.println(String.format("[ECM-EW] Pre-warm-up IC T_avg=%.4f K (%.2f C)",
+                    wuTAvg, wuTAvg - 273.15));
+                double[] wuTemps = new double[n];
+                Arrays.fill(wuTemps, wuTAvg);
+                double wuCurrent = currentProfile.currentAt(0.0);
+                byte[] wuInputBytes = null;
+                try {
+                    wuInputBytes = EcmBinaryIO.buildElementWiseInputBytes(
+                        0L, cellMapper.cellIds(), wuTemps, 0.0, 0.0, wuCurrent);
+                } catch (IOException e) {
+                    sim.println("[ECM-EW] WARN: pre-warm-up input build failed: " + e.getMessage()
+                        + " — step 1 will use stale injection file values.");
+                }
+                if (wuInputBytes != null) {
+                    Map<Integer, Double> wuQVolMap = null;
+                    if (persistentProcess != null) {
+                        try {
+                            wuQVolMap = persistentProcess.exchangeElementWise(
+                                sim, wuInputBytes, 0L, debugLog);
+                            if (wuQVolMap == null) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up persistent stepId mismatch"
+                                    + " — step 1 will use stale injection file values.");
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up persistent exchange failed: "
+                                + e.getMessage() + " — falling back to file-based.");
+                            persistentProcess.close();
+                            persistentProcess = null;
+                        }
+                    }
+                    if (wuQVolMap == null && persistentProcess == null) {
+                        try {
+                            EcmBinaryIO.writeBytes(ECM_IN_PATH, wuInputBytes);
+                            int wuExit = runProcess(sim, debugLog);
+                            if (wuExit != 0) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up ECM exited " + wuExit
+                                    + " — step 1 will use stale injection file values.");
+                            } else if (!waitForFile(ECM_OUT_PATH, ECM_TIMEOUT_S)) {
+                                sim.println("[ECM-EW] WARN: pre-warm-up ecm_out.bin timeout"
+                                    + " — step 1 will use stale injection file values.");
+                            } else {
+                                wuQVolMap = EcmBinaryIO.readElementWiseOutput(ECM_OUT_PATH, 0L);
+                                if (wuQVolMap == null) {
+                                    sim.println("[ECM-EW] WARN: pre-warm-up output stepId mismatch"
+                                        + " — step 1 will use stale injection file values.");
+                                }
+                            }
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up file exchange failed: "
+                                + e.getMessage() + " — step 1 will use stale injection file values.");
+                        }
+                    }
+                    if (wuQVolMap != null) {
+                        double[] wuQVolNew = new double[n];
+                        double wuTotalW = 0.0;
+                        double[] wuVols = cellMapper.volumes();
+                        double wuFallbackV = (n > 0) ? JELLY_ROLL_VOLUME_M3 / n : 0.0;
+                        int wuMatched = 0;
+                        for (Map.Entry<Integer, Double> entry : wuQVolMap.entrySet()) {
+                            int cid = entry.getKey();
+                            if (cid >= 0 && cid < n) {
+                                wuQVolNew[cid] = entry.getValue();
+                                double vi = (wuVols != null) ? wuVols[cid] : wuFallbackV;
+                                wuTotalW += wuQVolNew[cid] * vi;
+                                wuMatched++;
+                            }
+                        }
+                        sim.println(String.format(
+                            "[ECM-EW] Pre-warm-up: %d/%d cells matched. Q_total=%.6e W",
+                            wuMatched, n, wuTotalW));
+                        try {
+                            applyElementWiseHeatCsv(sim, cellMapper, wuQVolNew, qInjectionTable);
+                            qVolPrev = wuQVolNew;
+                            sim.println("[ECM-EW] Pre-warm-up complete: FileTable seeded with"
+                                + " IC-consistent qVol. Jump at t=deltaT eliminated.");
+                        } catch (IOException e) {
+                            sim.println("[ECM-EW] WARN: pre-warm-up injection failed: "
+                                + e.getMessage()
+                                + " — step 1 will use stale injection file values.");
+                        }
+                    }
+                }
+            } else {
+                sim.println("[ECM-EW] WARN: pre-warm-up skipped — IC T not available from tReport.");
+            }
+        }
 
         long stepId = 0L;
         double accumulatedTime = INITIAL_TIME_S;
