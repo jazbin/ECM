@@ -9,13 +9,239 @@
 
 ---
 
+### HARD RULE — NO AGENTS IN THIS WORKSPACE
+Never spawn Agent tool calls in /workspace. Do all work directly with Read/Edit/Bash/Grep/Glob. Use `cp` for file sync, not agents.
+
+---
+
+### Session 2026-07-07 (3) — ecm_mapping.csv blending absent (stale uniform-weight file)
+
+- **Symptom:** STAR-CCM+ mesh cells between ECM zone boundaries showed no blending.
+- **Root cause:** `in/testedVersion/ecm/ecm_mapping.csv` was generated from an old
+  `ecm_cell_map.csv` without the `volume_m3` column → `gen_ecm_mapping.py` used uniform
+  weight (3.017e-10 m³, half=0.333 mm) → too small to detect boundary cells →
+  0 multi-zone rows → no blending.
+- **Root cause (code bug):** `_maybe_regen_mapping()` in `ecm_coupler.py` had NO stale
+  check. In file-based mode (new Python process per step), `_REGEN_CHECKED` is empty on
+  every process start → the function ran on every coupling step → always overwrote the
+  blended mapping from `gen_ecm_mapping.py` with a simplified no-blending version
+  (ignores `volume_m3` column, always uses uniform weight, one row per cell).
+- **Code fix:** added stale check in `_maybe_regen_mapping()` — compares unique meshKey
+  count in existing mapping to row count in `ecm_cell_map.csv`. If equal (no remesh),
+  returns immediately, preserving the blended mapping. Only regenerates on actual cell-
+  count change (remesh). Synced to all 3 copies.
+- **Diagnostic:** `awk -F, 'NR>1 {c[$1]++} END {for(k in c) if(c[k]>1) m++; print m+0}' ecm_mapping.csv`
+  → 0 means no blending (bad); >0 means blending is present.
+- **Prevention going forward:** after any remesh, Java macro runs `gen_ecm_mapping.py`
+  (blended mapping produced); Python's `_maybe_regen_mapping()` now detects the new cell
+  count (≠ old mapping) → regenerates → blended result from `gen_ecm_mapping.py` is
+  expected to have been run already by the Java macro.
+- `in/starCCM_10C_experiment_twoCells_distributed/ecm/ecm_mapping.csv` was already
+  correct (7,611 / 30,131 boundary cells) — no action needed there.
+
+### Session 2026-07-07 (2) — Fix 8: post-remesh coord mismatch + reload CSV cleanup
+
+- **Post-remesh failure (54/78231 rows unmatched):** After remesh 22162→78231 cells, first macro attempt FATAL at step 0. Root cause: `getSeriesArray()` returns slightly different fp values on first extract() after remesh vs subsequent extractions. 54 cells straddle a 0.1mm hash-bin boundary, so startup coordinates and step-0 coordinates hash differently.
+- **Fix 8a:** Added `builtFromXyzTableOrder = true` flag to `CellMapper` when built via `createFromXyzTable()`. `buildTableToMapperMapping()` now returns identity `[0,1,...,N-1]` when this flag is set (T-table row order IS mapper cell order). Avoids fp re-comparison entirely. Flag cleared after first use.
+- **Fix 8b (CSV accumulation):** `writeQVolReloadCsv()` was creating `ecm_qvol_injection_reload_XXXXXX_YYYYY.csv` per coupling step with no cleanup. After a 78-step run, 78 files accumulated. Fix: added `prevReloadCsv` field; delete prev file after each successful `extract()`. Added startup cleanup: scan and delete all `ecm_qvol_injection_reload_*.csv` files at startup, reset `qTableReloadSerial=0`.
+- **autoConfigureJellyRollEnergySource non-fatal:** `CoupledSolidEnergyModel` in 2602 has ZERO heat-source getter methods (only setImplicit, getSecondaryGradients, etc). Full model scan shows 9 models, none have VolumetricHeatSourceProfile. Heat IS applied correctly because user configured energy source manually in STAR GUI. The WARN is noisy but non-blocking — simulation runs correctly.
+- **Copies synced:** all 4 copies. CODE_SUMMARY updated.
+
+### Session 2026-07-07 — Fix 7: T-table Parts-based regionIdx (7-cell distributed)
+
+- **Root cause diagnosed:** `computeRegionIndicesFromFvRep` failed (all 3 API paths → `Region.getCellCount()` NoSuchMethod). k-means fallback used instead → Voronoi boundary bleeding between adjacent cylindrical cells → cell counts 2752–3615 (±13%) → radial extents up to 25 mm (expected ≤10.85 mm).
+- **Fix 7:** `computeRegionIndicesFromTableParts()` — new SOLE method for multi-region regionIdx. Temporarily restricts the T-table to each Part one at a time → `extract()` + `getRowCount()` → exact per-region row counts, no k-means. Parts not in coupled-regions list are skipped (offset still tracked). Throws with clear diagnostic if any coupled region is missing from the Parts list. No fallbacks — k-means and FvRep removed from `buildMergedCellMapper()`.
+- **PCA axis issue also confirmed:** 3/7 regions had wrong PCA axes (Y/X dominant instead of Z). Consensus correctly recovers ≈Z. New `computeRegionIndicesFromTableParts` makes PCA axis purely a geometry annotation issue (not a cell-assignment issue).
+- **Active copies:** `starccm_plugin/src/`, `starccm_plugin/package/src/`, `in/testedVersion/src/`, `in/starCCM_10C_experiment_twoCells_distributed/src/`
+- CODE_SUMMARY.md updated (fix 7).
+
+### Session 2026-07-06 (7) — Full continuum-model scan (fix 6)
+
+- **Root cause confirmed:** `SegregatedSolidEnergyModel` has ZERO methods matching any of our keywords (`heat`, `source`, `volumetric`, `profile`, `energy`, `user`). The heat-source profile is on a DIFFERENT model in the physics continuum (likely `UserVolumetricHeatSourceModel` or similar).
+- **Fix 6:** `autoConfigureJellyRollEnergySource` now falls through to scan ALL models via `phys.getModelManager().getClass().getMethod("getObjects")` after the energy-model attempt fails. Each model is tried with each profile getter. On success: logs "Profile found on model: <classname> via <getter>". On failure: logs full model list.
+- **DIAG-1 upgraded:** now also dumps ALL methods (unfiltered) on `SegregatedSolidEnergyModel` AND lists every continuum model with keyword-matched methods. This will identify the correct class+getter name after next run.
+- **Next run:** check log for either "Profile found on model:" (fix worked) or DIAG-1 model list (need to add the new class name to getter list).
+- Synced to all 3 copies. CODE_SUMMARY updated (fix 6).
+
+### Session 2026-07-06 (6) — FileTable 1-row confirmed; verbose diagnostics added
+
+- **"Imported 1 rows" is NOT just startup** — it appears after EVERY step. `setFileName()` alone with same relative path does NOT force a re-read in STAR 2602. Fix: call BOTH `setFileName()` AND `extract()` every step. Also added: file-size check before/after CSV write, `getRowCount()` reflection check on FileTable.
+- **Energy source wiring failing** — `autoConfigureJellyRollEnergySource` fails: no method on `SegregatedSolidEnergyModel` matches keyword filter. Synced to all 3 copies. CODE_SUMMARY updated (fix 5).
+
+### Session 2026-07-06 (4) — regionIdx k-means + REGION_NAME → "Cell" (7-cell pack)
+
+- **Bug 1 (regionIdx=0 for N=7):** `computeRegionIndicesFromCentroids` has hardcoded `N=2` guard → always returns null for N=7. `computeRegionIndicesNearestCentroid` was listed in CODE_SUMMARY as PRIMARY but **was not implemented**. Fixed: implemented k-means spatial clustering (any N≥2, 150-iter, evenly-spaced init, sorted-output for determinism); wired into `buildMergedCellMapper` fallback chain after Y-bimodality.
+- **`REGION_NAME` default changed from `"jellyRoll"` to `"Cell"`** — matches Cell_01…Cell_07 naming in 7-cell pack .sim file. Overridable via `ECM_REGION_PATTERN` env var.
+- Synced to all 3 copies. CODE_SUMMARY updated.
+
+---
+
+### Session 2026-07-06 (3) — Heat=0 fix + regionIdx fix (STAR-CCM+ 2602, 7-cell sim)
+
+- **Root cause 1 (heat=0):** `SegregatedSolidEnergyModel.getVolumetricHeatSourceProfile()` does NOT exist in STAR-CCM+ 2602. Fixed: replaced with reflection loop over 7 candidate getter names (`getVolumetricHeatSourceProfile`, `getUserVolumetricHeatSourceProfile`, `getVolumetricEnergyGenerationProfile`, `getHeatSourceProfile`, `getVolumetricHeatSource`, `getUserHeatSourceProfile`, `getEnergySourceProfile`). Also 3-name loop for setter (`setTabularXyzMethod`/`setTableXyzMethod`/`setXyzTabularMethod`). On all-fail: logs all available methods on the energy model for diagnosis.
+- **Root cause 2 (all cells in region 0):** `FvRepresentation.getCellCount(Region)` and `getRegionCellCount(Region)` both absent in 2602 → `computeRegionIndicesFromFvRep` returns null for N=7 regions → fallback `computeRegionIndicesFromCentroids` only handles N=2 → all cells region 0. Fixed: third fallback `Region.getCellCount()` (no-arg, on Region directly).
+- **"Imported 1 rows"** in log = STAR's first-load message for stub CSV at startup; subsequent extract() calls are silent. Not the root cause.
+- Both fixes synced to all 4 copies. Next run will show whether a getter name matches (check log for `getter=` message) or will log available methods for final identification.
+
+---
+
+### Session 2026-07-06 (2) — EcmCouplerMacro compile fixes (STAR-CCM+ 2602)
+
+- `star.common.ClientServerObject` removed from 2602 API — previous fix to `star.common.StarObject` was ALSO wrong (`StarObject` does not exist in `star.common`)
+- **Correct fix (session 3)**: `ModelManager.getModel()` signature is `<T extends star.common.Model> T getModel(Class<T>)` → type bound must be `star.common.Model`
+- Fixed: `Class<star.common.StarObject>` → `Class<star.common.Model>` at lines ~2389/2390 and ~2462/2463 in all 4 copies
+- `TableManager.createTable(Class<T>)` deprecated → replaced with `createTable("FileTable")` (lines ~2162, ~2261)
+- All 4 copies synced: `in/testedVersion/src/`, `starccm_plugin/src/`, `starccm_plugin/package/src/`, `in/starCCM_10C_experiment_twoCells_distributed/src/`
+- `star.base.neo.ClientServerObject` still exists in 2602; `star.common.ClientServerObject` and `star.common.StarObject` do NOT
+- `StarApiInspector.java` updated: added `star.common.Model`, `star.common.StarObject`, `star.base.neo.ClientServerObject`, coupled flow model classes, `star.base.neo` to scan packages — run this first before guessing API names
+
+---
+
+### Session 2026-07-06 — Client proposal PDF + Battery Assistant API
+
+#### Integration proposal (client deliverable)
+- LaTeX source: `tools/proposal/starccm_ecm_integration_proposal.tex`
+- Final PDF: `artifacts/reports/starccm_ecm_integration_proposal_RevA_20260706.pdf`
+- SHA-256: `9bbc35066c242d0b9d4fb9cf1eebc50f93b2fbdf3e58da4e2339248c00daf9b5`
+- Three options: (1) TBM Generator [needs Battery Module], (2) Direct Setup Macro [RECOMMENDED, base license], (3) Full Pipeline [base license]
+- tectonic 0.15.0 static binary at `/tmp/tectonic` — use for all future LaTeX compilation
+
+#### Battery Assistant API confirmed (STAR-CCM+ 2602)
+- Program name: **Battery Assistant** (`BatteryUIAssistant extends SimulationAssistant`)
+- Requires **Battery Module license** — not included in base STAR-CCM+
+- Key class: `star.battery.BatteryCellManager`
+  - `createFromTbm(String tbmFile, List<BatteryCellBuildObject> objects)` — main TBM import
+  - `getTBMFileDescription(String tbmFile)` → `BatteryCellImportDescription` — validate without importing
+  - `importPartsAndcreateFromTbm(String, List<GeometryPart>, List<GeometryPart>)` — full import + post geometry
+- `BatteryCell.importTBMFile(String)` / `reloadTbmFile(String)` / `exportTBMData(String)`
+- Task hierarchy (Battery Assistant wizard):
+  `Task00_CreateBatteryCell` → `Task00_00_ImportTBMFile` → `Task00_01_CreateNewCell`
+  → `Task01_00_OverrideCellData` → `Task01_01_ElectricalGridResolution`
+  → `Task01_02_CreateBatteryModule` → `Task02_00_ModuleConfiguration` → `Task02_01_ModuleLayout`
+- Our Option 2 (Direct Setup Macro) bypasses all of this — builds .sim without Battery Assistant
+
+#### Tool note
+- `pdflatex`/`xelatex` not installed in this environment
+- Use `/tmp/tectonic` (downloaded from GitHub releases, musl static binary) for LaTeX → PDF
+- Command: `cd /tmp && ./tectonic <tex-file> --outdir <output-dir>`
+- Downloads packages from relay.fullyjustified.net on first use (cached)
+- UTF-8 ć: use `Vidovi\'c` (T1 + lmodern); em-dash: use `---` not Unicode `—`
+
+---
+
 ## Next session TODO
 
-1. **Anisotropic k in STAR-CCM+ .sim** — verify and correct AnisotropicThermalConductivityMethodWithValues setup in delivered .sim. Guide: STAR_CCM_ANISOTROPIC_THERMAL_CONDUCTIVITY_GUIDE.md.
-2. **Validation temperature sweep (10–60 °C)** — lumped and element-wise cases. Params.csv already covers multiple T points; needs a controlled campaign run. ~3–5 days.
-3. **Cell-size scaling methodology document** (21700 → 4680). STAR-CCM+ uses STEP geometry import (not STL). Writing task only. ~1–2 days.
-4. **Element-wise baseline re-run** post impedance-network fix before sweep campaign.
-5. **Verify pre-warm-up fix in STAR-CCM+** — run waterDomain_twoCells_rev3.sim and confirm EcmHeatJellyRolls.csv no longer shows jump at t=0.02→0.04 (EW mode, deltaT=0.02s). Previous run showed 22780→28961 W/m³ (+27%); fix should reduce to ~1-2%.
+0. **BDS — EcmBdsCompanion v1.1 ready (2026-07-05)**:
+   - Compile fixes: `star.segregatedenergy.*` package; `createTable("star.common.FileTable")`
+   - Detailed logging added: `ECM_BDS_VERBOSE=1` (stack traces + method/model listings); `ECM_BDS_LOG_FILE=<path>` (file mirror)
+   - Step timing (ms) on every step; `listMethods(obj, filter)` + `listModels(phys)` helpers
+   - Energy model search expanded: also tries CoupledSolidEnergyModel + CoupledEnergyModel → Step 5 now works on test sim too
+   - Launch scripts: `starccm_plugin/run_bds_companion.bat` + `in/testedVersion/run_bds_companion.bat`
+   - Expected result on waterDomain_twoCells_rev3.sim: 4/7 (checks 2–4 FAIL = no BDS cells, expected)
+   - **NEXT: copy to Windows, run `run_bds_companion.bat`, confirm 4/7 on test sim; 7/7 on real BDS sim**
+   - CreateMinimalBdsTestCase requires `batterysim` license — FATAL on current installation (expected)
+
+1. **Build EcmCoSimPartner.exe** — never compiled. Run on Windows:
+   `build.bat "C:\Program Files\Siemens\21.02.008\STAR-CCM+21.02.008"`
+   from `starccm_plugin/cosim/`. See `starccm_plugin/cosim/README.md`.
+
+2. **Anisotropic k in STAR-CCM+ .sim** — verify and correct AnisotropicThermalConductivityMethodWithValues setup in delivered .sim. Guide: STAR_CCM_ANISOTROPIC_THERMAL_CONDUCTIVITY_GUIDE.md.
+3. **Validation temperature sweep (10–60 °C)** — lumped and element-wise cases. ~3–5 days.
+4. **Cell-size scaling methodology document** (21700 → 4680). Writing task only. ~1–2 days.
+5. **Element-wise baseline re-run** post impedance-network fix before sweep campaign.
+6. **Verify pre-warm-up fix in STAR-CCM+** — run waterDomain_twoCells_rev3.sim, confirm no jump at t=0.02→0.04.
+
+---
+
+### CONFIRMED REQUIREMENT — BDS + Distributed ECM (2026-07-03)
+
+Client requirement (Robert, end client): use BDS to generate and parametrise the cell,
+AND run our custom distributed (element-wise) ECM coupling on the BDS-generated STAR case.
+
+- BDS role: cell design, HPPC regression, OCV/RCR tables, .tbm → STAR
+- Our distributed ECM role: axial×radial zone partitioning, per-zone T → Python ECM
+  (impedance-network current distribution via parallel_2rc_step) → per-zone qVol injection
+- NOT STAR's native ecell solver; NOT BDS/Simulink co-simulation
+- Robert has no existing BDS workflow — we define it
+- All electrical parameters from OUR measurements/tables — CONFIRMED (pre-meeting)
+- BDS used for: cell design, geometry, .tbm → STAR mesh/region setup only
+- EcmBdsCompanion: disable BDS heat only; no BDS parameter bridge needed
+- Formally recorded in docs/PROJECT_PLAN.md and artifacts/logs/decision.log
+
+---
+
+### Session 2026-07-05 — EcmBdsCompanion compile errors + StarApiInspector
+
+**Errors confirmed on STAR-CCM+ 2602.0001 win64:**
+- `batterysim` module absent → `CreateMinimalBdsTestCase` exits FATAL (expected, graceful)
+- `EcmBdsCompanion` two compile errors: `SegregatedSolidEnergyModel` and
+  `SegregatedFluidTemperatureModel` not found (wrong/missing package in import `star.energy.*`)
+- `TableManager.createTable(Class<T>)` is `[DEPRECATED]`
+
+**Fix strategy: enumerate before patching.**
+Created `StarApiInspector.java` (both copies). Run it first, paste output, then fix class names and method.
+
+---
+
+### Session 2026-07-04 — BDS macro compilation fix
+
+`sim.get(Class.forName(...))` fails to compile because `Class.forName()` returns
+`Class<?>` but `sim.get()` requires `Class<T extends ClientServerObject>`.
+
+**Fix — double-cast pattern (applied to all 4 file copies):**
+```java
+Class<?> raw = Class.forName("star.battery.BatteryTool");
+@SuppressWarnings("unchecked")
+Class<star.base.neo.ClientServerObject> typed =
+    (Class<star.base.neo.ClientServerObject>) (Class<?>) raw;
+Object bt = sim.get(typed);
+```
+Files: `starccm_plugin/src/` and `in/testedVersion/` copies of both macros.
+Macros still untested end-to-end on Windows — user needs to copy and re-run.
+
+---
+
+### Session 2026-07-03 — BDS integration macros written
+
+#### Key discovery: BDS architecture
+BDS (Battery Design Studio / Simcenter Battery Design Studio) is a **standalone tool**, NOT a STAR-CCM+ module.
+- BDS co-simulates with MATLAB Simulink, not STAR-CCM+
+- Workflow: BDS exports `.tbm` file → STAR-CCM+ imports `.tbm` → STAR creates `BatteryCellManager` tree
+- No Siemens-supplied template .sim files for BDS integration exist
+- Template `.tbm` location: `<BDS_INSTALL>/bin/templates/` and tutorial:
+  `_Projects/Automatic_RCR_Regression_Tutorial/High_Power_18650_RCR.tbm`
+- BDS docs live in `/workspace/BDS_docs/userguide_wrp/` (GUID-named HTML files)
+
+#### Files created
+- `starccm_plugin/src/EcmBdsCompanion.java` (~320 lines) — one-time POC diagnostic macro; 7 checks
+- `starccm_plugin/src/CreateMinimalBdsTestCase.java` (~280 lines) — setup macro: adds BDS battery
+  objects to existing .sim and saves as test_bds_case.sim
+- `CODE_SUMMARY.md` updated with EcmBdsCompanion section
+
+#### Both macros: reflection-only approach
+All `star.battery.*` API calls use `Class.forName()` + `Method.invoke()` — no compile-time imports.
+Graceful WARN if 'batterysim' license absent. Key API found in docs:
+- `BatteryCellManager.createFromTbm(String, List<BatteryCellBuildObject>)`
+- `BatteryCellManager.createUserDefinedBatteryCell()`
+- `BatteryTool.getBatteryCellBuildObjectManager(CellModelForm)` — CellModelForm: BLOCK, CYLINDRICAL, PRISMATIC, SPIRAL
+- `RCREquivalentCircuitBatteryCellDescription.getCellCapacity()` / `getInitialSOC()`
+- `RCREquivalentCircuitBatteryCellDescription.extractRCRParametersFromTBMFile(String)`
+- `RCREquivalentCircuitBatteryCellDescription.setUseEntropyTableEnabled(boolean)`
+- `RCREquivalentCircuitBatteryCellDescription.setUseRelaxationHeatEnabled(HeatFlowTypeOption)`
+
+#### EcmBdsCompanion 7 POC checks
+1. BatteryCellManager found  2. RCR params read  3. Regions found  4. BDS heat disabled
+5. Energy source → FileTable wired  6. VolumeAverageReport T in 200–500 K  7. Summary PASS/FAIL
+Config env vars: ECM_REGION_PATTERN, ECM_Q_TABLE_NAME, ECM_Q_TABLE_CSV, ECM_PROJECT_ROOT
+
+#### CreateMinimalBdsTestCase 5 steps
+A: BatteryTool access  B: cell creation (Path A: createFromTbm; fallback: UserDefinedBatteryCell with capacity=5.05 Ah, SOC=1.0)
+C: verify RCR  D: scan jellyRoll regions  E: saveSim to BDS_OUTPUT_SIM
+Config env vars: BDS_TBM_FILE, BDS_OUTPUT_SIM, ECM_REGION_PATTERN
+
+#### User workflow preference (confirmed this session)
+**Do NOT use Agent tool** for searches — do all file reads/greps directly.
+Reason: separate agent causes token cost to "skyrocket". Always do explorations in-line.
 
 ---
 
@@ -236,8 +462,7 @@ Dockerfile ENV NPM_CONFIG_PREFIX hardcoded to `/home/helios` — must edit + reb
 **Actions needed:**
 - Deploy equal-split fix to client: `n_per_region = 96751//2` bug in client's ecm_coupler.py
   (correct sizes: 49309 / 47442; fix uses ECM_REGION_SIZES env var — already in repo)
-- Fix `autoConfigureJellyRollEnergySource` for STAR 2602 — TypedObjectManager API change;
-  both `region.get(EnergyUserVolumeSourceOption.class)` and `continuum.get()` fail
+- ~~Fix `autoConfigureJellyRollEnergySource`~~ **FIXED 2026-07-06** — use `getModelManager().getModel()` path (see below)
 - Rename `appliedTotalHeatLog.csv` → misleading name; it logs ECM-computed heat, not STAR-applied
 - Tell client: don't restart macro mid-run; check jellyRoll_2 thermal BCs in STAR GUI
 
@@ -811,19 +1036,7 @@ while ECM writes correct qVol (~1.22e+06 W/m³):
 | `star.base.report.Report.getValue()` | **REMOVED** | Use reflection: try `getValue` then `getReportMonitorValue` |
 | `TableManager.createTable(Class)` | Deprecated (warning only) | Still compiles; fix later |
 
-**Known open issue**: `autoConfigureJellyRollEnergySource` still fails (TypedObjectManager
-error) but heat IS manually wired in the .sim file (both jellyRolls have
-`EnergyUserVolumeSourceOption Selected=1`, `XyzTabularScalarProfileMethod → Table=229
-ECM_jellyRoll_Q_Table, column qVol_W_m3`). The diagnostics will reveal if STAR is
-actually reading the table correctly.
-
-**Fix required (one-time, in STAR GUI)**: Enable "User Volumetric Heat Source" in the
-physics continuum for BOTH jellyRoll_1 and jellyRoll_2 continua:
-`Physics > [jellyRoll_X continuum] > Energy > User Volume Source = Enabled`
-After enabling, re-run the macro — `autoConfigureJellyRollEnergySource` will auto-wire
-the `ECM_jellyRoll_Q_Table` FileTable to both continua's energy source profiles.
-One combined Q-table for both regions is sufficient (STAR's XYZ interpolation is
-coordinate-based and handles both continua independently from one CSV).
+**FIXED 2026-07-06**: `autoConfigureJellyRollEnergySource` now uses `phys.getModelManager().getModel(SegregatedSolidEnergyModel)` → `getUserVolumeSourceOption()` / `getVolumetricHeatSourceProfile()`. Root cause: `EnergyUserVolumeSourceOption` is a property of the energy model, NOT the region/continuum TypedObjectManager. The old `region.get()` / `continuum.get()` path never worked in BDS or segregated-solid cases. Fix synced to all 4 copies; `diagProfileMethodType` also fixed.
 
 ### Overlap-weighted mapping (implemented 2026-05-26)
 
@@ -1130,16 +1343,10 @@ Fix: after first STAR run, self-heal overwrites ecm_cell_map.csv → re-run gen_
    - `_get_partition_volumes()` is cached so this is cheap.
    - Diagnostic: Python `qVol_min_Wm3` in ecm_diag is still the zone W/m³ (correct for display);
      the per-cell values written to ecm_out.bin are now W.
-   - `autoConfigureJellyRollEnergySource` also improved: tries `region.get()` then
-     `PhysicsContinuum.get()` fallback; better error message tells user to enable User Volumetric
-     Heat Source in the STAR GUI before running the macro.
-   - **KNOWN PERMANENT WARN** (2026-05-21): `autoConfigureJellyRollEnergySource` always throws
-     on STAR 21.02.008 — `EnergyUserVolumeSourceOption` not found via TypedObjectManager on either
-     `region.get()` or `continuum.get()`. This is a Java API traversal issue, not a missing GUI
-     option. The exception fires before any modification code runs, so existing GUI wiring is
-     never disturbed. **Workaround (one-time GUI)**: jellyRoll physics continuum → Energy →
-     User Volumetric Heat Source → method = Table (X,Y,Z) → ECM_jellyRoll_Q_Table → qVol_W_m3.
-     Wiring persists in .sim file. WARN is harmless on subsequent runs.
+   - `autoConfigureJellyRollEnergySource` **FIXED 2026-07-06**: now uses `getModelManager().getModel()` path.
+     Old `region.get()` / `continuum.get()` TypedObjectManager lookups removed.
+     Root cause confirmed via clientTest.sim inspection: option IS Selected:1 but not in TypedObjectManager;
+     it is a property of the energy model object and must be accessed via the model, not the continuum.
 
 2. **[DONE] CSV injection + R0-weighted distribution** (2026-05-21 session 3):
    - `INJECTION_MODE` default changed from `"globalParam"` → **`"csvReload"`** (line 158 of Java).

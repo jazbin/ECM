@@ -144,6 +144,7 @@ Fork of OpenFOAM `chtMultiRegionFoam`. Key additions:
 - **Source term sign**: use `-= ecmQdot * V` to add heat (positive ECM output = heat generation)
 - **Parallel**: always use `parallelMode masterGather` with `keyMode 0` (globalCellId); never `keyMode 1` with `-parallel`
 - **Solids-only implicit coupling**: known undershoot issue — use `useImplicit false` (explicit) unless investigating
+- **File paths in STAR-CCM+ FileTables and any config written by Java/Python must be RELATIVE paths** (relative to the project/sim root). Never call `getAbsolutePath()`, `toAbsolutePath()`, or construct an absolute path string when setting a table file reference. Absolute paths break portability and overwrite user-configured paths in the `.sim` file. **Any exception requires explicit double-confirmation from the user before proceeding.**
 
 ## Operating rules
 
@@ -170,3 +171,144 @@ Fork of OpenFOAM `chtMultiRegionFoam`. Key additions:
 | `artifacts/reports/` | Generated PDF run reports |
 | `tools/generate_lumped_report.py` | Report generation |
 | `tools/run_passport.sh` | Run passport generation |
+
+---
+
+## Document Generation Requirements — Controlled Final PDF Deliverables
+
+These requirements apply to every generated client-facing document, technical report, proposal, memo, calculation note, CFD/FEM report, engineering assessment, or other professional deliverable.
+
+### 1. Final deliverable format
+
+Unless the user explicitly instructs otherwise, all final client deliverables must be prepared as controlled PDF reports.
+
+Do not generate, offer, or deliver editable/source/working document files as default deliverables. This includes, but is not limited to:
+
+- DOCX / Word files
+- ODT / LibreOffice Writer files
+- LaTeX source files
+- Markdown source files intended as the client deliverable
+- Editable spreadsheets
+- Native CAD files
+- Native CFD/FEM project files
+- Post-processing source files
+- Scripts, notebooks, templates, or intermediate working files
+
+Editable/source/working files may only be included if they are explicitly listed as separate paid deliverables by the user.
+
+### 2. Document-control section placement
+
+Do not place the full document-control disclaimer at the beginning of the document.
+
+The beginning of the document should remain clean and client-facing:
+- title page
+- executive summary
+- introduction
+- main technical content
+
+The full document-control and verification statement must be placed at the end of the document, preferably as the final appendix or final section.
+
+Recommended section title:
+
+```text
+Appendix [X]. Document Control and Verification
+```
+
+or, if appendices are not used:
+
+```text
+Document Control and Verification
+```
+
+### 3. Required document-control block
+
+Every final controlled PDF report must include the following block at the end of the document, with placeholders filled in:
+
+```text
+Document Control and Verification
+
+Document title: [Report Title]
+Project: [Project Name]
+Client: [Client Name]
+Prepared by: Bojan Vidović
+Issue date: [YYYY-MM-DD]
+Revision: Rev A
+Deliverable format: Controlled PDF report
+
+This PDF is the controlled final issued report. The consultant is responsible only for this issued PDF version. Any modified, extracted, translated, reformatted, or edited version is not an authorized consultant-issued report unless reviewed and reissued by the consultant.
+
+Document verification:
+Filename: [filename.pdf]
+SHA-256 checksum: [hash]
+
+Any modification to the PDF file changes the checksum. Only the PDF matching the checksum above should be treated as the consultant-issued version.
+```
+
+### 4. Required footer
+
+Every final report should include a short footer on each page, unless the user explicitly requests no footer:
+
+```text
+Controlled PDF Report — Rev A — [YYYY-MM-DD] — Bojan Vidović
+```
+
+If the document has multiple revisions, update the revision field consistently:
+
+- Rev A
+- Rev B
+- Rev C
+
+### 5. SHA-256 checksum requirement
+
+For every final PDF, calculate and include a SHA-256 checksum.
+
+On Linux/Ubuntu, use:
+
+```bash
+sha256sum [filename.pdf]
+```
+
+The checksum must appear in:
+
+1. the final document-control section at the end of the report;
+2. the delivery message to the client.
+
+### 6. Standard delivery message
+
+When preparing the client delivery message, include this text:
+
+```text
+Hi [Client Name],
+
+I am submitting the final controlled PDF report for this milestone.
+
+For document-control purposes:
+
+Filename: [filename.pdf]
+Revision: Rev A
+Issue date: [YYYY-MM-DD]
+SHA-256 checksum: [hash]
+
+The document-control and verification statement is included at the end of the report.
+
+Thank you.
+```
+
+### 7. Source-file boundary
+
+Do not describe DOCX, Word, LaTeX, Markdown, CAD, CFD, FEM, spreadsheet, script, or other editable files as included unless the user explicitly states that these files are part of the paid scope.
+
+Use this wording when needed:
+
+```text
+Editable/source/working files are not included unless explicitly listed as separate paid deliverables.
+```
+
+For offers/proposals, include this deliverables clause:
+
+```text
+Final deliverable:
+Controlled PDF technical report.
+
+Editable/source/working files, including DOCX, CAD files, CFD cases, scripts, spreadsheets, and native post-processing files, are not included unless explicitly listed as separate paid deliverables.
+```

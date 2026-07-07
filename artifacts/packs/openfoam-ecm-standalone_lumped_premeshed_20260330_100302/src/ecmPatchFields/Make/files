@@ -1,3 +1,0 @@
-ecmTemperatureRadCoupledMixedFvPatchScalarField.C
-
-LIB = $(FOAM_USER_LIBBIN)/libecmPatchFields
