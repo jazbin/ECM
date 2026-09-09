@@ -400,7 +400,9 @@ def apply_rcrtable_3d(content: str, ecm: dict, kappa_r: float, kappa_z: float) -
 
         new_lines.append(ln)
 
-    return pre + '\n'.join(new_lines) + post
+    result = pre + '\n'.join(new_lines) + post
+    result = apply_modelmap_iet(result, "RCRTable 3D")
+    return result
 
 
 def tbm_get(content: str, field: str) -> float | None:
@@ -538,6 +540,65 @@ def apply_jellyroll_thermal(content: str) -> tuple[str, dict]:
         'C_vol_target':  JR_RHO_KG_M3 * 985.0,
     }
     return content, info
+
+
+def apply_modelmap_iet(content: str, target_iet: str) -> str:
+    """Set MODELMAP IET selector to target_iet.
+
+    Requirements:
+    - exactly one <MODELMAP> block
+    - exactly one IET entry within it
+    - target SIMMOD must already exist in content
+    - if already set to target_iet the operation is idempotent (returns content unchanged)
+    - preserves all whitespace/tab style on the replaced line
+    - raises ValueError (fail closed) for malformed or ambiguous MODELMAP
+    - logs previous and new selector
+    """
+    if not re.search(r'<SIMMOD>\r?\n' + re.escape(target_iet) + r'\r?\n', content):
+        raise ValueError(
+            f"apply_modelmap_iet: target SIMMOD '{target_iet}' not found in content"
+        )
+
+    modelmap_blocks = list(re.finditer(r'<MODELMAP>(.*?)</MODELMAP>', content, flags=re.DOTALL))
+    if len(modelmap_blocks) != 1:
+        raise ValueError(
+            f"apply_modelmap_iet: expected exactly one MODELMAP block, found {len(modelmap_blocks)}"
+        )
+
+    mm = modelmap_blocks[0]
+    block_inner = mm.group(1)
+
+    iet_pattern = re.compile(r'(?m)^([ \t]*IET[ \t]*=[ \t]*)([^\t\r\n]+)([ \t]*)$')
+    iet_matches = list(iet_pattern.finditer(block_inner))
+    if len(iet_matches) != 1:
+        raise ValueError(
+            f"apply_modelmap_iet: expected exactly one IET entry in MODELMAP, found {len(iet_matches)}"
+        )
+
+    current_iet = iet_matches[0].group(2).strip()
+
+    if current_iet == target_iet:
+        print(f"apply_modelmap_iet: IET already '{target_iet}' — no change")
+        return content
+
+    print(f"apply_modelmap_iet: IET '{current_iet}' → '{target_iet}'")
+
+    new_block_inner = iet_pattern.sub(
+        lambda m: m.group(1) + target_iet + m.group(3),
+        block_inner,
+    )
+
+    before_lines = block_inner.splitlines()
+    after_lines = new_block_inner.splitlines()
+    if len(before_lines) != len(after_lines):
+        raise ValueError("apply_modelmap_iet: line count changed in MODELMAP block")
+    diffs = [i for i, (a, b) in enumerate(zip(before_lines, after_lines)) if a != b]
+    if len(diffs) != 1:
+        raise ValueError(
+            f"apply_modelmap_iet: expected exactly one changed line in MODELMAP, got {len(diffs)}"
+        )
+
+    return content[:mm.start(1)] + new_block_inner + content[mm.end(1):]
 
 
 def apply_package_thermal(content: str) -> str:
