@@ -1,96 +1,143 @@
 # Current TBM Field Audit
 
-Classification of every important field in the current v3 variants (`tbm_validation/variants/v3_package_20260909/`). All four v3 variants are identical in these fields (they differ only in `m_bNegTab`, `m_bPosTab`, `m_nNegTabVertOrientation`).
+Field-by-field classification for the current V3 variants. Every important field is assigned a status and a risk level for production use.
 
-Confidence levels:
-- **VERIFIED_FROM_ABOUT_ENERGY** — value comes from About-Energy characterisation data (`python/params.csv` or direct communication) and has been cross-checked
-- **VERIFIED_FROM_CELL_REFERENCE** — value confirmed from cell datasheet, physical measurement, or external reference document
-- **VERIFIED_FROM_SIEMENS_REFERENCE** — value matches known-good Siemens TBM reference
-- **COPIED_FROM_KNOWN_GOOD_TEMPLATE** — value taken from Siemens stock TBM without independent verification
-- **DERIVED** — calculated from other verified values (show formula)
-- **ASSUMED** — value chosen without direct verification; assumption documented
-- **UNKNOWN** — origin unclear; value retained from source without any verification
+**Last revised:** 2026-09-09 (independent review of commit e3c3b14 — corrected flat-scan capacity classification; corrected mandrel-width conclusion; added REPORT/offset_pos_avg/DataSheet entries from machine extraction)
 
 ---
 
-## Package block
+## Status definitions
 
-| Field | Value | Classification | Notes |
+| Status | Meaning |
+|---|---|
+| VERIFIED | Value confirmed from About-Energy data, cell datasheet, or Siemens reference that matches at least one known-good TBM |
+| ASSUMED | Value not directly confirmed; adopted from a reference or internal logic; must verify before production |
+| WARN | Known discrepancy or anomaly; flagged by validator; may or may not cause import failure |
+| UNRESOLVED | Value is uncertain; correct value not determinable from available data |
+| STALE | Value inherited from old geometry (18650 or older BDS session); will be wrong for 2170 |
+| CORRECT | Value confirmed correct and will not need to change |
+
+---
+
+## Package fields
+
+| Field | V3 value | Status | Risk | Notes |
+|---|---|---|---|---|
+| `m_dextDiameter` | 21.09 mm | VERIFIED | Low | From cell datasheet |
+| `m_dextHeight` | 70.02 mm | VERIFIED | Low | From cell datasheet |
+| `m_dintDiameter` | 20.6274 mm | VERIFIED | Low | Derived: 21.09 − 2×0.2313 mm |
+| `m_dintHeight` | 65.11 mm | VERIFIED | Low | Negative electrode collector width from About-Energy |
+| `m_strName` | 2170 | CORRECT | Low | Label only |
+| `m_bextVolCalc` | 1 | CORRECT | Low | STAR recalculates at import |
+| `m_bintVolCalc` | 1 | CORRECT | Low | STAR recalculates at import |
+| `m_dextVolume` | 16.5321 cm³ | STALE | Low | Stale from old 18650 geometry; STAR recomputes (m_bextVolCalc=1) |
+| `m_dintVolume` | 14.9232 cm³ | STALE | Low | Same; STAR recomputes |
+
+---
+
+## BUILDER — Detailed Builder fields
+
+| Field | V3 value | Status | Risk | Notes |
+|---|---|---|---|---|
+| `m_dJellyrollThickness_mm` | 19.25 mm | **UNRESOLVED** | **High** | ~1.38 mm gap to can ID (20.6274 mm). Correct value not confirmed. Do NOT force to can ID without cell teardown data. See STAR_IMPORT_ERROR_HISTORY. |
+| `m_dMandrelThickness_mm` | 6 mm | ASSUMED | Medium | Mandrel diameter from TBM source; not confirmed from About-Energy or cell construction data |
+| `m_dMandrelWidth_mm` | 6 mm | ASSUMED | Low | Set equal to thickness (cylindrical convention, matches HE18650 where width=thickness=5). Width=0 is also valid (Tutorial ref). This field exists in Detailed Builder only (Simple Builder has separate `m_dMandrelWidth`). |
+| `m_bMandrelFlat` | 0 | ASSUMED | Low | Cylindrical mandrel; consistent with all references |
+| `m_dElectrodeOverlapAtStart_mm` | 8 mm | ASSUMED | Medium | Matches HP18650-template (8 mm). Copied from Simple Builder in source. Not confirmed from About-Energy electrode spec. |
+| `m_dElectrodeOverlapAtEnd_mm` | 20 mm | **UNRESOLVED** | Medium | Lower than all references (HE18650=50, HP18650-templ=30, Tutorial=40). Origin unknown. Not expected to block import but may affect winding geometry. |
+| `m_dSepFeedLength_mm` | 0 mm | ASSUMED | Low | Matches HE18650 (also 0); HP18650-templ uses 10. May affect whether separator "wraps" around end. |
+| `m_dSepTailLength_mm` | 0 mm | ASSUMED | Low | Same as above |
+| `m_dOffsetPosAvg` | 1e-06 | **WARN** | Medium | All known-working references (HE18650, HP18650-templ, Tutorial, LiIonSpiral) use 0.5. HP18650-DIST also uses 1e-06. Provenance of 1e-06 in our source TBM is UNKNOWN. Impact on BDS winding geometry is UNCONFIRMED. Added to high-risk field audit. |
+| `m_nNumSpokes` | (inherited) | ASSUMED | Low | Not audited; matches reference structure |
+
+---
+
+## BUILDER — Simple Builder fields (cross-check)
+
+The Simple Builder section contains a second copy of some Detailed Builder fields. STAR-CCM+'s precedence rule (which copy wins during "Create from Tbm") is UNCONFIRMED.
+
+| Field | DB value | SB value | Match? | Notes |
+|---|---|---|---|---|
+| `m_dElectrodeOverlapAtStart` | 8 mm | 8 mm | ✓ Yes | Consistent after V3 fix |
+| `m_dMandrelWidth` | 6 mm | 0 mm | ✗ No | DB≠SB; unknown impact |
+| `m_dOffsetPosAvg` | 1e-06 | 0.5 | ✗ No | DB≠SB; unknown which takes priority |
+
+---
+
+## m_bOnly1D (per-SIMMOD block)
+
+| SIMMOD block | V3 value | Status | Notes |
 |---|---|---|---|
-| `Package m_dextDiameter` | 21.09 mm | VERIFIED_FROM_CELL_REFERENCE | 2170 external diameter from `docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md` |
-| `Package m_dextHeight` | 70.02 mm | VERIFIED_FROM_CELL_REFERENCE | 2170 external height from same reference |
-| `Package m_dintDiameter` | 20.6274 mm | DERIVED | = 21.09 − 2 × 0.2313 (OD − 2 × can wall). Can wall 0.2313 mm from reference doc. |
-| `Package m_dintHeight` | 65.11 mm | VERIFIED_FROM_ABOUT_ENERGY | = negative electrode collector width from `python/params.csv` (jelly-roll active height) |
-| `Package m_strName` | `2170` | VERIFIED_FROM_CELL_REFERENCE | Cell format name. |
-| `DataSheet m_dDSHeight` | 65.0 mm | **ASSUMED / SUSPICIOUS** | Value not updated from 18650 clone (18650 is also 65 mm). Should be 70.02 mm (can external height) or 65.11 mm (JR height). Label field only — does not drive geometry, but inconsistency with `m_dextHeight = 70.02` is a red flag for a reviewer. |
-| `DataSheet m_dDSDiameter` | 21 mm | VERIFIED_FROM_CELL_REFERENCE | Rounded from 21.09 mm. |
+| Distributed 3D | 0 | ASSUMED | V3 set to 0 (was 1 in source). LiIonSpiral/Tutorial/HV-LiCoO2f have 0; HE18650/HP18650-templ have 1. References disagree. |
+| Distributed | 0 | ASSUMED | V3 set to 0. HE18650=0, HP18650-templ=false match. LiIonSpiral/Tutorial have true/1. |
+| NTGPTable 3D | 0 | ASSUMED | V3 set to 0. Matches HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. |
+| **RCRTable 3D** | **0** | **VERIFIED** | Active model block. Matches ALL working references: HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. Only HP18650-DIST has 1 (import status unknown). |
+
+The V2 package failure was caused by SOURCE having m_bOnly1D=1 in all blocks (including RCRTable 3D). V3 sets all to 0.
 
 ---
 
-## Detailed Builder — winding geometry
+## Electrochemical — RCRTable 3D block
 
-| Field | Value | Classification | Notes |
+**IMPORTANT — correct block required for lookup:** Several fields appear in multiple SIMMOD blocks. The values below are from the RCRTable 3D block specifically (active electrochemical model). A flat file scan returns different values. The corrected validator uses block-aware lookup.
+
+| Field | RCRTable 3D value | Status | Notes |
 |---|---|---|---|
-| `m_dJellyrollThickness_mm` | 19.25 mm | **UNKNOWN / WRONG** | This is the jellyroll outer diameter. Value appears to be a carry-over from the source. The correct value should be approximately equal to the can ID (20.6274 mm) for the JR to contact the can. Current value leaves 1.38 mm radial gap. Source of 19.25 mm is not traced. **This is the highest-risk unresolved geometry field.** |
-| `m_dMandrelThickness_mm` | 6.0 mm | VERIFIED_FROM_CELL_REFERENCE | Mandrel diameter 6 mm, confirmed from cell teardown/reference. |
-| `m_dMandrelWidth_mm` | 6.0 mm | ASSUMED | Set equal to `m_dMandrelThickness_mm`. For a cylindrical mandrel, width = thickness. Not independently confirmed. HE18650 reference does not have this field. |
-| `m_bMandrelFlat` | 0 | VERIFIED_FROM_SIEMENS_REFERENCE | 0 = cylindrical mandrel. Correct for 2170 (cylindrical cell). Matches HE18650 reference. |
-| `m_dElectrodeOverlapAtStart_mm` | 8.0 mm | ASSUMED | Copied from Simple Builder block (`m_dElectrodeOverlapAtStart = 8`) in the same source TBM. The Detailed Builder occurrence was 0 (a placeholder). The 8 mm value has not been confirmed from About-Energy's electrode design data. |
-| `m_dElectrodeOverlapAtEnd_mm` | 20.0 mm | UNKNOWN | Value retained from source TBM. HE18650 reference has ~10 mm. Not confirmed from cell spec. May be wrong. |
-| `m_dSepFeedLength_mm` | 0 | COPIED_FROM_KNOWN_GOOD_TEMPLATE | HE18650 reference does not have this field (effectively 0). Our template had 0 in Detailed Builder (10 in Simple Builder). 0 retained. Effect of 0 in 3D mode UNCONFIRMED. |
-| `m_dSepTailLength_mm` | 0 | COPIED_FROM_KNOWN_GOOD_TEMPLATE | Same rationale as SepFeedLength. |
-| `+Electrode Collector m_dWidth_mm` | 64.11 mm | VERIFIED_FROM_ABOUT_ENERGY | Positive electrode collector width (= axial active height) from About-Energy characterisation data. |
-| `-Electrode Collector m_dWidth_mm` | 65.11 mm | VERIFIED_FROM_ABOUT_ENERGY | Negative electrode collector width from About-Energy characterisation data. This is the cell's active jelly-roll height. |
+| `m_bSpecifyCapacity` | 1 | VERIFIED | Capacity explicitly specified (1 = yes) |
+| `m_dAhCell` | 5.0 Ah | VERIFIED | From About-Energy `Qnom_Ah = 5.0` in params.csv |
+| `m_nRCRParameterSets` | 3 | VERIFIED | 3 temperature sets |
+| `Set[0]_m_dT` | 288.15 K | VERIFIED | 15°C from params.csv |
+| `Set[1]_m_dT` | 298.15 K | VERIFIED | 25°C |
+| `Set[2]_m_dT` | 308.15 K | VERIFIED | 35°C |
+| `Set[N]_RCR_V_Ro_*` | See params.csv | VERIFIED | R0 from About-Energy characterisation |
+| `Set[N]_RCR_V_Rp_*` | See params.csv | VERIFIED | R1 from About-Energy |
+| `Set[N]_RCR_V_tau_*` | See params.csv | VERIFIED | τ1 = R1·C1 from About-Energy |
+| `Set[N]_RCR_V_SOC_1` | -0.08 | ASSUMED | Extrapolation point: SOC = 1 − 5.4/5.0. Intentional per translate script. STAR SOC-range tolerance UNCONFIRMED. |
 
 ---
 
-## Tab configuration (variant-dependent)
+## DataSheet fields
 
-| Field | V1 (tabs-on-std) | V2 (tabs-off-std) | V3 (tabs-on-SF) | V4 (tabs-off-SF) | Classification | Notes |
-|---|---|---|---|---|---|---|
-| `m_bNegTab` | 1 | 0 | 1 | 0 | TEST VARIANT | Controls presence of negative tab in BDS geometry. |
-| `m_bPosTab` | 1 | 0 | 1 | 0 | TEST VARIANT | Controls presence of positive tab in BDS geometry. |
-| `m_nNegTabVertOrientation` | 1 (bottom) | 1 (bottom) | 0 (top) | 0 (top) | TEST VARIANT | 0=top, 1=bottom. Same-face target config: 0. |
-| `m_nPosTabVertOrientation` | 0 (top) | 0 (top) | 0 (top) | 0 (top) | VERIFIED_FROM_ABOUT_ENERGY | Positive tab is on top — confirmed with Miles 2026-09-03. |
+These are label/metadata fields. They do NOT affect geometry or physics. They do NOT cause STAR import failures. However, they should be corrected before production for documentation hygiene and to avoid confusion if STAR displays these values in reports.
+
+| Field | V3 value | Expected 2170 value | Status | Priority |
+|---|---|---|---|---|
+| `m_strName` | HPCell | hp2170NCA | STALE | Fix before production |
+| `m_strDSName` | HPCell | hp2170NCA | STALE | Fix before production |
+| `m_dHeight` | 65.0 mm | 70.02 mm | STALE (HP18650 residual) | Fix before production |
+| `m_dDSHeight` | 65.0 mm | 70.02 mm | STALE (HP18650 residual) | Fix before production |
+| `m_dCapacity` | 1.1 Ah | 5.0 Ah | STALE (HP18650 residual) | Fix before production |
+| `m_dDSCapacity` | 0.9 Ah | 5.0 Ah | STALE (HP18650 residual) | Fix before production |
+| `m_dDSDiameter` | 21.09 mm | 21.09 mm | CORRECT | No change needed |
 
 ---
 
-## Electrochemical mode flags
+## REPORT block fields
 
-| Field | Value | Classification | Notes |
+The `<REPORT>` block contains BDS-computed output values from a prior BDS session with the old 18650-like jelly-roll geometry. All fields in our TBM have flag=0 (BDS-computed). `m_dRepCanXDim/YDim/ZDim` are Level-C fields documented as consumed by STAR-CCM+ at import. The remaining `m_dRep*` fields are informational.
+
+| Field | V3 value | Correct value | Status | Consumed by STAR? |
+|---|---|---|---|---|
+| `m_dRepCanXDim` | 21.09 mm | 21.09 mm | CORRECT | YES (Level-C, documented) |
+| `m_dRepCanYDim` | 21.09 mm | 21.09 mm | CORRECT | YES |
+| `m_dRepCanZDim` | 70.02 mm | 70.02 mm | CORRECT | YES |
+| `m_dRepJellyrollDiameter` | 17.8064 mm | ~19–20 mm (TBD) | STALE | UNCONFIRMED |
+| `m_dRepJellyrollHeight` | 52.5 mm | 65.11 mm | STALE | UNCONFIRMED |
+| `m_dRepCapacity` | 1.14762 Ah | 5.0 Ah | STALE | UNCONFIRMED (likely recomputed by STAR) |
+| `m_dRepActiveArea_m2` | 0.0855507 m² | Depends on geometry | STALE | UNCONFIRMED |
+
+---
+
+## High-risk field audit summary
+
+Fields in this list require special attention before production. These are fields where the current value is either wrong, stale, or its impact is uncertain.
+
+| Field | Current V3 value | Risk | Action required |
 |---|---|---|---|
-| `m_bOnly1D` (4 blocks) | 0 (all) | ASSUMED | Set to 0 to allow 3D distributed operation. V3 fix. The HE18650 reference does not have this field (effectively absent = not 1D-only). The HP18650 template has [1,false,0,0]. Whether first-block 0 vs 1 matters is UNCONFIRMED. |
-| `m_bSpecifyCapacity` | 0 | ASSUMED | Capacity derived from electrode geometry. If all JR geometry dims were correct for 2170, this would be acceptable. With `m_dJellyrollThickness_mm` still at 19.25 (not yet corrected), the derived capacity may be off. |
-| `m_dAhCell` | 0 | ASSUMED | Explicitly zero because `m_bSpecifyCapacity = 0`. Nominal capacity is 5 Ah (from `python/params.csv`). |
-
----
-
-## Electrochemical tables — RCRTable 3D
-
-| Field | Value | Classification | Notes |
-|---|---|---|---|
-| `Set[0]_m_dT` | 288.15 K | VERIFIED_FROM_ABOUT_ENERGY | = 15°C. From `python/params.csv` column T_degC. |
-| `Set[1]_m_dT` | 298.15 K | VERIFIED_FROM_ABOUT_ENERGY | = 25°C. |
-| `Set[2]_m_dT` | 308.15 K | VERIFIED_FROM_ABOUT_ENERGY | = 35°C. |
-| `Set[N]_RCR_V_SOC_M` (7 pts) | From params.csv | VERIFIED_FROM_ABOUT_ENERGY | 7 SOC points per temperature set. |
-| `Set[N]_RCR_V_Ro_M` (7 pts) | 0.00568–0.00862 Ω | VERIFIED_FROM_ABOUT_ENERGY | R0 (ohmic resistance) from `python/params.csv`. Valid range confirmed by static validator. |
-| `Set[N]_RCR_V_Rp_M` / `_V_tau_M` | From params.csv | VERIFIED_FROM_ABOUT_ENERGY | R1, τ1 for RC pair 1. |
-| `Set[N]_RCR_V_Rp1_M` / `_V_tau1_M` | From params.csv | VERIFIED_FROM_ABOUT_ENERGY | R2, τ2 for RC pair 2 (if present). |
-| OCV equilibrium data | From About-Energy | VERIFIED_FROM_ABOUT_ENERGY | Populated by `translate_tbm_from_openfoam.py`. |
-
----
-
-## Summary: open / highest-risk fields
-
-Ranked by risk to STAR-CCM+ import or physics correctness:
-
-| # | Field | Issue | Risk level |
-|---|---|---|---|
-| 1 | `m_dJellyrollThickness_mm = 19.25` | 1.38 mm gap to can ID; JR may not contact can in BDS geometry | HIGH — may cause geometry defect |
-| 2 | `m_bOnly1D = 0` in all 4 blocks | Pattern not confirmed against documented Siemens spec; may need first=1 | MEDIUM — awaiting import test |
-| 3 | `m_bSpecifyCapacity = 0` | Derived capacity may be off because JR geometry not fully correct | MEDIUM — silent physics error |
-| 4 | `m_dElectrodeOverlapAtEnd_mm = 20` | Not confirmed from cell spec; deviates from 18650 reference | LOW-MEDIUM |
-| 5 | `DataSheet m_dDSHeight = 65` | Label inconsistency; does not drive geometry | LOW |
-| 6 | `m_dElectrodeOverlapAtStart_mm = 8` | Value from Simple Builder; not confirmed from About-Energy | LOW (used in v2+ without blocking error) |
-| 7 | `m_dMandrelWidth_mm = 6` | Assumed equal to thickness; HE18650 doesn't have field | LOW |
-| 8 | `m_dSepFeedLength_mm = 0` | Matches HE18650 reference but unconfirmed for 3D | LOW |
+| `m_dJellyrollThickness_mm` | 19.25 mm | **HIGH** | Confirm correct JR OD from cell teardown or AE data. Do NOT force to can ID without evidence. |
+| `m_dOffsetPosAvg` (Detailed Builder) | 1e-06 | **MEDIUM** | Investigate provenance. Consider correcting to 0.5 (matches all simple references). Monitor if STAR import behaves differently with 0.5 vs 1e-06. |
+| `m_dElectrodeOverlapAtEnd_mm` | 20 mm | **MEDIUM** | Confirm from About-Energy electrode spec. Lower than all references. |
+| `m_dElectrodeOverlapAtStart_mm` | 8 mm | **MEDIUM** | Confirm from About-Energy electrode spec. Currently assumed from Simple Builder value; matches HP18650-template. |
+| `SOC_min = -0.08` | -0.08 | **MEDIUM** | Verify STAR-CCM+ accepts SOC < 0 in RCR tables. Document intentional extrapolation point. |
+| `m_dMandrelThickness_mm` | 6 mm | **LOW-MEDIUM** | Confirm from cell construction data. |
+| REPORT stale fields | 18650 geometry | **LOW** | Likely recomputed by STAR during "Create from Tbm"; m_dRepCanXDim/YDim/ZDim are correct. Monitor. |

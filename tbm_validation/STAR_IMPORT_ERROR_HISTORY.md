@@ -1,66 +1,109 @@
-# STAR-CCM+ Import Error History
+# STAR-CCM+ / BDS Import Error History
 
-Every known STAR-CCM+ import failure, in chronological order. All errors were reported by Robert (end client) who runs STAR-CCM+ with the Battery Design Studio (BDS) plugin. The import operation is "File > Create from Tbm".
+Record of every known STAR-CCM+ or BDS import failure for this project's TBM files. Each entry is linked to the specific TBM file (by SHA-256) that triggered the error.
 
-Reproducing these errors requires STAR-CCM+ + BDS. We cannot reproduce them in this environment.
-
----
-
-## Error 1 — "Extrusion distance can not be 0" — v1 package (2026-09-04)
-
-**Package:** v1 (`tbm_geometry_test_20260904.zip`)
-**Affected TBMs:** All 4 variants (SHA listed in TBM_INVENTORY.md, v1 section)
-**Error text (verbatim, from Robert's log):** `Electrode Root 1 : Extrusion distance can not be 0`
-**Stage:** BDS 3D geometry builder, during "Create from Tbm"
-**How reported:** Robert reported "Same error for all four cases"
-
-**Diagnosis:** `m_dElectrodeOverlapAtStart_mm = 0` in the Detailed Builder block. This field controls the initial electrode extension length (the "extrusion" of the spiral wind start). Setting it to 0 leaves BDS with no valid winding start geometry.
-
-**Root cause:** The source TBM `hp2170NCA-ECM.tbm` had this field at 0 in the Detailed Builder block. The corresponding field in the Simple Builder block (`m_dElectrodeOverlapAtStart`, no `_mm` suffix) was 8 mm, but the Detailed Builder block was apparently not populated when the source TBM was built. The difference in field name (`_mm` suffix vs none) means a global regex replace on the name without the suffix does not reach the Detailed Builder occurrence.
-
-**Fix applied:** `apply_common_fixes()` in `generate_tbm_test_variants.py` now sets `m_dElectrodeOverlapAtStart_mm = 8` (using the `sub_first()` function which targets the Detailed Builder occurrence). Value 8 was copied from the Simple Builder block; it has not been independently confirmed from About-Energy cell spec data.
-
-**Also fixed in same release:** `m_dMandrelWidth_mm = 0 → 6` (mandrel width set equal to mandrel thickness for cylindrical mandrel).
-
-**Confirmed fixed in v2:** Yes — Robert did not report this error for the v2 package.
+Do not delete or modify historical entries. Add new entries as they occur.
 
 ---
 
-## Error 2 — "m_bOnly1D option is not supported" — v2 package (2026-09-07)
+## Error 1 — V1 package (2026-09-04)
 
-**Package:** v2 (`tbm_geometry_test_20260907.zip`)
-**Affected TBMs:** All 4 variants (SHA listed in TBM_INVENTORY.md, v2 section)
-**Error text (verbatim, from Robert's log):**
+**Package:** `consultant_dt_sensitivity_20260505.zip` → `tbm_geometry_test_20260904.zip` (v1)
+**TBM file SHA-256:** (v1 variants — not recorded, predates SHA-256 audit)
+**Error text (verbatim from Robert):**
+```
+Electrode Root 1 : Extrusion distance can not be 0
+```
+**STAR-CCM+ operation:** File > Create from Tbm
+
+**Diagnosis:**
+`m_dElectrodeOverlapAtStart_mm` in the Detailed Builder section was `0`. BDS requires a positive extrusion distance to create the winding geometry. The source TBM (hp2170NCA-ECM.tbm) had this field set to 0 in the Detailed Builder block — a placeholder left over from the original 18650 template when the TBM was generated in 1D-only mode.
+
+The correct value (8 mm) was already present in the Simple Builder section (`m_dElectrodeOverlapAtStart = 8`) of the same source TBM, but BDS reads the Detailed Builder value.
+
+**Fix applied in V2:**
+`m_dElectrodeOverlapAtStart_mm` → 8 mm (Detailed Builder).
+
+The V2 generate script explicitly copies the Simple Builder value to Detailed Builder:
+```
+m_dElectrodeOverlapAtStart_mm = 8  (copied from Simple Builder; Detailed Builder had 0)
+```
+
+**HE18650 reference value:** 30 mm
+**HP18650-template reference value:** 8 mm (matches our fix)
+**Tutorial reference value:** 3 mm
+
+**Validator check:** `overlap_start` → FAIL if Detailed Builder value is 0.
+
+---
+
+## Error 2 — V2 package (2026-09-07)
+
+**Package:** `tbm_geometry_test_20260907.zip` (v2)
+**TBM file SHA-256:** (V2 variants — recorded in TBM_INVENTORY.md)
+**Error text (verbatim from Robert):**
 ```
 Warning: m_bOnly1D option is not supported
 Warning: m_bOnly1D option is not supported
 ```
-(Two occurrences — corresponding to two of the four SIMMOD blocks where `m_bOnly1D = 1`)
+(Two instances reported; total number in file was not stated by Robert)
+**STAR-CCM+ operation:** File > Create from Tbm
 
-**Stage:** BDS processing during "Create from Tbm". After these two warnings the operation failed to complete 3D geometry creation.
+**Diagnosis:**
+`m_bOnly1D = 1` was present in all 24 SIMMOD blocks of the source TBM. The source file was generated with the 1D-only electrochemical mode flag set (likely during the initial BDS session with About-Energy where the emphasis was on 1D ECM, not 3D distributed). STAR-CCM+'s "Create from Tbm" operation for 3D geometry creation does not support the 1D-only mode.
 
-**How reported:** Robert reported "Same error for all four cases I'm afraid" with the log showing two warning lines repeated.
+**Per-SIMMOD-block analysis:**
+The error message "Warning: m_bOnly1D option is not supported" appears per-block, not per-file. Two instances were reported — BDS may only report the first N instances or may report for specific blocks (e.g. the two 3D blocks that have explicit 3D geometry creation).
 
-**Diagnosis:** `m_bOnly1D = 1` in the SIMMOD blocks instructs BDS to treat the cell as a 1D-only electrochemical model. BDS's 3D distributed geometry builder cannot use a 1D-only electrochemical model and explicitly emits a "not supported" warning and aborts. The source TBM had `m_bOnly1D = 1` in all 4 SIMMOD blocks where this flag appears (`Distributed 3D`, `Distributed`, `NTGPTable 3D`, `RCRTable 3D`).
+The critical block is `RCRTable 3D` — our active electrochemical model. All known-working references (HE18650, HP18650-template, LiIonSpiral, Tutorial, HV-LiCoO2f) have `m_bOnly1D = 0` or absent in the RCRTable 3D block. Only HP18650-DIST has 1 in RCRTable 3D — its successful import status is UNCONFIRMED.
 
-**Origin of wrong value:** The source TBM was cloned from the Siemens stock `hp18650Spiral1.tbm` template. In that template, `m_bOnly1D` has the pattern [1, false, 0, 0] — first block = 1, rest = 0/false. Somewhere in the creation of `hp2170NCA-ECM.tbm`, all four values became 1. Whether this happened during the initial BDS-assisted creation session or was inherited from a different template is not reconstructed. The DIST reference (`hp18650Spiral-DIST.tbm`) also has all 4 = 1, but its 3D import status is unknown.
+For the `Distributed 3D` block, references disagree: HE18650 and HP18650-template use 1; LiIonSpiral, Tutorial, HV-LiCoO2f use 0. It is possible BDS only reports the warning for `Distributed 3D` block (the explicit 3D geometry block), not all blocks.
 
-**Fix applied:** `apply_common_fixes()` now calls `sub_all(content, 'm_bOnly1D', 0)` which sets ALL occurrences to 0. This is more conservative than the HE18650 template pattern [1, 0, 0, 0] (first block = 1). The reasoning: setting all to 0 is unambiguously 3D-compatible; setting first to 1 follows the template but its effect is unconfirmed. If STAR-CCM+ requires first=1 for some capability, this fix may need to be revised to [1, 0, 0, 0].
+**Fix applied in V3:**
+All `m_bOnly1D` occurrences set to 0 via `sub_all()`. V3 has `m_bOnly1D = 0` in all 24 SIMMOD blocks.
 
-**Confirmed fixed in v3:** PENDING — Robert has not yet reported results for v3.
+**Per-SIMMOD table for V3:**
+| SIMMOD block | V3 | HE18650 | HP18650-templ | LiIonSpiral | Tutorial |
+|---|---|---|---|---|---|
+| Distributed 3D | 0 | 1 | 1 | 0 | 0 |
+| Distributed | 0 | 0 | false | true | true |
+| NTGPTable 3D | 0 | 0 | 0 | 0 | 0 |
+| RCRTable 3D | 0 | 0 | 0 | 0 | 0 |
 
-**Ambiguity note:** The correct pattern ([0,0,0,0] vs [1,0,0,0] vs [1,1,0,0]) is not confirmed from Siemens documentation. The HE18650 pattern [1,0,0,0] is used by a known-working reference but we do not know what setting first=1 enables or disables. This is flagged as UNCONFIRMED in `CURRENT_TBM_FIELD_AUDIT.md`.
+**Open question:** HE18650 and HP18650-template have `m_bOnly1D = 1` in the Distributed 3D block, yet (presumably) import successfully. This suggests the error is NOT triggered by the Distributed 3D block having 1. The error in V2 was more likely triggered by having 1 in the RCRTable 3D block (the active model). V3's all-zero pattern is therefore more conservative than needed, but is consistent with LiIonSpiral and Tutorial (STAR-install TBMs known to work).
+
+**Validator check:** `m_bOnly1D_rcrtable` → PASS if RCRTable 3D block has 0 or false.
 
 ---
 
-## Errors not yet encountered (but known risks)
+## Error 3 — V3 package (2026-09-09)
 
-These are not confirmed errors — they are predicted based on still-open field issues:
+**Package:** `tbm_geometry_test_20260909.zip` (v3)
+**STAR_IMPORT_PASS status:** **PENDING** — awaiting confirmation from Robert.
 
-| Risk | Field | Current value | Impact if wrong |
-|---|---|---|---|
-| JellyRoll-Can gap | `m_dJellyrollThickness_mm` | 19.25 mm (1.38 mm gap to can ID) | BDS may generate JellyRoll that doesn't contact the Can inner surface. Unknown if this causes an error or just wrong geometry. |
-| Capacity wrong | `m_bSpecifyCapacity = 0` | Capacity derived from geometry | If JR geometry dims are not all correct for 2170, derived capacity will be wrong without error. |
-| Separator lengths | `m_dSepFeedLength_mm = 0`, `m_dSepTailLength_mm = 0` | 0 | Unknown effect. HE18650 also has 0 (field absent). May be correct for cylindrical mandrel. |
-| Electrode overlap at end | `m_dElectrodeOverlapAtEnd_mm = 20` | 20 mm | Not confirmed from cell spec. If wrong, winding end geometry will be incorrect. |
-| DataSheet height | `DataSheet m_dDSHeight = 65` | 65 mm | Label field only — does not drive geometry. But inconsistency with can height (70.02) is suspicious. |
+No errors reported as of 2026-09-09 (package just sent). When Robert reports results, add an entry here.
+
+---
+
+## Template for new entries
+
+```
+## Error N — [package name] ([date])
+
+**Package:** [filename]
+**TBM file SHA-256:** [hash of the specific TBM that failed, from TBM_INVENTORY.md]
+**Error text (verbatim from Robert):**
+```
+[paste exact error text]
+```
+**STAR-CCM+ operation:** [File > Create from Tbm / Run Physics / Other]
+
+**Diagnosis:**
+[What field or value caused the error. Which reference TBM was checked. What the correct value is.]
+
+**Fix applied:**
+[What was changed and in which package version]
+
+**Validator check added:**
+[Which check in validate_tbm.py now catches this. If none, note the gap.]
+```

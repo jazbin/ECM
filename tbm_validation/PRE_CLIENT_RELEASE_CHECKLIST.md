@@ -8,7 +8,7 @@ Use this checklist before sending any TBM package to Robert. A candidate package
 
 | State | Meaning |
 |---|---|
-| STATIC_PASS | `tools/validate_tbm.py` reports 0 FAIL for all variants in the package. WARNs must be reviewed and either resolved or explicitly accepted with justification. |
+| STATIC_PASS | `tools/validate_tbm.py` reports 0 FAIL for all variants in the package. WARNs must be reviewed and either resolved or explicitly accepted with written justification. Do NOT claim STATIC_PASS if any check depends on a known parser ambiguity. |
 | STAR_IMPORT_PASS | Robert has successfully run "File > Create from Tbm" in STAR-CCM+ on all variants without error. BDS has generated the expected geometry. |
 | PHYSICS_PASS | A STAR-CCM+ simulation with the TBM has been run and the output is physically reasonable (temperatures, heat generation, capacity). At minimum: initial SOC discharge, temperature rise qualitatively consistent with About-Energy data. |
 
@@ -24,30 +24,68 @@ Use this checklist before sending any TBM package to Robert. A candidate package
 - [ ] The generate script version (git commit SHA) that produced the variants is recorded.
 - [ ] The source TBM used is recorded by SHA-256.
 - [ ] Any new error history entries are written to STAR_IMPORT_ERROR_HISTORY.md.
+- [ ] Regression tests pass: `python3 tbm_validation/tests/test_validator.py`
 
 ---
 
-## Current v3 package status (`out/tbm_geometry_test_20260909.zip`)
+## Current v3 package status (`tbm_geometry_test_20260909.zip`)
 
 **Sent to Robert:** 2026-09-09
-**Static validator:** 0 FAIL, 3 WARN for all 4 variants.
+**Static validator:** 0 FAIL, 8 WARN for all 4 variants.
+
+**Note on WARN count revision:** The original validator (commit e3c3b14) reported 3 WARN for V3 variants. The corrected validator (this commit) now correctly detects 8 WARN per variant. The additional WARNs (offset_pos_avg, DataSheet residuals) were present in V3 but not caught by the old validator. The REPORT block WARNs were hidden by a parser bug (REPORT block format uses tab-separated fields which the main regex did not match).
 
 ### WARN review for v3
 
-| WARN | Field | Action |
-|---|---|---|
-| JellyRoll-Can gap | `m_dJellyrollThickness_mm = 19.25` | **ACCEPTED FOR GEOMETRY TEST** — the purpose of this send is to test topology, not final physics. A 1.38 mm JR-Can gap does not prevent geometry creation (BDS may create the JR slightly undersized) but means the JR and Can are not in contact. Must be fixed before any production/physics send. Awaiting geometry test result to understand if STAR-CCM+ treats this as an error. |
-| DataSheet height | `DataSheet m_dDSHeight = 65` | **ACCEPTED FOR GEOMETRY TEST** — label field, does not drive geometry. Not expected to cause import error. Must be fixed before production send. |
-| Capacity derivation | `m_bSpecifyCapacity = 0` | **ACCEPTED FOR GEOMETRY TEST** — no physics run requested for this send. Must be resolved (either fix JR geometry so derivation is correct, or set `m_bSpecifyCapacity = 1`, `m_dAhCell = 5`) before production send. |
+| WARN | Field | V3 value | Action |
+|---|---|---|---|
+| JR-Can gap | `m_dJellyrollThickness_mm = 19.25` | 19.25 mm | **ACCEPTED FOR GEOMETRY TEST** — tests topology, not final physics. JR-Can gap does not prevent geometry creation. Must be fixed before production. UNRESOLVED until cell teardown data available. |
+| m_dOffsetPosAvg | `m_dOffsetPosAvg (DB) = 1e-06` | 1e-06 | **ACCEPTED FOR GEOMETRY TEST** — impact on BDS winding geometry is UNCONFIRMED. Fixed in V4 candidate (→ 0.5). |
+| DataSheet m_dHeight | `DataSheet m_dHeight = 65.0` | 65.0 mm | **ACCEPTED FOR GEOMETRY TEST** — label field, does not drive geometry. Fixed in V4 candidate. |
+| DataSheet m_dDSHeight | `DataSheet m_dDSHeight = 65.0` | 65.0 mm | **ACCEPTED FOR GEOMETRY TEST** — same. Fixed in V4 candidate. |
+| DataSheet m_dCapacity | `DataSheet m_dCapacity = 1.1` | 1.1 Ah | **ACCEPTED FOR GEOMETRY TEST** — label field. Fixed in V4 candidate. |
+| DataSheet m_dDSCapacity | `DataSheet m_dDSCapacity = 0.9` | 0.9 Ah | **ACCEPTED FOR GEOMETRY TEST** — label field. Fixed in V4 candidate. |
+| DataSheet m_strName | `DataSheet m_strName = HPCell` | HPCell | **ACCEPTED FOR GEOMETRY TEST** — label field. Fixed in V4 candidate. |
+| DataSheet m_strDSName | `DataSheet m_strDSName = HPCell` | HPCell | **ACCEPTED FOR GEOMETRY TEST** — label field. Fixed in V4 candidate. |
 
-### v3 static confidence level: STATIC_PASS (0 FAIL, 3 WARN all accepted)
+**Additional findings now visible (REPORT block, were undetected in v3 by parser bug):**
+These WARNs exist in the V3 TBM files sent to Robert. They were not detectable by the old validator. They are documented here for completeness; they do NOT make V3 retroactively not STATIC_PASS since the REPORT stale values are informational and m_dRepCanXDim/YDim/ZDim (consumed by STAR) are correct.
+
+| Check | V3 value | Issue |
+|---|---|---|
+| `report_jr_diameter` | 17.8064 mm | Stale from old BDS session; BUILDER has 19.25 mm. STAR likely recomputes at import. |
+| `report_jr_height` | 52.5 mm | Stale; Package m_dintHeight = 65.11 mm. |
+| `report_capacity` | 1.14762 Ahr | Stale; RCRTable 3D m_dAhCell = 5.0 Ahr. |
+
+### v3 static confidence level: STATIC_PASS (0 FAIL, 8 WARN all accepted for geometry test)
 ### v3 STAR_IMPORT_PASS: PENDING (awaiting Robert's results)
 
 ---
 
-## Template for future packages
+## V4 candidate status (`out/v4_candidate/`)
 
-Copy this block for each new candidate package and fill in the values:
+**NOT sent to Robert.** Review candidate prepared 2026-09-09.
+**Generate script:** `tools/generate_tbm_v4_candidate.py`
+**Static validator:** 0 FAIL, 4 WARN for all 4 variants.
+
+See `tbm_validation/V4_CANDIDATE_DELTA_REPORT.md` for full analysis.
+
+### WARN review for V4 candidate
+
+| WARN | Field | Value | Status |
+|---|---|---|---|
+| JR-Can gap | `m_dJellyrollThickness_mm = 19.25` | 19.25 mm | UNRESOLVED — pending geometry test result and cell data |
+| REPORT JR diameter | `m_dRepJellyrollDiameter = 17.8064` | 17.8064 mm | STALE — REPORT block informational; not consumed (m_dRepCanXDim/YDim/ZDim are correct) |
+| REPORT JR height | `m_dRepJellyrollHeight = 52.5` | 52.5 mm | STALE — same |
+| REPORT capacity | `m_dRepCapacity = 1.14762` | 1.14762 Ahr | STALE — informational; RCRTable 3D has correct m_dAhCell=5.0 |
+
+### V4 candidate confidence level: NOT_YET_ASSESSED
+- Reviewer must confirm WARN justifications in V4_CANDIDATE_DELTA_REPORT.md
+- Do not send until V3 STAR_IMPORT_PASS is confirmed and V4 WARN justifications are reviewed
+
+---
+
+## Template for future packages
 
 ```
 ## Package: [name] — [date]
@@ -56,6 +94,7 @@ Copy this block for each new candidate package and fill in the values:
 **Source TBM SHA-256:** [hash]
 **Generate script git commit:** [sha]
 **Sent to Robert:** [yes/no, date]
+**Static validator (corrected):** [N FAIL N WARN N INFO N PASS per variant]
 
 ### Variant SHA-256s
 | Variant | SHA-256 | Static validator |
@@ -68,7 +107,7 @@ Copy this block for each new candidate package and fill in the values:
 ...
 
 ### Confidence level
-- Static: STATIC_PASS / NOT PASSED (FAILs present)
+- Static: STATIC_PASS / NOT PASSED / NOT_YET_ASSESSED
 - STAR import: PENDING / STAR_IMPORT_PASS / FAILED (error text in STAR_IMPORT_ERROR_HISTORY.md)
 - Physics: PENDING / PHYSICS_PASS / TBD
 ```
@@ -79,10 +118,10 @@ Copy this block for each new candidate package and fill in the values:
 
 The following must be fixed before any TBM is used for production physics simulation:
 
-1. **`m_dJellyrollThickness_mm`** — must equal can ID (~20.627 mm). Confirm exact value from About-Energy or cell teardown.
-2. **Capacity specification** — either verify that BDS-derived capacity = 5 Ah with corrected JR geometry, or set `m_bSpecifyCapacity = 1` and `m_dAhCell = 5.0`.
-3. **`DataSheet m_dDSHeight`** — set to 70.02 mm (can external height) for consistency.
-4. **`m_dElectrodeOverlapAtStart_mm = 8`** — confirm from About-Energy electrode spec. Currently assumed from Simple Builder value.
-5. **`m_dElectrodeOverlapAtEnd_mm = 20`** — confirm from About-Energy electrode spec. Currently unknown origin.
-6. **`m_bOnly1D` pattern** — confirm [0,0,0,0] is correct vs [1,0,0,0]. Check Siemens documentation for first-block flag semantics.
-7. **Geometry test result** — understand what topology BDS generates for all 4 variants before locking the production tab configuration.
+1. **`m_dJellyrollThickness_mm`** — must be confirmed from About-Energy or cell teardown. Current 19.25 mm leaves a 1.38 mm diametral gap to the can ID. Do NOT force to can ID without evidence.
+2. **Electrode overlap values** — `m_dElectrodeOverlapAtStart_mm = 8` is ASSUMED (from HP18650-template reference). `m_dElectrodeOverlapAtEnd_mm = 20` is UNRESOLVED (lower than all references). Both must be confirmed from About-Energy electrode spec or cell construction data.
+3. **`m_dOffsetPosAvg`** — V4 fixes this to 0.5 (CONSISTENCY_FIX). Must confirm no adverse geometry effect in STAR. The Simple Builder value was already 0.5; this makes Detailed Builder consistent.
+4. **DataSheet corrections** — V4 fixes all HP18650 label residuals. Label-only, no physics impact.
+5. **Geometry test result** — understand what topology BDS generates for all 4 variants before locking the production tab configuration. V3 result pending.
+6. **SOC range** — confirm STAR-CCM+ accepts SOC < 0 in RCR tables (our min is -0.08, intentional).
+7. **Thermal properties** — verify `m_dDensity`, `m_dHeatCapacity`, `m_dThermalConductivity` in TBM electrochemistry blocks against `cellprops.csv` values from About-Energy. Currently unaudited — may retain 18650 stock values.
