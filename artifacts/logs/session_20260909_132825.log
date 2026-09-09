@@ -1,0 +1,7 @@
+SESSION LOG — 2026-09-09 — Siemens TBM reference corpus collection
+
+User input: Collect every Siemens/BDS/STAR TBM reference available on this machine, build a byte-preserving corpus and structural inventory, do not modify client TBMs, and push the result.
+Assistant actions: Created branch tbm-siemens-reference-corpus from reviewed commit da8f212 in an isolated worktree. Searched /opt, /usr/local, /home, and /workspace recursively.
+Assistant actions: Found 179 TBM/legacy reference files with 124 unique SHA-256 contents and 55 duplicate copies, plus 119 related BDS/STAR sample files. Recorded BDS 17.04.008, BDS 20.04.007 path evidence, and STAR-CCM+ 2602.0001 build 21.02.008 environment evidence.
+Assistant actions: Copied references byte-for-byte and generated INVENTORY.csv, INVENTORY.md, RELATED_FILE_INVENTORY.csv, SIEMENS_TBM_CORPUS_MATRIX.csv, and the repeatable collection script. Extraction completed with 179 TBM rows, 349 builder rows, and 2096 SIMMOD rows.
+Assistant actions: Verified zero byte-identity errors, zero changed ordinary source files against the pre-copy hashes, and zero modified existing TBM paths in the branch diff. No client/generated TBMs under /workspace/out were copied or modified.

@@ -1,0 +1,26 @@
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\LCO-1-Corr.tbm
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\NCA-2-Corr.tbm
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\NCM-2-Corr.tbm
+
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\LCO-DISCH.prg
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\NCA_DISCH.prg
+
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\LCO-1-Corr.tdo
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\SolidPhaseDiffCoeff\NCA-2-Corr.tdo
+
+<TESTER_OPTIONS>
+Cycler
+0 0 0
+<TESTER_OPTIONS>
+OutTester
+0 0 0
+<MONITOR_OPTIONS>
+0
+0
+10000
+Test(min)
+Volts
+
+1
+0
+0

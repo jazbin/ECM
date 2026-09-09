@@ -1,0 +1,24 @@
+C:\Program Files\Siemens\BatteryDesignStudio\BDS20.04.007\_Projects\bdsTest\tutorialCell.tbm
+
+C:\Program Files\Siemens\BatteryDesignStudio\BDS20.04.007\_Projects\bdsTest\tutorialDischarge.prg?44 0 1 -1 -1 -1 -1 654 113 963 250
+
+
+
+
+
+<TESTER_OPTIONS>
+Cycler
+0 0 0
+<TESTER_OPTIONS>
+OutTester
+0 0 0
+<MONITOR_OPTIONS>
+0
+0
+10000
+Test(min)
+Volts
+
+1
+0
+0

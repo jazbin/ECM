@@ -4,3 +4,5 @@
 2026-09-09 assistant: Corrected documentation and audit tooling, added extractor-backed tests across the six required documents, and passed documentation 5/5, structural 41/41, validator 21/21, syntax, batch-validator, and eight-hash checks.
 2026-09-09 user: Asked whether the supplied STEP files had already been analyzed and requested review of the last month's session logs.
 2026-09-09 assistant: Reviewed session_20260831_073946.log and the associated geometry characterization report. Confirmed the August STEP package was analyzed and recorded the field-consumption and overlap findings; reconciled branch documentation and added regression coverage.
+2026-09-09 user: Requested collection of all Siemens/BDS/STAR TBM references on the machine without modifying client TBMs.
+2026-09-09 assistant: Created tbm-siemens-reference-corpus, searched the requested installation and sample roots, collected 179 TBM/legacy references plus 119 related sample files, generated inventories and extraction matrix, and verified byte identity.

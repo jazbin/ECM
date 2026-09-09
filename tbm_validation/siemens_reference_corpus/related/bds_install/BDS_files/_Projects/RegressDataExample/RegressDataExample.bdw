@@ -1,0 +1,25 @@
+
+
+
+
+
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\RegressDataExample\BPE_Opt.tdo
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\RegressDataExample\BPE_Opt_fc.tdo
+C:\cygwin64\home\cc8dhe\dev\bdsprojects\RegressDataExample\USABC Lumped Parameter Battery Model.smd
+
+<TESTER_OPTIONS>
+Cycler
+0 0 0
+<TESTER_OPTIONS>
+OutTester
+0 0 0
+<MONITOR_OPTIONS>
+0
+0
+10000
+Test(min)
+Volts
+
+1
+0
+0
