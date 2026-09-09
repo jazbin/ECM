@@ -10,9 +10,9 @@ Prose and table entries are always consistent because both come from the same ex
 
 **Naming convention:**
 - `package_rev3 / variant_N` — the geometry-test package (sent 2026-09-09, commit e3c3b14)
-- `package_rev4_candidate / variant_N` — the V4 review candidate (commit 2ea5b45, NOT yet sent to Robert)
+- `package_rev4_candidate / variant_N` — the package_rev4_candidate review candidate (commit 2ea5b45, NOT yet sent to Robert)
 
-Do not use bare "V3" or "V4" — those terms are ambiguous (V3 is a package that contains four variants; the term "V4" in an earlier session was used to refer to variant 4 of package_rev3, NOT the package_rev4_candidate).
+Use `package_rev3`, `package_rev4_candidate`, and `variant_N` explicitly; package revision and variant identifiers must not be collapsed into shorthand.
 
 ## Files compared
 
@@ -87,7 +87,7 @@ Two occurrences per file: one in the **Detailed Builder** (DB) block, one in the
 | package_rev4_candidate / variant_3 | 8 | 8 |
 | package_rev4_candidate / variant_4 | 8 | 8 |
 
-source DB = `0` was a placeholder left by About-Energy (TBM generated in 1D-only ECM mode). BDS rejects zero with "Extrusion distance cannot be 0". All package_rev3 and package_rev4_candidate variants have this corrected to `8`.
+source DB = `0` was a placeholder in the source file; the field provenance is unknown. BDS reported "Extrusion distance cannot be 0" for the source geometry test. All package_rev3 and package_rev4_candidate variants have this corrected to `8`.
 
 ## `m_bOnly1D` — 1D-only ECM flag (per SIMMOD, document order)
 
@@ -106,7 +106,7 @@ source DB = `0` was a placeholder left by About-Energy (TBM generated in 1D-only
 
 **Notes:**
 
-- source: `[1, 1, 1, 1]`. All four affected SIMODs set to 1 because About-Energy generated this TBM in 1D-only ECM mode. BDS emits "Warning: m_bOnly1D option is not supported" for each occurrence and then fails to build the 3D geometry.
+- source: `[1, 1, 1, 1]`. The source was assembled in this workspace from Siemens template material and About-Energy data; provenance of the `m_bOnly1D` values is unknown. BDS reported "Warning: m_bOnly1D option is not supported" during the earlier geometry test.
 - HE18650 (known-good): `[1, 0, 0, 0]`. Machine extraction confirms HE18650 **does** contain four `m_bOnly1D` fields. The first SIMMOD (Distributed 3D) retains `m_bOnly1D = 1`; the remaining three are 0. The file builds successfully in BDS, indicating that only certain SIMMOD contexts cause BDS to reject the value. **Prior incorrect claim corrected: an earlier version of this document stated "HE18650 does NOT have the m_bOnly1D field in any of its SIMMOD blocks at all." That statement was false. Machine extraction proves the field is present.**
 - All package_rev3 variants: `[0, 0, 0, 0]` — all four zeroed by the generator to clear the BDS "not supported" error.
 - All package_rev4_candidate variants: `[0, 0, 0, 0]` — unchanged from package_rev3 (no change needed).
@@ -127,4 +127,3 @@ source DB = `0` was a placeholder left by About-Energy (TBM generated in 1D-only
 | package_rev4_candidate / variant_4 | 1 | 5.0 |
 
 `m_bSpecifyCapacity = 1` with `m_dAhCell = 5.0 Ah` is the About-Energy NCA 2170 5 Ah specification. Both source and all variants correctly set this. HE18650 has `m_bSpecifyCapacity = 0` because it relies on internal winding geometry to determine capacity rather than an explicit override.
-

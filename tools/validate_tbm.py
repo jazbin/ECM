@@ -376,8 +376,8 @@ class TBMValidator:
 
         if not blocks_with_flag:
             self._add("INFO", "m_bOnly1D",
-                      "No m_bOnly1D fields found. The known-good HE18650 reference also does not have "
-                      "this field — its absence is consistent with a working 3D import.")
+                      "No m_bOnly1D fields found. The known-good HE18650 reference contains "
+                      "m_bOnly1D = [1, 0, 0, 0]; absence in this file is therefore unconfirmed.")
             return
 
         # Build per-block table

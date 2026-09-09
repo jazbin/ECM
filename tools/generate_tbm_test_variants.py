@@ -14,18 +14,18 @@ The 2x2 matrix isolates two unknowns:
 
   Variant  | Tabs     | Neg orientation       | Key question answered
   ---------|----------|-----------------------|--------------------------------------------
-  V1       | ON       | Standard (neg=bottom) | Reference: full component list, can-bottom?
-  V2       | OFF      | Standard (neg=bottom) | Does suppressing tabs remove EndPlate_neg?
-  V3       | ON       | Same-face (neg=top)   | Does same-face move EndPlate_neg to top?
-  V4       | OFF      | Same-face (neg=top)   | Target config: bottom clean, top only?
+  variant_1 | ON       | Standard (neg=bottom) | Reference: full component list, can-bottom?
+  variant_2 | OFF      | Standard (neg=bottom) | How does suppressing tabs affect generated components?
+  variant_3 | ON       | Same-face (neg=top)   | How does same-face tab placement affect generated components?
+  variant_4 | OFF      | Same-face (neg=top)   | How does tab-off same-face affect generated components?
 
 Rob's checklist for each import (Create from Tbm -> Assign Parts to Regions):
   1. List all generated parts/regions (JellyRoll, Can, EndPlate_neg?, EndPlate_pos?, other?)
   2. Is the Can body open (tube only) or closed (tube + bottom face)?
-  3. Is there a separate region at the bottom in V1/V2?
-  4. Does that bottom region disappear in V2 vs V1?
-  5. Does the EndPlate move from bottom to top between V1 and V3?
-  6. In V4 (target): is the bottom clear, top only?
+  3. Is there a separate region at the bottom in variant_1/variant_2?
+  4. Does that bottom region differ between variant_2 and variant_1?
+  5. How do generated components differ between variant_1 and variant_3?
+  6. What topology is generated for variant_4?
 """
 
 import hashlib
@@ -191,7 +191,7 @@ def main() -> None:
             print(line)
 
     print("\n" + "=" * 70)
-    print("\nROB'S IMPORT CHECKLIST (run for each variant in order V1→V4):")
+    print("\nROB'S IMPORT CHECKLIST (run for each variant in order variant_1→variant_4):")
     print("  File > Create from Tbm  →  select the variant .tbm")
     print("  Battery Module > Assign Parts to Regions")
     print("  For each variant record:")
@@ -201,11 +201,8 @@ def main() -> None:
     print("    d) Is there a separate part at the TOP of the cell? (EndPlate_pos?)")
     print("    e) Any unexpected parts (washers, posts, etc.)?")
     print()
-    print("  Expected pattern if geometry behaves as hoped:")
-    print("    V1: JellyRoll + Can + EndPlate_neg(bottom) + EndPlate_pos(top) + tabs/posts")
-    print("    V2: JellyRoll + Can + [EndPlate_neg gone?] + EndPlate_pos(top)")
-    print("    V3: JellyRoll + Can + EndPlate_neg(top) + EndPlate_pos(top) + tabs/posts")
-    print("    V4: JellyRoll + Can + [nothing at bottom] + [EndPlate at top?]  ← TARGET")
+    print("  Record the observed parts and topology for each variant; no one-to-one STAR/OpenFOAM")
+    print("  topology is a production requirement without Siemens-model evidence.")
 
 
 if __name__ == '__main__':

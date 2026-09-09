@@ -27,12 +27,12 @@ These issues exist in the source file and are corrected by `tools/generate_tbm_t
 | `Package m_strName` | `18650` | `2170` | Yes |
 | `m_dElectrodeOverlapAtStart_mm` | 0 | 8 mm | Yes |
 | `m_dMandrelWidth_mm` | 0 | 6 mm | Yes |
-| `m_bOnly1D` | 1 (all 4 blocks) | 0 | Yes (v3 onward) |
+| `m_bOnly1D` | 1 (all 4 blocks) | 0 | Yes (package_rev3 onward) |
 | `m_nNegTabVertOrientation` | 1 (bottom) | 0 (top, same-face) | Yes (variant-dependent) |
 
 Still open in source and NOT yet fixed by the generate script:
-- `m_dJellyrollThickness_mm = 19.25` (should be ~20.627 mm to match can ID)
-- `m_dAhCell = 0`, `m_bSpecifyCapacity = 0` (capacity derived from geometry)
+- `m_dJellyrollThickness_mm = 19.25` (current value; can ID is 20.6274 mm; correct winding OD remains unresolved)
+- Active `RCRTable 3D`: `m_bSpecifyCapacity = 1`, `m_dAhCell = 5.0`; whether STAR interprets the override as intended remains unconfirmed.
 - `DataSheet m_dDSHeight = 65` (should be 70.02 mm = can external height)
 - `m_dElectrodeOverlapAtEnd_mm = 20` — not verified from cell spec
 - `m_dSepFeedLength_mm = 0`, `m_dSepTailLength_mm = 0` — not verified
@@ -93,21 +93,21 @@ Fixes added vs v1: `m_dElectrodeOverlapAtStart_mm = 8`, `m_dMandrelWidth_mm = 6`
 | `hp2170-test-v3-tabs-on-sameFace.tbm` | `918cf52a0df655a23b3987b749cbf0218743883a307020ee8f8c1b6022246337` | FAILED — same error |
 | `hp2170-test-v4-tabs-off-sameFace.tbm` | `946c7553bafc0a7112283d61dc8e67525dd2562341cbd187f312fa2f67abd3fb` | FAILED — same error |
 
-### v3 package — 2026-09-09 (`tbm_validation/variants/v3_package_20260909/`) — CURRENT
+### package_rev3 — 2026-09-09 (`tbm_validation/variants/v3_package_20260909/`) — CURRENT
 
 Fixes added vs v2: `m_bOnly1D = 0` (all 4 SIMMOD blocks).
 
-Static validator result: **0 FAIL, 3 WARN, 25 PASS** per file (identical result for all 4 variants).
+Static validator result: **0 FAIL, 11 WARN, 29 PASS** per file (identical result for all 4 variants).
 STAR-CCM+ import status: **PENDING** — not yet tested by Robert.
 
 | File | SHA-256 | Static validator | STAR import |
 |---|---|---|---|
-| `hp2170-test-v1-tabs-on-standard.tbm` | `cae78b4d66204b18898ce081252a1aae4fbf53f6cb325b77310690f727e411ad` | 0 FAIL 3 WARN | PENDING |
-| `hp2170-test-v2-tabs-off-standard.tbm` | `9f388fdf2a177a01d0441ce5ef5a24d06ae2104491a73db3ef955eeff7393593` | 0 FAIL 3 WARN | PENDING |
-| `hp2170-test-v3-tabs-on-sameFace.tbm` | `e03d2eaf97cf21d0a16e24bb503ab632bd1a2b0c17dfb0d3b6d8d1cbf8011c81` | 0 FAIL 3 WARN | PENDING |
-| `hp2170-test-v4-tabs-off-sameFace.tbm` | `9a973f4de048907520d8b48f592dab2d2c29e3d120b2db97a5c29bbacfcd8329` | 0 FAIL 3 WARN | PENDING |
+| `hp2170-test-v1-tabs-on-standard.tbm` | `cae78b4d66204b18898ce081252a1aae4fbf53f6cb325b77310690f727e411ad` | 0 FAIL 11 WARN | PENDING |
+| `hp2170-test-v2-tabs-off-standard.tbm` | `9f388fdf2a177a01d0441ce5ef5a24d06ae2104491a73db3ef955eeff7393593` | 0 FAIL 11 WARN | PENDING |
+| `hp2170-test-v3-tabs-on-sameFace.tbm` | `e03d2eaf97cf21d0a16e24bb503ab632bd1a2b0c17dfb0d3b6d8d1cbf8011c81` | 0 FAIL 11 WARN | PENDING |
+| `hp2170-test-v4-tabs-off-sameFace.tbm` | `9a973f4de048907520d8b48f592dab2d2c29e3d120b2db97a5c29bbacfcd8329` | 0 FAIL 11 WARN | PENDING |
 
-Remaining WARNs in v3 (not blocking import but need resolution before production):
+Remaining WARNs in package_rev3 (not blocking import but need resolution before production):
 1. `m_dJellyrollThickness_mm = 19.25` — 1.38 mm gap to can ID 20.627 mm
 2. `DataSheet m_dDSHeight = 65.0` vs `Package m_dextHeight = 70.02`
-3. `m_bSpecifyCapacity = 0` — capacity derived from geometry (may be wrong if JR dims still off)
+3. Active RCRTable 3D capacity override is `m_bSpecifyCapacity = 1`, `m_dAhCell = 5.0`; confirm STAR interprets it as intended and that geometry-derived quantities remain internally consistent.

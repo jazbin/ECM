@@ -1,6 +1,6 @@
 # Current TBM Field Audit
 
-> **Naming correction (integration review, 2026-09-09):** Bare "V3" replaced with `package_rev3` throughout. "V4" was previously ambiguous — it referred to both variant_4 of package_rev3 and the package_rev4_candidate. This document covers package_rev3 only. See `V4_CANDIDATE_DELTA_REPORT.md` for the package_rev4_candidate.
+> **Naming correction (integration review, 2026-09-09):** Package and variant identifiers are explicit throughout. This document covers package_rev3 only. See `V4_CANDIDATE_DELTA_REPORT.md` for package_rev4_candidate.
 >
 > **SB m_dOffsetPosAvg correction:** The Simple Builder cross-check table row for `m_dOffsetPosAvg` previously listed SB = `0.5`. Machine extraction proves the Simple Builder value is `0` in both source and all package_rev3 variants. Corrected below.
 >
@@ -27,23 +27,23 @@ Field-by-field classification for the package_rev3 variants. Every important fie
 
 ## Package fields
 
-| Field | V3 value | Status | Risk | Notes |
+| Field | package_rev3 value | Status | Risk | Notes |
 |---|---|---|---|---|
 | `m_dextDiameter` | 21.09 mm | VERIFIED | Low | From cell datasheet |
 | `m_dextHeight` | 70.02 mm | VERIFIED | Low | From cell datasheet |
 | `m_dintDiameter` | 20.6274 mm | VERIFIED | Low | Derived: 21.09 − 2×0.2313 mm |
 | `m_dintHeight` | 65.11 mm | VERIFIED | Low | Negative electrode collector width from About-Energy |
 | `m_strName` | 2170 | CORRECT | Low | Label only |
-| `m_bextVolCalc` | 1 | CORRECT | Low | STAR recalculates at import |
-| `m_bintVolCalc` | 1 | CORRECT | Low | STAR recalculates at import |
-| `m_dextVolume` | 16.5321 cm³ | STALE | Low | Stale from old 18650 geometry; STAR recomputes (m_bextVolCalc=1) |
-| `m_dintVolume` | 14.9232 cm³ | STALE | Low | Same; STAR recomputes |
+| `m_bextVolCalc` | 1 | CORRECT | Low | Recalculation by STAR at import is unconfirmed |
+| `m_bintVolCalc` | 1 | CORRECT | Low | Recalculation by STAR at import is unconfirmed |
+| `m_dextVolume` | 16.5321 cm³ | STALE | Low | Stale from old 18650 geometry; recalculation by STAR is unconfirmed (m_bextVolCalc=1) |
+| `m_dintVolume` | 14.9232 cm³ | STALE | Low | Same; recalculation by STAR is unconfirmed |
 
 ---
 
 ## BUILDER — Detailed Builder fields
 
-| Field | V3 value | Status | Risk | Notes |
+| Field | package_rev3 value | Status | Risk | Notes |
 |---|---|---|---|---|
 | `m_dJellyrollThickness_mm` | 19.25 mm | **UNRESOLVED** | **High** | ~1.38 mm gap to can ID (20.6274 mm). Correct value not confirmed. Do NOT force to can ID without cell teardown data. See STAR_IMPORT_ERROR_HISTORY. |
 | `m_dMandrelThickness_mm` | 6 mm | ASSUMED | Medium | Mandrel diameter from TBM source; not confirmed from About-Energy or cell construction data |
@@ -64,7 +64,7 @@ The Simple Builder section contains a second copy of some Detailed Builder field
 
 | Field | DB value | SB value | Match? | Notes |
 |---|---|---|---|---|
-| `m_dElectrodeOverlapAtStart` | 8 mm | 8 mm | ✓ Yes | Consistent after V3 fix |
+| `m_dElectrodeOverlapAtStart` | 8 mm | 8 mm | ✓ Yes | Consistent after package_rev3 fix |
 | `m_dMandrelWidth` | 6 mm | 0 mm | ✗ No | DB≠SB; unknown impact |
 | `m_dOffsetPosAvg` | 1e-06 | 0 | ✓ n/a | DB=1e-06, SB=0. Values differ (DB near-zero, SB zero). Prior doc incorrectly showed SB=0.5; machine extraction corrects this. |
 
@@ -106,9 +106,9 @@ The package_rev2 failure was caused by SOURCE having `m_bOnly1D = 1` in all four
 
 ## DataSheet fields
 
-These are label/metadata fields. They do NOT affect geometry or physics. They do NOT cause STAR import failures. However, they should be corrected before production for documentation hygiene and to avoid confusion if STAR displays these values in reports.
+These appear to be label/metadata fields based on their names and placement. Their effect on geometry, physics, and STAR import has not been established by repository evidence. They should be corrected before production for documentation hygiene and to avoid confusion if STAR displays these values in reports.
 
-| Field | V3 value | Expected 2170 value | Status | Priority |
+| Field | package_rev3 value | Expected 2170 value | Status | Priority |
 |---|---|---|---|---|
 | `m_strName` | HPCell | hp2170NCA | STALE | Fix before production |
 | `m_strDSName` | HPCell | hp2170NCA | STALE | Fix before production |
@@ -122,9 +122,9 @@ These are label/metadata fields. They do NOT affect geometry or physics. They do
 
 ## REPORT block fields
 
-The `<REPORT>` block contains BDS-computed output values from a prior BDS session with the old 18650-like jelly-roll geometry. All fields in our TBM have flag=0 (BDS-computed). `m_dRepCanXDim/YDim/ZDim` are Level-C fields documented as consumed by STAR-CCM+ at import. The remaining `m_dRep*` fields are informational.
+The `<REPORT>` block contains output values from a prior BDS session with the old 18650-like jelly-roll geometry. All fields in our TBM have flag=0. The repository evidence does not establish which REPORT fields STAR consumes or recomputes at import; the `m_dRepCanXDim/YDim/ZDim` fields match the package dimensions, while the remaining fields should be treated as consumption unconfirmed.
 
-| Field | V3 value | Correct value | Status | Consumed by STAR? |
+| Field | package_rev3 value | Correct value | Status | Consumed by STAR? |
 |---|---|---|---|---|
 | `m_dRepCanXDim` | 21.09 mm | 21.09 mm | CORRECT | YES (Level-C, documented) |
 | `m_dRepCanYDim` | 21.09 mm | 21.09 mm | CORRECT | YES |
@@ -140,7 +140,7 @@ The `<REPORT>` block contains BDS-computed output values from a prior BDS sessio
 
 Fields in this list require special attention before production. These are fields where the current value is either wrong, stale, or its impact is uncertain.
 
-| Field | Current V3 value | Risk | Action required |
+| Field | Current package_rev3 value | Risk | Action required |
 |---|---|---|---|
 | `m_dJellyrollThickness_mm` | 19.25 mm | **HIGH** | Confirm correct JR OD from cell teardown or AE data. Do NOT force to can ID without evidence. |
 | `m_dOffsetPosAvg` (Detailed Builder) | 1e-06 | **MEDIUM** | Investigate provenance. Consider correcting to 0.5 (matches all simple references). Monitor if STAR import behaves differently with 0.5 vs 1e-06. |
@@ -148,4 +148,4 @@ Fields in this list require special attention before production. These are field
 | `m_dElectrodeOverlapAtStart_mm` | 8 mm | **MEDIUM** | Confirm from About-Energy electrode spec. Currently assumed from Simple Builder value; matches HP18650-template. |
 | `SOC_min = -0.08` | -0.08 | **MEDIUM** | Verify STAR-CCM+ accepts SOC < 0 in RCR tables. Document intentional extrapolation point. |
 | `m_dMandrelThickness_mm` | 6 mm | **LOW-MEDIUM** | Confirm from cell construction data. |
-| REPORT stale fields | 18650 geometry | **LOW** | Likely recomputed by STAR during "Create from Tbm"; m_dRepCanXDim/YDim/ZDim are correct. Monitor. |
+| REPORT stale fields | 18650 geometry | **LOW** | Recomputed-by-STAR behavior and field consumption are unconfirmed. The can-dimension values match the package dimensions. Monitor. |

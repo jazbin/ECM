@@ -68,7 +68,7 @@ tools/generate_tbm_test_variants.py
        ↓ (applies geometry fixes + tab/orientation variants)
 out/test/hp2170-test-v{1..4}-*.tbm   ← test variant TBMs
        ↓
-out/tbm_geometry_test_20260909.zip   ← client package v3
+out/tbm_geometry_test_20260909.zip   ← client package package_rev3
 ```
 
 The `translate_tbm_from_openfoam.py` script reads `params.csv` and writes the RCR and OCV sections into the TBM. The `generate_tbm_test_variants.py` script reads the resulting source TBM and applies geometry corrections + variant-specific tab settings.

@@ -2,6 +2,8 @@
 
 **Last updated: 2026-09-09**
 
+This file is a synchronized copy of the canonical root-level `STARCCM_TBM_PROJECT_CONTEXT.md`; it also carries the repository-forensics appendix. Factual statements in both files must remain aligned.
+
 ---
 
 ## 1. What we are doing and why
@@ -39,7 +41,7 @@ About-Energy does not know about STAR-CCM+ or TBM files — they characterise th
 | Mandrel diameter | 6 mm | TBM source |
 | Tab orientation | Both on top (same-face) | confirmed with Miles 2026-09-03 |
 
-The cell regions that map to OpenFOAM are: jellyRoll (active zone), shell (can), cap (top end). There is no bottom end-plate in the target STAR-CCM+ geometry — the can base is a clean sealed steel face, consistent with the dual-top-terminal configuration.
+The cell regions that map to OpenFOAM are: jellyRoll (active zone), shell (can), and cap (top end). The physical target may use a dual-top-terminal configuration, while STAR/BDS generated components may have solver or electrical semantics. The objective is equivalent cell-level and distributed electrothermal response within defined validation tolerances; STAR internal topology and discretization do not need to match the OpenFOAM representation one-to-one.
 
 ---
 
@@ -72,7 +74,7 @@ A TBM file contains two main categories of data:
 - Tab geometry: `m_bNegTab`, `m_bPosTab`, `m_nNegTabVertOrientation` (0 = top, 1 = bottom), `m_nPosTabVertOrientation`
 
 **Key electrochemical mode flag**:
-- `m_bOnly1D` — must be `0` for STAR-CCM+'s distributed 3D solver. The stock template we cloned had this set to `1` (1D-only mode), which BDS/STAR-CCM+ explicitly rejects when creating 3D geometry or running distributed physics. All our generated variants must set this to `0`.
+- `m_bOnly1D` — the current package variants use `0` in all four SIMMOD blocks, including the active RCRTable 3D block. The repository documents an import warning for some `1` values, but the exact STAR/BDS semantics by SIMMOD context remain unconfirmed.
 
 ---
 
@@ -99,13 +101,13 @@ These are fixed by the generate script for the test variants but the source file
 | `Package m_strName` | 18650 | 2170 | Yes |
 | `m_dElectrodeOverlapAtStart_mm` | 0 | 8 mm (copied from Simple Builder) | Yes |
 | `m_dMandrelWidth_mm` | 0 | 6 mm (= mandrel thickness, cylindrical) | Yes |
-| `m_bOnly1D` | 1 | 0 | Yes (added v3) |
+| `m_bOnly1D` | 1 | 0 | Yes (added in package_rev3) |
 | `m_nNegTabVertOrientation` | 1 (bottom) | 0 (top, same-face) | Yes (variant-dependent) |
 
 ### What is still open (not yet addressed by the script)
 
-- **`m_dJellyrollThickness_mm = 19.25`** — this is the jelly-roll outer diameter. It should be ~20.627 mm (= can ID) to make contact with the can. Current value leaves a ~1.4 mm radial gap. Not yet fixed in the generate script.
-- **`m_dAhCell = 0`, `m_bSpecifyCapacity = 0`** — capacity is not explicitly specified; BDS will derive it from electrode geometry. With the geometry still partially stock-18650-derived, the derived capacity may be wrong.
+- **`m_dJellyrollThickness_mm = 19.25`** — current value. The can ID is 20.6274 mm, giving a 1.3774 mm diametral difference. Whether this field represents the winding OD or another geometry quantity, and the correct physical JR OD, remain unresolved; 20.6274 mm is a geometric upper bound/cavity ID, not a proven winding OD.
+- **Active `RCRTable 3D` capacity** — machine extraction verifies `m_bSpecifyCapacity = 1` and `m_dAhCell = 5.0`. The remaining question is whether STAR interprets and uses the 5 Ah override as intended and whether geometry-derived quantities remain internally consistent.
 - **Separator and electrode overlap at end** — `m_dSepFeedLength_mm = 0`, `m_dSepTailLength_mm = 0`, `m_dElectrodeOverlapAtEnd_mm = 20` — not yet validated against About-Energy data or a 2170 reference.
 - **`DataSheet m_dDSHeight = 65`** — should probably be 70.02 mm (full can height) or 65.11 mm (active height); inconsistent.
 
@@ -113,16 +115,16 @@ These are fixed by the generate script for the test variants but the source file
 
 ## 7. The geometry test (current work)
 
-Before committing to a production TBM, we are running a geometry inspection test. The goal is to confirm that STAR-CCM+'s "Create from Tbm" generates a topology that matches the OpenFOAM geometry: **JellyRoll + Can + top EndPlate only** (no EndPlate at the bottom, consistent with dual-top terminal and the OF jellyRoll / shell / cap regions).
+Before committing to a production TBM, we are running a geometry inspection test. The test may inspect parts and topology, but the production objective is equivalent cell-level and distributed electrothermal response within defined validation tolerances. It does not require STAR/BDS to reproduce **JellyRoll + Can + top EndPlate only** one-to-one, and absence of a bottom EndPlate is not a production requirement without Siemens-model evidence.
 
 The test uses four variants that isolate two unknowns — whether tabs are on or off, and whether the negative tab is on top (same-face) or bottom (standard) — to see how each combination affects what parts BDS generates.
 
 | Variant | Tabs | Neg orientation | Key question |
 |---|---|---|---|
-| V1 | ON | Standard (neg=bottom) | Full component list — what does BDS generate by default? |
-| V2 | OFF | Standard | Does suppressing tabs remove the bottom EndPlate? |
-| V3 | ON | Same-face (neg=top) | Does same-face move the EndPlate to top? |
-| V4 | OFF | Same-face | **Target config**: bottom clean, top only? |
+| variant_1 | ON | Standard (neg=bottom) | Full component list — what does BDS generate by default? |
+| variant_2 | OFF | Standard | How does suppressing tabs affect generated components? |
+| variant_3 | ON | Same-face (neg=top) | How does same-face tab placement affect generated components? |
+| variant_4 | OFF | Same-face | How does the tab-off same-face case affect generated components? |
 
 Robert's job for this test: import each TBM → "Create from Tbm" → export to STEP → send back 4 STEP files. We then analyse the topology. He does not run any physics for this test.
 
@@ -130,17 +132,17 @@ Robert's job for this test: import each TBM → "Create from Tbm" → export to 
 
 | Package | Date | SHA-256 | What was fixed |
 |---|---|---|---|
-| v1 (`tbm_geometry_test_20260904.zip`) | 2026-09-04 | — | Initial attempt |
-| v2 (`tbm_geometry_test_20260907.zip`) | 2026-09-07 | `e3abefda...` | `m_dElectrodeOverlapAtStart_mm` 0→8 (fixed "Extrusion distance = 0" error); `m_dMandrelWidth_mm` 0→6 |
-| v3 (`tbm_geometry_test_20260909.zip`) | 2026-09-09 | `127079ad...` | `m_bOnly1D` 1→0 (fixed "m_bOnly1D option is not supported" failure) |
+| package_rev1 (`tbm_geometry_test_20260904.zip`) | 2026-09-04 | — | Initial attempt |
+| package_rev2 (`tbm_geometry_test_20260907.zip`) | 2026-09-07 | `e3abefda...` | `m_dElectrodeOverlapAtStart_mm` 0→8 (addressed the reported extrusion-distance error); `m_dMandrelWidth_mm` 0→6 |
+| package_rev3 (`tbm_geometry_test_20260909.zip`) | 2026-09-09 | `127079ad...` | `m_bOnly1D` 1→0 (addressed the reported import warning) |
 
-**Current package for Robert: v3** (`out/tbm_geometry_test_20260909.zip`)
+**Current package for Robert: package_rev3** (`out/tbm_geometry_test_20260909.zip`)
 
-Variant SHA-256s (v3):
-- V1 (tabs-on-standard): `cae78b4d...`
-- V2 (tabs-off-standard): `9f388fdf...`
-- V3 (tabs-on-sameFace): `e03d2eaf...`
-- V4 (tabs-off-sameFace): `9a973f4d...`
+Variant SHA-256s (package_rev3):
+- variant_1 (tabs-on-standard): `cae78b4d...`
+- variant_2 (tabs-off-standard): `9f388fdf...`
+- variant_3 (tabs-on-sameFace): `e03d2eaf...`
+- variant_4 (tabs-off-sameFace): `9a973f4d...`
 
 ---
 
@@ -169,9 +171,9 @@ A complete forensic handoff has been pushed to the `jazbin/ECM` GitHub repositor
 | `data/README_data.md` | Explanation of all data files and TBM pipeline |
 | `docs/STARCCM_TBM_PROJECT_CONTEXT.md` | This document |
 
-**Static validator — v3 results:**
+**Static validator — current package results:**
 Source TBM (`hp2170NCA-ECM.tbm`): 1 FAIL, 11 WARN — correctly captures every known issue.
-All v3 variants: **0 FAIL, 3 WARN** (jellyroll gap, DataSheet height, capacity derivation — all accepted for geometry test, must be fixed for production).
+All package_rev3 variants: **0 FAIL, 11 WARN**. All package_rev4_candidate variants: **0 FAIL, 4 WARN**. These are current corrected-validator totals.
 
 **STAR-CCM+ version:** Not confirmed from Robert. Field interpretation may vary.
 **BDS version:** Not confirmed from Robert.
@@ -181,9 +183,9 @@ All v3 variants: **0 FAIL, 3 WARN** (jellyroll gap, DataSheet height, capacity d
 ## 8. Open questions
 
 1. **Geometry test result** — awaiting Robert's 4 STEP files to confirm topology.
-2. **Jelly-roll diameter** — `m_dJellyrollThickness_mm = 19.25` needs to be corrected to ~20.627 mm before production TBM. Confirm what the correct value is from About-Energy or cell datasheet.
+2. **Jelly-roll diameter** — current `m_dJellyrollThickness_mm = 19.25`; can ID is 20.6274 mm and the diametral difference is 1.3774 mm. Confirm the correct physical JR OD and the STAR meaning of this field from Siemens-model evidence, cell teardown, or an applicable datasheet. Do not assume the JR OD must equal the can ID.
 3. **Electrode overlap at start** — 8 mm was copied from the Simple Builder block in the source TBM. Miles to confirm this is correct per the electrode design spec.
-4. **Capacity specification** — whether to explicitly set `m_bSpecifyCapacity = 1` / `m_dAhCell = 5` or allow BDS to derive it from electrode geometry. If geometry is not fully correct, explicit specification is safer.
+4. **Capacity specification** — the active RCRTable 3D block currently explicitly sets `m_bSpecifyCapacity = 1` / `m_dAhCell = 5.0`. Confirm STAR interpretation and consistency with geometry-derived quantities.
 5. **Distributed discretisation equivalence** — once the geometry test passes and a production TBM is running in STAR-CCM+, a quantitative comparison against the OpenFOAM-ECM distributed results is needed to confirm equivalence.
 
 ---
@@ -193,14 +195,14 @@ All v3 variants: **0 FAIL, 3 WARN** (jellyroll gap, DataSheet height, capacity d
 | Path | Purpose |
 |---|---|
 | `out/hp2170NCA-ECM.tbm` | Source TBM (partially corrected from stock 18650, electrochemistry from About-Energy) |
-| `out/test/hp2170-test-v{1..4}-*.tbm` | Current geometry test variants (v3) |
-| `out/tbm_geometry_test_20260909.zip` | v3 package for Robert |
+| `out/test/hp2170-test-v{1..4}-*.tbm` | Current geometry test variants (package_rev3) |
+| `out/tbm_geometry_test_20260909.zip` | package_rev3 for Robert |
 | `tools/generate_tbm_test_variants.py` | Script that applies fixes and generates all 4 variants from the source TBM |
 | `tools/translate_tbm_from_openfoam.py` | Script used to populate the RCR/OCV electrochemical tables from About-Energy / OpenFOAM data |
 | `tools/validate_tbm.py` | **Independent static validator — run before every send** |
 | `python/params.csv` | About-Energy characterisation data (R0, R1, C1, R2, C2, OCV vs SOC at 3 temperatures) |
 | `docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md` | 2170 cell physical dimensions reference |
-| `BDS_files/_Projects/HE18650/he18650spiral1.tbm` | Siemens stock HE18650 reference TBM (no m_bOnly1D field; used as geometry reference) |
+| `BDS_files/_Projects/HE18650/he18650spiral1.tbm` | Siemens stock HE18650 reference TBM; machine extraction finds `m_bOnly1D = [1, 0, 0, 0]` |
 | `artifacts/reports/TBM_CELL_GEOMETRY_FINDINGS_RevA_20260812.pdf` | Controlled PDF report documenting the original geometry mismatch findings (2026-08-12) |
 
-**Distinction: geometric topology vs electrothermal equivalence.** The current geometry test establishes that STAR-CCM+ generates the correct part topology (JellyRoll + Can + EndPlate regions matching the OpenFOAM mesh decomposition). This is a necessary but not sufficient condition for electrothermal equivalence. The spatial discretisation in STAR-CCM+'s distributed solver differs from the OpenFOAM-ECM axial × radial zone scheme. A separate quantitative validation step (temperature, heat generation profiles vs OpenFOAM-ECM results at same boundary conditions) is required before the TBM is declared an equivalent replacement.
+**Distinction: geometric topology vs electrothermal equivalence.** The pending geometry test will document the parts and topology STAR-CCM+ generates from each package variant. That observation is necessary but not sufficient for electrothermal equivalence. The spatial discretisation in STAR-CCM+'s distributed solver differs from the OpenFOAM-ECM axial × radial zone scheme. A separate quantitative validation step (temperature, heat generation profiles vs OpenFOAM-ECM results at same boundary conditions) is required before the TBM is declared an equivalent replacement.

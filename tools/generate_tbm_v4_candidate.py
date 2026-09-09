@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Generate V4 candidate TBM variants (do NOT send to Robert without review).
+Generate package_rev4_candidate TBM variants (do NOT send to Robert without review).
 
-This script extends the V3 generation with evidence-based corrections identified
+This script extends the package_rev3 generation with evidence-based corrections identified
 in the independent review of commit e3c3b14. V3 variants in
 tbm_validation/variants/v3_package_20260909/ are not modified.
 
 Source: tbm_validation/source/hp2170NCA-ECM.tbm
 Output: out/v4_candidate/hp2170-v4c-*.tbm
 
-V4 adds the following corrections on top of all V3 fixes:
+package_rev4_candidate adds the following corrections on top of all package_rev3 fixes:
 
   Change                | Field                        | Classification      | Evidence
   ----------------------|------------------------------|---------------------|--------------------------------------
   1e-06 → 0.5           | m_dOffsetPosAvg (DB)         | CONSISTENCY_FIX     | HE18650, HP18650-templ, Tutorial = 0.5
-  HPCell → hp2170NCA    | DataSheet m_strName          | CONSISTENCY_FIX     | label field, no geometry impact
+  HPCell → hp2170NCA    | DataSheet m_strName          | CONSISTENCY_FIX     | label field; STAR consumption unconfirmed
   HPCell → hp2170NCA    | DataSheet m_strDSName        | CONSISTENCY_FIX     | label field
   65 → 70.02            | DataSheet m_dHeight          | CONSISTENCY_FIX     | 65 = HP18650 residual; 2170 = 70.02 mm
   65 → 70.02            | DataSheet m_dDSHeight        | CONSISTENCY_FIX     | same
@@ -24,7 +24,7 @@ V4 adds the following corrections on top of all V3 fixes:
 NOT changed (still UNRESOLVED or intentional):
 
   m_dJellyrollThickness_mm = 19.25     UNRESOLVED_ASSUMPTION — JR OD gap, correct value unknown
-  m_bOnly1D = 0 (all blocks)           Already correct in V3
+  m_bOnly1D = 0 (all blocks)           Already correct in package_rev3
   SOC min = -0.08                       INTENTIONAL — extrapolation point per translate script
   m_dElectrodeOverlapAtEnd_mm = 20     UNRESOLVED — lower than refs, value not confirmed
   m_dElectrodeOverlapAtStart_mm = 8    ASSUMED — matches HP18650-templ; not confirmed from AE
@@ -115,7 +115,7 @@ def apply_v4_fixes(content: bytes) -> tuple[bytes, list[str]]:
     # CONSISTENCY_FIX: m_dOffsetPosAvg Detailed Builder 1e-06 → 0.5
     # Evidence: HE18650, HP18650-template, LiIonSpiral, Tutorial all use 0.5.
     # HP18650-DIST uses 1e-06 (same as our source) but its import status is unconfirmed.
-    # Simple Builder already has 0.5 in both source and V3 — this fix makes DB consistent.
+    # Simple Builder remains 0 in source and package_rev3; only Detailed Builder changes.
     content, hit = sub_first(content, 'm_dOffsetPosAvg', '0.5')
     if hit:
         log.append("  m_dOffsetPosAvg (first/DB occurrence) → 0.5  "

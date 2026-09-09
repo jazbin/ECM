@@ -72,11 +72,10 @@ def generate(src, he, r3v1, r3v2, r3v3, r3v4, r4v1, r4v2, r4v3, r4v4) -> str:
     h()
     h('**Naming convention:**')
     h('- `package_rev3 / variant_N` — the geometry-test package (sent 2026-09-09, commit e3c3b14)')
-    h('- `package_rev4_candidate / variant_N` — the V4 review candidate (commit 2ea5b45, NOT yet sent to Robert)')
+    h('- `package_rev4_candidate / variant_N` — the package_rev4_candidate review candidate (commit 2ea5b45, NOT yet sent to Robert)')
     h()
-    h('Do not use bare "V3" or "V4" — those terms are ambiguous (V3 is a package '
-      'that contains four variants; the term "V4" in an earlier session was used '
-      'to refer to variant 4 of package_rev3, NOT the package_rev4_candidate).')
+    h('Use `package_rev3`, `package_rev4_candidate`, and `variant_N` explicitly; '
+      'package revision and variant identifiers must not be collapsed into shorthand.')
     h()
 
     h('## Files compared')
@@ -166,9 +165,9 @@ def generate(src, he, r3v1, r3v2, r3v3, r3v4, r4v1, r4v2, r4v3, r4v4) -> str:
         h(f'| {label} | {_fmt(f.detailed_builder.electrode_overlap_at_start)} '
           f'| {_fmt(f.simple_builder.electrode_overlap_at_start)} |')
     h()
-    h('source DB = `0` was a placeholder left by About-Energy (TBM generated in 1D-only ECM mode). '
-      'BDS rejects zero with "Extrusion distance cannot be 0". All package_rev3 and '
-      'package_rev4_candidate variants have this corrected to `8`.')
+    h('source DB = `0` was a placeholder in the source file; the field provenance is unknown. '
+      'BDS reported "Extrusion distance cannot be 0" for the source geometry test. All '
+      'package_rev3 and package_rev4_candidate variants have this corrected to `8`.')
     h()
 
     # ---- m_bOnly1D ----
@@ -186,9 +185,10 @@ def generate(src, he, r3v1, r3v2, r3v3, r3v4, r4v1, r4v2, r4v3, r4v4) -> str:
 
     h('**Notes:**')
     h()
-    h(f'- source: `{src_bonly}`. All four affected SIMODs set to 1 because About-Energy '
-      f'generated this TBM in 1D-only ECM mode. BDS emits "Warning: m_bOnly1D option is '
-      f'not supported" for each occurrence and then fails to build the 3D geometry.')
+    h(f'- source: `{src_bonly}`. The source was assembled in this workspace from Siemens '
+      f'template material and About-Energy data; provenance of the `m_bOnly1D` values is '
+      f'unknown. BDS reported "Warning: m_bOnly1D option is not supported" during the '
+      f'earlier geometry test.')
     h(f'- HE18650 (known-good): `{he_bonly}`. Machine extraction confirms HE18650 **does** '
       f'contain four `m_bOnly1D` fields. The first SIMMOD (Distributed 3D) retains '
       f'`m_bOnly1D = 1`; the remaining three are 0. The file builds successfully in BDS, '

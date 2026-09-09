@@ -1,0 +1,4 @@
+User input: Continue autonomously from the current ECM repository state; finish documentation consistency and regression-test pass, validate package totals and hashes, commit and push tbm-review-integration. Do not modify main/master or TBM files.
+Assistant actions: Located repository at /workspace, protected dirty master worktree by using /tmp/ecm-tbm-review, confirmed branch and clean status, and began inventory.
+Assistant actions: Ran machine extraction and both validator batches; confirmed package_rev3 0 FAIL/11 WARN and package_rev4_candidate 0 FAIL/4 WARN for all four files; confirmed all eight TBM SHA-256 values.
+Assistant actions: Updated contexts, audit/checklist/inventory/history/delta documentation, generator/validator wording, and added tbm_validation/tests/test_documentation_consistency.py. Documentation test 5/5, structural test 41/41, validator unit test 21/21, Python syntax checks passed.

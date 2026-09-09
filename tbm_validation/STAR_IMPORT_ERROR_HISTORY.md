@@ -50,7 +50,7 @@ Warning: m_bOnly1D option is not supported
 **STAR-CCM+ operation:** File > Create from Tbm
 
 **Diagnosis:**
-`m_bOnly1D = 1` was present in all 24 SIMMOD blocks of the source TBM. The source file was generated with the 1D-only electrochemical mode flag set (likely during the initial BDS session with About-Energy where the emphasis was on 1D ECM, not 3D distributed). STAR-CCM+'s "Create from Tbm" operation for 3D geometry creation does not support the 1D-only mode.
+`m_bOnly1D = 1` was present in all 24 SIMMOD blocks of the source TBM. The source file was assembled in this workspace from Siemens template material and About-Energy data; provenance of the flag values is unknown. The repository records an import warning for this source pattern, but exact STAR-CCM+/BDS support by SIMMOD context is unconfirmed.
 
 **Per-SIMMOD-block analysis:**
 The error message "Warning: m_bOnly1D option is not supported" appears per-block, not per-file. Two instances were reported — BDS may only report the first N instances or may report for specific blocks (e.g. the two 3D blocks that have explicit 3D geometry creation).
@@ -59,26 +59,26 @@ The critical block is `RCRTable 3D` — our active electrochemical model. All kn
 
 For the `Distributed 3D` block, references disagree: HE18650 and HP18650-template use 1; LiIonSpiral, Tutorial, HV-LiCoO2f use 0. It is possible BDS only reports the warning for `Distributed 3D` block (the explicit 3D geometry block), not all blocks.
 
-**Fix applied in V3:**
-All `m_bOnly1D` occurrences set to 0 via `sub_all()`. V3 has `m_bOnly1D = 0` in all 24 SIMMOD blocks.
+**Fix applied in package_rev3:**
+All `m_bOnly1D` occurrences set to 0 via `sub_all()`. package_rev3 has `m_bOnly1D = 0` in all 24 SIMMOD blocks.
 
-**Per-SIMMOD table for V3:**
-| SIMMOD block | V3 | HE18650 | HP18650-templ | LiIonSpiral | Tutorial |
+**Per-SIMMOD table for package_rev3:**
+| SIMMOD block | package_rev3 | HE18650 | HP18650-templ | LiIonSpiral | Tutorial |
 |---|---|---|---|---|---|
 | Distributed 3D | 0 | 1 | 1 | 0 | 0 |
 | Distributed | 0 | 0 | false | true | true |
 | NTGPTable 3D | 0 | 0 | 0 | 0 | 0 |
 | RCRTable 3D | 0 | 0 | 0 | 0 | 0 |
 
-**Open question:** HE18650 and HP18650-template have `m_bOnly1D = 1` in the Distributed 3D block, yet (presumably) import successfully. This suggests the error is NOT triggered by the Distributed 3D block having 1. The error in V2 was more likely triggered by having 1 in the RCRTable 3D block (the active model). V3's all-zero pattern is therefore more conservative than needed, but is consistent with LiIonSpiral and Tutorial (STAR-install TBMs known to work).
+**Open question:** HE18650 and HP18650-template have `m_bOnly1D = 1` in the Distributed 3D block, yet are known-good references. The warning trigger by SIMMOD context is unconfirmed. The package_rev2 result may relate to the RCRTable 3D block (the active model). package_rev3's all-zero pattern is a conservative project choice, and is consistent with LiIonSpiral and Tutorial reference files.
 
 **Validator check:** `m_bOnly1D_rcrtable` → PASS if RCRTable 3D block has 0 or false.
 
 ---
 
-## Error 3 — V3 package (2026-09-09)
+## Error 3 — package_rev3 package (2026-09-09)
 
-**Package:** `tbm_geometry_test_20260909.zip` (v3)
+**Package:** `tbm_geometry_test_20260909.zip` (package_rev3)
 **STAR_IMPORT_PASS status:** **PENDING** — awaiting confirmation from Robert.
 
 No errors reported as of 2026-09-09 (package just sent). When Robert reports results, add an entry here.
