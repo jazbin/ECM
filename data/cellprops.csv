@@ -1,0 +1,2 @@
+cellname,paramID,Qnom_Ah,mass_g,V_EOC_V,V_EOD_V,Cp_cell_J_K-1,Asurf_m2
+cylindrical,2.1,5,68.8,4.2,2.5,903.9,0.0053
