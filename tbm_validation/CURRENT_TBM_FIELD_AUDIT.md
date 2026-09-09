@@ -1,8 +1,14 @@
 # Current TBM Field Audit
 
-Field-by-field classification for the current V3 variants. Every important field is assigned a status and a risk level for production use.
+> **Naming correction (integration review, 2026-09-09):** Bare "V3" replaced with `package_rev3` throughout. "V4" was previously ambiguous — it referred to both variant_4 of package_rev3 and the package_rev4_candidate. This document covers package_rev3 only. See `V4_CANDIDATE_DELTA_REPORT.md` for the package_rev4_candidate.
+>
+> **SB m_dOffsetPosAvg correction:** The Simple Builder cross-check table row for `m_dOffsetPosAvg` previously listed SB = `0.5`. Machine extraction proves the Simple Builder value is `0` in both source and all package_rev3 variants. Corrected below.
+>
+> **HE18650 m_bOnly1D correction:** A note in the m_bOnly1D table previously stated "HE18650 does NOT have the m_bOnly1D field in any of its SIMMOD blocks at all." Machine extraction shows HE18650 contains `m_bOnly1D = [1, 0, 0, 0]` (Distributed 3D = 1, remaining three = 0). The table and notes have been corrected.
 
-**Last revised:** 2026-09-09 (independent review of commit e3c3b14 — corrected flat-scan capacity classification; corrected mandrel-width conclusion; added REPORT/offset_pos_avg/DataSheet entries from machine extraction)
+Field-by-field classification for the package_rev3 variants. Every important field is assigned a status and a risk level for production use.
+
+**Last revised:** 2026-09-09 (independent review of commit e3c3b14; integration corrections applied 2026-09-09 — SB m_dOffsetPosAvg and HE18650 m_bOnly1D narrative corrected from machine extraction)
 
 ---
 
@@ -60,20 +66,22 @@ The Simple Builder section contains a second copy of some Detailed Builder field
 |---|---|---|---|---|
 | `m_dElectrodeOverlapAtStart` | 8 mm | 8 mm | ✓ Yes | Consistent after V3 fix |
 | `m_dMandrelWidth` | 6 mm | 0 mm | ✗ No | DB≠SB; unknown impact |
-| `m_dOffsetPosAvg` | 1e-06 | 0.5 | ✗ No | DB≠SB; unknown which takes priority |
+| `m_dOffsetPosAvg` | 1e-06 | 0 | ✓ n/a | DB=1e-06, SB=0. Values differ (DB near-zero, SB zero). Prior doc incorrectly showed SB=0.5; machine extraction corrects this. |
 
 ---
 
 ## m_bOnly1D (per-SIMMOD block)
 
-| SIMMOD block | V3 value | Status | Notes |
-|---|---|---|---|
-| Distributed 3D | 0 | ASSUMED | V3 set to 0 (was 1 in source). LiIonSpiral/Tutorial/HV-LiCoO2f have 0; HE18650/HP18650-templ have 1. References disagree. |
-| Distributed | 0 | ASSUMED | V3 set to 0. HE18650=0, HP18650-templ=false match. LiIonSpiral/Tutorial have true/1. |
-| NTGPTable 3D | 0 | ASSUMED | V3 set to 0. Matches HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. |
-| **RCRTable 3D** | **0** | **VERIFIED** | Active model block. Matches ALL working references: HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. Only HP18650-DIST has 1 (import status unknown). |
+| SIMMOD block | package_rev3 value | HE18650 value | Status | Notes |
+|---|---|---|---|---|
+| Distributed 3D | 0 | 1 | ASSUMED | package_rev3 set to 0 (was 1 in source). HE18650 has 1 here; LiIonSpiral/Tutorial/HV-LiCoO2f have 0. References disagree for this block. |
+| Distributed | 0 | 0 | ASSUMED | package_rev3 set to 0. HE18650=0 matches. LiIonSpiral/Tutorial have 1. |
+| NTGPTable 3D | 0 | 0 | ASSUMED | package_rev3 set to 0. Matches HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. |
+| **RCRTable 3D** | **0** | **0** | **VERIFIED** | Active model block. Matches ALL working references: HE18650, HP18650-templ, LiIonSpiral, Tutorial, HV-LiCoO2f. Only HP18650-DIST has 1 (import status unknown). |
 
-The V2 package failure was caused by SOURCE having m_bOnly1D=1 in all blocks (including RCRTable 3D). V3 sets all to 0.
+**HE18650 m_bOnly1D note (corrected):** Machine extraction confirms HE18650 **does** contain four `m_bOnly1D` fields with values `[1, 0, 0, 0]`. The first SIMMOD block (Distributed 3D) retains `m_bOnly1D = 1`; the remaining three are 0. HE18650 builds successfully in BDS despite Distributed 3D having `m_bOnly1D = 1`, indicating only certain SIMMOD contexts cause BDS to reject the value. A prior version of this document stated "HE18650 does NOT have the m_bOnly1D field in any of its SIMMOD blocks at all" — that was incorrect and has been removed.
+
+The package_rev2 failure was caused by SOURCE having `m_bOnly1D = 1` in all four blocks (including RCRTable 3D). package_rev3 sets all to 0.
 
 ---
 
