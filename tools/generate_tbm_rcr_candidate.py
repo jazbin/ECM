@@ -40,7 +40,7 @@ def _modelmap_span(raw: bytes) -> tuple[int, int, bytes]:
 
 
 def _iet_value(block: bytes) -> bytes:
-    matches = re.findall(br"(?m)^\s*IET\s*=\s*([^\t\r\n]+)", block)
+    matches = re.findall(br"(?m)^[ \t]*IET[ \t]*=[ \t]*([^\t\r\n]+)", block)
     if len(matches) != 1:
         raise ValueError(f"expected exactly one IET entry in MODELMAP, found {len(matches)}")
     return matches[0].strip()
@@ -55,11 +55,12 @@ def patch_modelmap(raw: bytes) -> bytes:
             f"unexpected base MODELMAP IET={current!r}; expected {EXPECTED_OLD_IET!r}"
         )
 
-    # A populated RCRTable 3D SIMMOD must exist before selecting it.
+    # A RCRTable 3D SIMMOD must exist before selecting it.
     if not re.search(br"<SIMMOD>\r?\nRCRTable 3D\r?\n", raw):
         raise ValueError("RCRTable 3D SIMMOD not found")
 
-    old_line = re.compile(br"(?m)^(\s*IET\s*=\s*)Distributed 3D(\s*)$")
+    # Restrict whitespace to horizontal characters so line boundaries cannot move.
+    old_line = re.compile(br"(?m)^([ \t]*IET[ \t]*=[ \t]*)Distributed 3D([ \t]*)$")
     patched_block, count = old_line.subn(br"\1RCRTable 3D\2", block)
     if count != 1:
         raise ValueError(f"expected one MODELMAP IET replacement, got {count}")
