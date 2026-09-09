@@ -53,13 +53,28 @@ class TestModelMapParser(unittest.TestCase):
 
 
 class TestRepositoryEvidence(unittest.TestCase):
-    def test_star_validation_tbm_selects_rcr(self):
-        path = ROOT / "tbm_validation" / "in_StarCCM_bds" / "validationBattery.tbm"
+    def _assert_reference_selector(self, relpath: str, expected: str):
+        path = ROOT / relpath
         text = path.read_text(encoding="latin-1")
         modelmap = validator.extract_modelmap(text)
         simmods = validator.extract_simmods(text)
-        self.assertEqual(modelmap.get("IET"), "RCRTable 3D")
-        self.assertIn("RCRTable 3D", simmods)
+        self.assertEqual(modelmap.get("IET"), expected)
+        self.assertIn(expected, simmods)
+
+    def test_star_validation_tbm_selects_rcr(self):
+        self._assert_reference_selector(
+            "tbm_validation/in_StarCCM_bds/validationBattery.tbm", "RCRTable 3D"
+        )
+
+    def test_siemens_dist_reference_selects_distributed3d(self):
+        self._assert_reference_selector(
+            "tbm_validation/reference/HP18650/hp18650Spiral-DIST.tbm", "Distributed 3D"
+        )
+
+    def test_star_cylindrical_tutorial_selects_ntgp(self):
+        self._assert_reference_selector(
+            "tbm_validation/in_StarCCM_bds/tutorialCylindricalCell.tbm", "NTGPTable 3D"
+        )
 
     def test_frozen_v4_variant3_is_wrong_for_expected_rcr(self):
         path = ROOT / "out" / "v4_candidate" / "hp2170-v4c-v3-tabs-on-sameFace.tbm"
