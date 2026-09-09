@@ -41,7 +41,7 @@ Use this checklist before sending any TBM package to Robert. A candidate package
 
 | WARN | Field | package_rev3 value | Action |
 |---|---|---|---|
-| JR-Can gap | `m_dJellyrollThickness_mm = 19.25` | 19.25 mm | **ACCEPTED FOR GEOMETRY TEST** — tests topology, not final physics. JR-Can gap does not prevent geometry creation. Must be fixed before production. UNRESOLVED until cell teardown data available. |
+| JR-Can gap | `m_dJellyrollThickness_mm = 19.25` | 19.25 mm | **ACCEPTED FOR GEOMETRY TEST** — the 2026-08-31 STEP characterization established that Detailed Builder JR diameter is consumed and that the tested feasibility guard rejects JR 18.2 mm against an 18.0 mm can. The correct physical 2170 OD and package-specific import result remain open; do not force the value to the 20.6274 mm can ID. |
 | m_dOffsetPosAvg | `m_dOffsetPosAvg (DB) = 1e-06` | 1e-06 | **ACCEPTED FOR GEOMETRY TEST** — impact on BDS winding geometry is UNCONFIRMED. Fixed in package_rev4_candidate (→ 0.5). |
 | DataSheet m_dHeight | `DataSheet m_dHeight = 65.0` | 65.0 mm | **ACCEPTED FOR GEOMETRY TEST** — apparent metadata field; STAR consumption is unconfirmed. Fixed in package_rev4_candidate. |
 | DataSheet m_dDSHeight | `DataSheet m_dDSHeight = 65.0` | 65.0 mm | **ACCEPTED FOR GEOMETRY TEST** — apparent metadata field; STAR consumption is unconfirmed. Fixed in package_rev4_candidate. |
@@ -55,7 +55,7 @@ These WARNs exist in the package_rev3 TBM files sent to Robert. They were not de
 
 | Check | package_rev3 value | Issue |
 |---|---|---|
-| `report_jr_diameter` | 17.8064 mm | Stale from old BDS session; BUILDER has 19.25 mm. Recalculation at import is likely but unconfirmed. |
+| `report_jr_diameter` | 17.8064 mm | Stale from old BDS session; BUILDER has 19.25 mm. The August STEP characterization did not observe this REPORT field driving JR geometry; broader import behavior remains unconfirmed. |
 | `report_jr_height` | 52.5 mm | Stale; Package m_dintHeight = 65.11 mm. |
 | `report_capacity` | 1.14762 Ahr | Stale; RCRTable 3D m_dAhCell = 5.0 Ahr. |
 
@@ -124,6 +124,6 @@ The following must be fixed before any TBM is used for production physics simula
 2. **Electrode overlap values** — `m_dElectrodeOverlapAtStart_mm = 8` is ASSUMED (from HP18650-template reference). `m_dElectrodeOverlapAtEnd_mm = 20` is UNRESOLVED (lower than all references). Both must be confirmed from About-Energy electrode spec or cell construction data.
 3. **`m_dOffsetPosAvg`** — package_rev4_candidate corrects Detailed Builder from `1e-06` to `0.5` (CONSISTENCY_FIX). Must confirm no adverse geometry effect in STAR. The Simple Builder value is `0` in source, package_rev3, and package_rev4_candidate (unchanged). Only the Detailed Builder was changed.
 4. **DataSheet corrections** — package_rev4_candidate fixes all HP18650 label residuals. Their physics impact is unconfirmed.
-5. **Geometry test result** — understand what topology BDS generates for all 4 variants before locking the production tab configuration. package_rev3 result pending.
+5. **Package-specific geometry test result** — understand what topology BDS generates for all 4 `package_rev3` variants before locking the production tab configuration. The August field-dependency characterization is complete; the package-specific result remains pending.
 6. **SOC range** — confirm STAR-CCM+ accepts SOC < 0 in RCR tables (our min is -0.08, intentional).
 7. **Thermal properties** — verify `m_dDensity`, `m_dHeatCapacity`, `m_dThermalConductivity` in TBM electrochemistry blocks against `cellprops.csv` values from About-Energy. Currently unaudited — may retain 18650 stock values.

@@ -45,7 +45,7 @@ Field-by-field classification for the package_rev3 variants. Every important fie
 
 | Field | package_rev3 value | Status | Risk | Notes |
 |---|---|---|---|---|
-| `m_dJellyrollThickness_mm` | 19.25 mm | **UNRESOLVED** | **High** | ~1.38 mm gap to can ID (20.6274 mm). Correct value not confirmed. Do NOT force to can ID without cell teardown data. See STAR_IMPORT_ERROR_HISTORY. |
+| `m_dJellyrollThickness_mm` | 19.25 mm | **UNRESOLVED** | **High** | August 2026 STEP characterization established that Detailed Builder `m_dJellyrollThickness_mm` drives realized JR diameter and that 18.2 mm fails against an 18.0 mm can in the tested model. The correct physical 2170 value remains unconfirmed; do not force it to the 20.6274 mm can ID. See `GEOMETRY_CHARACTERIZATION_FINDINGS_20260831.md`. |
 | `m_dMandrelThickness_mm` | 6 mm | ASSUMED | Medium | Mandrel diameter from TBM source; not confirmed from About-Energy or cell construction data |
 | `m_dMandrelWidth_mm` | 6 mm | ASSUMED | Low | Set equal to thickness (cylindrical convention, matches HE18650 where width=thickness=5). Width=0 is also valid (Tutorial ref). This field exists in Detailed Builder only (Simple Builder has separate `m_dMandrelWidth`). |
 | `m_bMandrelFlat` | 0 | ASSUMED | Low | Cylindrical mandrel; consistent with all references |
@@ -129,7 +129,7 @@ The `<REPORT>` block contains output values from a prior BDS session with the ol
 | `m_dRepCanXDim` | 21.09 mm | 21.09 mm | CORRECT | YES (Level-C, documented) |
 | `m_dRepCanYDim` | 21.09 mm | 21.09 mm | CORRECT | YES |
 | `m_dRepCanZDim` | 70.02 mm | 70.02 mm | CORRECT | YES |
-| `m_dRepJellyrollDiameter` | 17.8064 mm | ~19–20 mm (TBD) | STALE | UNCONFIRMED |
+| `m_dRepJellyrollDiameter` | 17.8064 mm | ~19–20 mm (TBD) | STALE | August STEP characterization did not observe this REPORT field driving JR diameter; production import consumption remains unconfirmed |
 | `m_dRepJellyrollHeight` | 52.5 mm | 65.11 mm | STALE | UNCONFIRMED |
 | `m_dRepCapacity` | 1.14762 Ah | 5.0 Ah | STALE | UNCONFIRMED (likely recomputed by STAR) |
 | `m_dRepActiveArea_m2` | 0.0855507 m² | Depends on geometry | STALE | UNCONFIRMED |

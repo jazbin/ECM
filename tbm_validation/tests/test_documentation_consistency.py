@@ -17,6 +17,7 @@ DOCS = [
     ROOT / "tbm_validation/CURRENT_TBM_FIELD_AUDIT.md",
     ROOT / "tbm_validation/V4_CANDIDATE_DELTA_REPORT.md",
     ROOT / "tbm_validation/PRE_CLIENT_RELEASE_CHECKLIST.md",
+    ROOT / "tbm_validation/GEOMETRY_CHARACTERIZATION_FINDINGS_20260831.md",
 ]
 
 SOURCE = ROOT / "tbm_validation/source/hp2170NCA-ECM.tbm"
@@ -34,7 +35,7 @@ def test_extracted_builder_values_are_protected_in_docs():
     he = extract_tbm_fields(HE18650)
     assert source.simple_builder.offset_pos_avg == "0"
     assert he.m_bonly1d_list == ["1", "0", "0", "0"]
-    for path in DOCS[2:]:
+    for path in DOCS[2:6]:
         text = path.read_text()
         assert "Simple Builder" in text
         assert "m_dOffsetPosAvg" in text
@@ -84,6 +85,18 @@ def test_context_files_are_explicitly_related():
         assert "Do not assume the JR OD must equal the can ID" in text
     assert "canonical root-level" in root_text or "canonical" in root_text
     assert "synchronized copy" in docs_text
+
+
+def test_step_characterization_findings_are_recorded():
+    evidence = (ROOT / "tbm_validation/GEOMETRY_CHARACTERIZATION_FINDINGS_20260831.md").read_text()
+    assert "21 isolated TBM variants" in evidence
+    assert "19 STEP files" in evidence
+    assert "Detailed Builder `m_dJellyrollThickness_mm` is consumed" in evidence
+    assert "Simple Builder jelly-roll diameter" in evidence
+    assert "zero measured JellyRoll∩Can and JellyRoll∩Mandrel intersection volume" in evidence
+    combined = "\n".join(path.read_text() for path in DOCS)
+    assert "August STEP characterization established" in combined
+    assert "geometry test still pending" not in combined
 
 
 if __name__ == "__main__":

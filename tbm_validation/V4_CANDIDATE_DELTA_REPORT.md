@@ -31,11 +31,11 @@ The package_rev4_candidate applies seven evidence-based corrections to the packa
 
 | Field | package_rev3 / package_rev4_candidate value | Reason NOT changed |
 |---|---|---|
-| `m_dJellyrollThickness_mm` | 19.25 mm | UNRESOLVED_ASSUMPTION — JR OD gap = 1.38 mm diametral. Correct value not confirmed from cell teardown or About-Energy. Do not force to can ID without evidence. |
+| `m_dJellyrollThickness_mm` | 19.25 mm | UNRESOLVED_ASSUMPTION — August STEP characterization established that Detailed Builder `m_dJellyrollThickness_mm` drives realized JR diameter, but the correct physical 2170 OD remains unconfirmed. The 1.38 mm diametral gap to the 20.6274 mm can ID is not by itself an error; do not force the value to the can ID. |
 | `m_bOnly1D` | 0 (all blocks) | Already correct in package_rev3 — no change needed. |
 | `Set[N]_RCR_V_SOC_1` = -0.08 | -0.08 | INTENTIONAL — extrapolation point derived by translate script (SOC = 1 − 5.4/5.0). STAR tolerance unconfirmed. |
 | `m_dElectrodeOverlapAtEnd_mm` | 20 mm | UNRESOLVED — lower than all references but not confirmed import blocker. |
-| REPORT block fields | Stale 18650 values | Recalculation and consumption by STAR are unconfirmed. The can-dimension values match the package dimensions. Cannot regenerate REPORT from BDS without a BDS session. |
+| REPORT block fields | Stale 18650 values | August STEP characterization did not observe REPORT JR diameter or height fields driving the tested geometry. Broader production import consumption and recomputation remain unconfirmed. The can-dimension values match the package dimensions. |
 
 ---
 
@@ -73,16 +73,16 @@ Source TBM SHA-256: fa4cb299fc444a35875b51bb0093fae43b88f78a677b92554d732cc72cae
 The current corrected validator reports all 11 package_rev3 WARNs. The three REPORT WARNs were not visible in an older validator run because of its REPORT parser bug; that historical result must not be used as the current package_rev3 total.
 | Check | WARN message | Status |
 |---|---|---|
-| `report_jr_diameter` | m_dRepJellyrollDiameter=17.8064 vs BUILDER 19.25 (Δ=1.44mm) | STALE — REPORT block from old BDS session. STAR probably recomputes. |
-| `report_jr_height` | m_dRepJellyrollHeight=52.5 vs Package 65.11 (Δ=12.6mm) | STALE — same. |
-| `report_capacity` | m_dRepCapacity=1.14762 vs RCR 5.0 (Δ=3.85 Ah) | STALE — same. m_dRepCapacity is informational. |
+| `report_jr_diameter` | m_dRepJellyrollDiameter=17.8064 vs BUILDER 19.25 (Δ=1.44mm) | STALE — August STEP characterization did not observe the REPORT JR diameter field driving geometry; broader production import behavior remains unconfirmed. |
+| `report_jr_height` | m_dRepJellyrollHeight=52.5 vs Package 65.11 (Δ=12.6mm) | STALE — August STEP characterization did not observe REPORT JR height driving geometry; broader production import behavior remains unconfirmed. |
+| `report_capacity` | m_dRepCapacity=1.14762 vs RCR 5.0 (Δ=3.85 Ah) | STALE — capacity-field consumption by STAR remains unconfirmed. |
 
 These three REPORT WARNs are present in the package_rev3 variants and remain in package_rev4_candidate.
 
 **Remaining package_rev4_candidate WARNs and their justification:**
 | WARN | Justification for acceptance |
 |---|---|
-| JR-Can gap (pkg_id_vs_jr) | UNRESOLVED_ASSUMPTION — correct JR OD unknown; geometry test still pending |
+| JR-Can gap (pkg_id_vs_jr) | UNRESOLVED_ASSUMPTION — August characterization established the Detailed Builder geometry driver and a physical feasibility guard, but the correct production 2170 OD and package-specific import result remain open |
 | REPORT JR diameter | STALE — consumption by STAR is unconfirmed; recomputation at import is likely but not established by repository evidence |
 | REPORT JR height | STALE — consumption by STAR is unconfirmed; recomputation at import is likely but not established by repository evidence |
 | REPORT capacity | STALE — consumption by STAR is unconfirmed; the active RCRTable 3D block has `m_dAhCell=5.0` |
@@ -96,7 +96,7 @@ These three REPORT WARNs are present in the package_rev3 variants and remain in 
 - [ ] Confirm `m_dOffsetPosAvg = 0.5` is correct for the Detailed Builder; the Simple Builder value is `0` in source, package_rev3, and package_rev4_candidate and was not changed.
 - [ ] Confirm DataSheet corrections do not affect geometry or physics; repository evidence establishes their values but does not establish STAR consumption semantics.
 - [ ] Confirm REPORT stale WARNs (jr_diameter, jr_height, capacity) are non-blocking for import; their consumption and recomputation by STAR remain unconfirmed.
-- [ ] Confirm JR-Can gap WARN is accepted as UNRESOLVED_ASSUMPTION pending package_rev3 geometry test result.
+- [ ] Confirm JR-Can gap WARN is accepted as UNRESOLVED_ASSUMPTION pending the package-specific `package_rev3` import result and physical 2170 winding evidence; the August field-consumption characterization is already complete.
 - [ ] Confirm SOC min = -0.08 is intentional (translate_tbm_from_openfoam.py sets this from params.csv Q_max = 5.4 Ah → SOC = 1 − 5.4/5 = −0.08).
 - [ ] Run `python3 tools/validate_tbm.py --batch out/v4_candidate/` and confirm 0 FAIL.
 

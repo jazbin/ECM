@@ -106,14 +106,16 @@ These are fixed by the generate script for the test variants but the source file
 
 ### What is still open (not yet addressed by the script)
 
-- **`m_dJellyrollThickness_mm = 19.25`** — current value. The can ID is 20.6274 mm, giving a 1.3774 mm diametral difference. Whether this field represents the winding OD or another geometry quantity, and the correct physical JR OD, remain unresolved; 20.6274 mm is a geometric upper bound/cavity ID, not a proven winding OD.
+- **`m_dJellyrollThickness_mm = 19.25`** — current value. The 2026-08-31 STEP characterization established that this Detailed Builder field drives realized JR diameter, while the tested Simple Builder and REPORT JR diameter fields were not observed to drive it. The can ID is 20.6274 mm, giving a 1.3774 mm diametral difference. The correct physical 2170 JR OD remains unresolved; 20.6274 mm is a geometric upper bound/cavity ID, not a proven winding OD. See `tbm_validation/GEOMETRY_CHARACTERIZATION_FINDINGS_20260831.md`.
 - **Active `RCRTable 3D` capacity** — machine extraction verifies `m_bSpecifyCapacity = 1` and `m_dAhCell = 5.0`. The remaining question is whether STAR interprets and uses the 5 Ah override as intended and whether geometry-derived quantities remain internally consistent.
 - **Separator and electrode overlap at end** — `m_dSepFeedLength_mm = 0`, `m_dSepTailLength_mm = 0`, `m_dElectrodeOverlapAtEnd_mm = 20` — not yet validated against About-Energy data or a 2170 reference.
 - **`DataSheet m_dDSHeight = 65`** — should probably be 70.02 mm (full can height) or 65.11 mm (active height); inconsistent.
 
 ---
 
-## 7. The geometry test (current work)
+## 7. Geometry characterization and current package-specific test
+
+The 2026-08-31 STEP characterization is complete for field-dependency and feasibility behavior. It tested 21 variants, received 19 STEP files plus one documented geometry-creation failure, and analyzed 20 successful variants. Detailed Builder jelly-roll diameter was consumed; the tested REPORT and Simple Builder JR diameter fields were not observed to be consumed; all 20 successful variants had zero JellyRoll∩Can and JellyRoll∩Mandrel intersection volume. This establishes the relevant STAR field behavior but does not prove the correct physical 2170 winding OD.
 
 Before committing to a production TBM, we are running a geometry inspection test. The test may inspect parts and topology, but the production objective is equivalent cell-level and distributed electrothermal response within defined validation tolerances. It does not require STAR/BDS to reproduce **JellyRoll + Can + top EndPlate only** one-to-one, and absence of a bottom EndPlate is not a production requirement without Siemens-model evidence.
 
@@ -148,7 +150,7 @@ Variant SHA-256s (package_rev3):
 
 ## 8. Open questions
 
-1. **Geometry test result** — awaiting Robert's 4 STEP files to confirm topology.
+1. **Package-specific geometry test result** — awaiting the four `package_rev3` STEP files to confirm the topology and tab variants. This is separate from the completed August field-dependency characterization.
 2. **Jelly-roll diameter** — current `m_dJellyrollThickness_mm = 19.25`; can ID is 20.6274 mm and the diametral difference is 1.3774 mm. Confirm the correct physical JR OD and the STAR meaning of this field from Siemens-model evidence, cell teardown, or an applicable datasheet. Do not assume the JR OD must equal the can ID.
 3. **Electrode overlap at start** — 8 mm was copied from the Simple Builder block in the source TBM. Miles to confirm this is correct per the electrode design spec.
 4. **Capacity specification** — the active RCRTable 3D block currently explicitly sets `m_bSpecifyCapacity = 1` / `m_dAhCell = 5.0`. Confirm STAR interpretation and consistency with geometry-derived quantities.

@@ -86,11 +86,15 @@ These are the primary source of field-level guidance available without Siemens d
 
 ---
 
-## Geometry test findings (pending)
+## Geometry characterization findings (2026-08-31)
+
+The August STEP characterization is recorded in `tbm_validation/GEOMETRY_CHARACTERIZATION_FINDINGS_20260831.md`. It established that Detailed Builder `m_dJellyrollThickness_mm` drives realized jelly-roll diameter, while the tested Simple Builder and REPORT jelly-roll diameter fields were not observed to drive it. It also recorded zero JellyRoll∩Can and JellyRoll∩Mandrel intersection volume in all 20 successful variants.
+
+This finding does not establish the correct physical 2170 winding OD, and it does not replace the separate package-specific import/topology check for the four `package_rev3` variants.
 
 ### Robert's STEP file inspection — expected date: after v3 test
 
-**When received:** Not yet received as of 2026-09-09.
+**When received:** The August characterization STEP package was received and analyzed on 2026-08-31. The four package-specific `package_rev3` STEP exports are a separate pending result.
 
 **Will answer:**
 - Whether BDS generates JellyRoll + Can + EndPlate topology as expected
