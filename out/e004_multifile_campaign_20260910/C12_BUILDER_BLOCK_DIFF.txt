@@ -1,0 +1,27 @@
+--- project Detailed Builder
++++ Siemens validationBattery Detailed Builder
+
+- 	Material m_dDensity_gpercm3	=	0	!		!	Density, g/cmï¿½
+- 	m_bNegTab	=	1
+- 	m_bPosTab	=	1
+- 	m_dElectrodeOverlapAtEnd_mm	=	20	!		!	Electrode Overlap at end, mm
+- 	m_dElectrodeOverlapAtStart_mm	=	8
+- 	m_dJellyrollThickness_mm	=	20.6274	!		!	Jellyroll Diameter, mm
+- 	m_dMandrelWidth_mm	=	6
+- 	m_dOffsetPosAvg	=	0.5
+- 	m_dSepFeedLength_mm	=	0	!		!	Separator Feed Length, mm
+- 	m_dSepTailLength_mm	=	0	!		!	Separator Tail Length, mm
+- 	m_nNegTabVertOrientation	=	0
+- 	m_nPosTabVertOrientation	=	0
++ 	Material m_dDensity_gpercm3	=	0	!		!	Density, g/cm^3
++ 	m_bNegTab	=	1	!	
++ 	m_bPosTab	=	1	!	
++ 	m_dElectrodeOverlapAtEnd_mm	=	40	!		!	Electrode Overlap at end, mm
++ 	m_dElectrodeOverlapAtStart_mm	=	3	!		!	Electrode Overlap at start, mm
++ 	m_dJellyrollThickness_mm	=	17.9	!		!	Jellyroll Diameter, mm
++ 	m_dMandrelWidth_mm	=	0	!		!	
++ 	m_dOffsetPosAvg	=	0.5	!		!	Positive Offset, mm
++ 	m_dSepFeedLength_mm	=	10	!		!	Separator Feed Length, mm
++ 	m_dSepTailLength_mm	=	85	!		!	Separator Tail Length, mm
++ 	m_nNegTabVertOrientation	=	1	!	
++ 	m_nPosTabVertOrientation	=	0	!	

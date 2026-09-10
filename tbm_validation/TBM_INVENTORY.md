@@ -180,3 +180,35 @@ Generator: `tools/generate_tbm_jr_od_test.py` (SHA-pinned to V3 base)
 - `perfect_contact` succeeds → 20.6274 mm is the production value; WARN 1 (`jr_od`) closes
 - `perfect_contact` fails with feasibility guard → `safe_20p55` is the production value; request STEP + JR OD measurement
 - Either way, 19.25 mm is retired in V4 RCR candidate
+
+---
+
+## E004 Diagnostic Campaign (`out/e004_multifile_campaign_20260910/`) — 2026-09-10
+
+**Purpose:** Controlled multifile campaign to localize the persistent E004 fatal blocker:
+`Electrode Root 1 : Extrusion distance can not be 0.`
+
+**Baseline:** commit `d74b3283cb5d73e114bc141f3f0d18e7c7ed5463`, `out/hp2170NCA-RCR-distributed-exact-contact-final.tbm`, SHA `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+
+**Generator:** `tools/generate_e004_multifile_campaign.py` (deterministic, SHA-pinned)
+
+**Client package:** `out/hp2170NCA-STAR-E004-multifile-diagnostic-20260910.zip`, SHA `5bfb50497d0489e7cd98b9fe7cd679d9c102f4ef5fd136facb32ee7d7a44e84e`
+
+| File | SHA-256 | Changed fields | STAR import |
+|---|---|---|---|
+| `C00_SIEMENS_CONTROL_validationBattery.tbm` | `82aa9daa6a7e9a4218bb8eb5e3aad2fdfb299a3031deede89523715a542dffee` | N/A — unmodified Siemens reference | PENDING |
+| `C01_FEED10.tbm` | `912db12a2183209f2ad4f49c776b176765db6b82cfa8367c532b08ddd62732c7` | SepFeedLength_mm: 0→10 | PENDING |
+| `C02_TAIL85.tbm` | `7596ff01f4f43218ba60484b53b59cd9d52994ff8f9735d50621b27c57ad449a` | SepTailLength_mm: 0→85 | PENDING |
+| `C03_FEED10_TAIL85.tbm` | `bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53` | SepFeedLength_mm: 0→10; SepTailLength_mm: 0→85 | PENDING |
+| `C04_END40.tbm` | `6e737ca16035da37aa2118f700e38a004f500a17cfebff31368d72e96f82ce80` | ElectrodeOverlapAtEnd_mm: 20→40 | PENDING |
+| `C05_FEED10_TAIL85_END40.tbm` | `90d289c9d2e6f20e2759f0dbcf1b7d4327f42bb4c7c7ba4eae0ee04f2f54e5a9` | Feed=10; Tail=85; OverlapEnd=40 | PENDING |
+| `C06_MANDRELWIDTH0.tbm` | `49f4f6f50d57db2dc3aed63ca37733ca0cdd51fe41280d7805f4dd7a5475ce36` | MandrelWidth_mm: 6→0 | PENDING |
+| `C07_FEED10_TAIL85_MANDRELWIDTH0.tbm` | `e418b2f09c0ea957d25607fe7e90df079e3e6da7b2564350eaaeffd5f06654c4` | Feed=10; Tail=85; MandrelWidth=0 | PENDING |
+| `C08_JRWIDTH65p11.tbm` | `a271bfbd6c7012bf9fb9f8543706804c0048594323f4a92047e6967a71acbc88` | JellyrollWidth_mm: 0→65.11 | PENDING |
+| `C09_FEED10_TAIL85_JRWIDTH65p11.tbm` | `364501027db55ce8974224aa20ae9b8e20a515ac10b3c9d6139dd9af18f8387e` | Feed=10; Tail=85; JRWidth=65.11 | PENDING |
+| `C10_STAR_BUILDER_PATTERN.tbm` | `08252a958eeacc8157d906637e3d2416d1b7baa74f4e21f7d5f87529c0ad8984` | Feed=10; Tail=85; OvStart=3; OvEnd=40; MandrelWidth=0 | PENDING |
+| `C11_STAR_BUILDER_PATTERN_JRWIDTH65p11.tbm` | `5726c52ff9be146705f9d6ced6bf502ac03c39524ef4f8e379c85e436f2531e6` | All C10 + JRWidth=65.11 | PENDING |
+| `C12_FULL_SIEMENS_DETAILED_BUILDER.tbm` | `94e0fef9b7cb4199103dd462b960be5a26f08d78a5829489c9683bfd25b31c8f` | Complete Siemens BUILDER block transplant | PENDING |
+| `C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm` | `606b2ccd3d774e90d25f03a55157f7f6acb1dbcdf21da9274a8fab3d06c67d8d` | Siemens PCD + BUILDER; project SIMMOD/RCR retained | PENDING |
+
+All STAR import results PENDING — awaiting Robert's runtime test.

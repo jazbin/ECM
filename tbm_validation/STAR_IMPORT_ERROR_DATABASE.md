@@ -306,6 +306,43 @@ Every working reference TBM in the repo has `m_dSepFeedLength_mm ≥ 10` and `m_
 
 ---
 
+# `CAMPAIGN_PREPARED` — 2026-09-10 — E004 multifile diagnostic campaign
+
+**Status:** PREPARED — not yet sent to Robert. Runtime results pending.
+
+**Campaign document:** `tbm_validation/STAR_E004_MULTIFILE_DIAGNOSTIC_CAMPAIGN_20260910.md` + addendum
+
+**Generator:** `tools/generate_e004_multifile_campaign.py` (deterministic, SHA-pinned to baseline)
+
+**Baseline:** commit `d74b3283`, `out/hp2170NCA-RCR-distributed-exact-contact-final.tbm`, SHA `2c89d2d9…`
+
+**Package:** `out/hp2170NCA-STAR-E004-multifile-diagnostic-20260910.zip`, SHA `5bfb50497d0489e7cd98b9fe7cd679d9c102f4ef5fd136facb32ee7d7a44e84e`
+
+**Variants (14 files, C00-C13):**
+
+| ID | Key delta | Hypothesis tested |
+|---|---|---|
+| C00 | None — Siemens control | Environment/import-path validation |
+| C01 | SepFeedLength_mm: 0→10 | H004-5 (feed alone) |
+| C02 | SepTailLength_mm: 0→85 | H004-5 (tail alone) |
+| C03 | Feed=10, Tail=85 | H004-5 combined (leading) |
+| C04 | OverlapEnd_mm: 20→40 | Rank 3 end-overlap |
+| C05 | Feed=10, Tail=85, OverlapEnd=40 | H004-5 + Rank 3 interaction |
+| C06 | MandrelWidth_mm: 6→0 | Rank 4 mandrel width convention |
+| C07 | Feed=10, Tail=85, MandrelWidth=0 | H004-5 + Rank 4 interaction |
+| C08 | JellyrollWidth_mm: 0→65.11 | Rank 5 JR width probe |
+| C09 | Feed=10, Tail=85, JRWidth=65.11 | H004-5 + Rank 5 interaction |
+| C10 | Feed=10, Tail=85, OvStart=3, OvEnd=40, MandrelWidth=0 | Broad STAR-reference Builder pattern |
+| C11 | All C10 + JRWidth=65.11 | Maximum rescue variant |
+| C12 | Complete Siemens BUILDER block transplant | Builder-block localization control |
+| C13 | Siemens PCD + BUILDER; project SIMMOD/RCR retained | Geometry-vs-model localization |
+
+**E004 status at time of campaign preparation:** ACTIVE / UNRESOLVED. H004-5 is the leading hypothesis (CANDIDATE_APPLIED, runtime PENDING on R006/C03). Campaign was generated because a single speculative fix per round has been insufficient; controlled multifile testing is required.
+
+**Do not update E004 hypothesis ledger from campaign results until Robert returns runtime evidence.**
+
+---
+
 # Next-entry template
 
 ```text
