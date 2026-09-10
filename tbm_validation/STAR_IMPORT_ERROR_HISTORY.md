@@ -111,6 +111,26 @@ Client package: `out/hp2170NCA-RCR-STAR-import-test-S3fix-20260910.zip`
 
 ---
 
+## V3 preflight status — 2026-09-10 (no new runtime error; static preflight complete)
+
+**Package:** `out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip` → `hp2170NCA-RCR-distributed-final-preflight.tbm`
+**TBM file SHA-256:** `91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4`
+**Status:** Static preflight passed. No new runtime error (V3 has not yet been tested by Robert). STAR import result PENDING.
+
+**Static preflight result:** 0 FAIL, 4 WARN, 14 INFO, 37 PASS
+
+**Change from V2:** One field added — `Transport Number sets = 0` in General Electrolyte SIMMOD block. Evidence: all 4 STAR-install cylindrical references contain this field. Robert's V1 runtime log (Error 3 above) reported "Transport Number sets not found in the file, defaulting to 0." Inserting it explicitly eliminates that runtime message and aligns the file with STAR-install reference format. No physics impact (value matches the runtime default).
+
+**Remaining WARNs (all pre-existing; none linked to a known runtime failure):**
+1. `jr_od` — JellyRoll-can gap 1.38 mm; correct winding OD not confirmed
+2. `report_jr_diameter` — REPORT block JR diameter not updated
+3. `report_jr_height` — REPORT block JR height not updated
+4. `report_capacity` — REPORT block capacity not updated
+
+**Next action:** Await Robert's runtime result on V3. Freeze all further TBM changes until runtime evidence is received.
+
+---
+
 ## Template for new entries
 
 ```

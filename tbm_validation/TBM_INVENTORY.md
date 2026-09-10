@@ -138,3 +138,20 @@ Delta vs V1: exactly one semantic field — `+Electrode m_dS3 = 0 → 5`.
 Evidence: all 4 STAR-install cylindrical references use S3=5; BDS-generated source had S3=0 (1D-mode placeholder). See `STAR_GEOMETRY_COMPATIBILITY_AUDIT_20260910.md` and `RCR_V1_TO_V2_S3_GEOMETRY_DELTA_20260910.md`.
 
 Client package: `out/hp2170NCA-RCR-STAR-import-test-S3fix-20260910.zip` (SHA-256: `ec6df0c5918667d76c82c4610decfc2ff7f9cf8e3b319c7769d1c52c7c595830`)
+
+### V3 — 2026-09-10 (maximum static preflight; PENDING Robert test)
+
+| File | SHA-256 | Bytes | Validator | STAR import |
+|---|---|---|---|---|
+| `hp2170-rcr-v3-star-preflight-tabs-on-sameFace.tbm` | `91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4` | 304337 | 0 FAIL 4 WARN 14 INFO 37 PASS | PENDING |
+
+V3 base: `out/v4_candidate/hp2170-v4c-v3-tabs-on-sameFace.tbm` (SHA `2cd3b503559e5ed0dd060d7b26cd555121cd224e40d91fe6c2b96dc23a7c8afd`, regenerated with Transport Number sets fix) + MODELMAP IET switch to RCRTable 3D.
+
+Delta vs V2: exactly one field inserted — `Transport Number sets = 0` in General Electrolyte SIMMOD block (+29 bytes).
+Evidence: all 4 STAR-install cylindrical references contain this field; Robert's V1 runtime log (2026-09-09) confirmed "Transport Number sets not found in the file, defaulting to 0."
+See `RCR_V2_TO_V3_TRANSPORT_NUM_DELTA.md` and `STAR_MAXIMUM_STATIC_PREFLIGHT_20260910.md`.
+
+Client copy: `out/hp2170NCA-RCR-distributed-final-preflight.tbm` (byte-identical; SHA `91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4`)
+Client package: `out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip`
+
+**FREEZE: no further TBM changes until Robert returns runtime evidence on V3.**

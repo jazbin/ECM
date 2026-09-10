@@ -21,10 +21,11 @@ import sys
 from pathlib import Path
 
 BASE = Path("out/v4_candidate/hp2170-v4c-v3-tabs-on-sameFace.tbm")
-OUT = Path("out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm")
-# V2 base: V4/v3 regenerated with +Electrode m_dS3 = 0 -> 5 (S3 geometry fix).
-# Prior pinned SHA was 24eacae56e40d826f162046bc63131f7c590b3c5d72dec80828c7e6a5520667f (V1 base, S3=0).
-BASE_SHA256 = "e645ab18ad5da81b8a90646743051e8a2e3259d745a2d683589154ad68c12b26"
+OUT = Path("out/rcr_candidate/hp2170-rcr-v3-star-preflight-tabs-on-sameFace.tbm")
+# V3 base: V4/v3 regenerated with Transport Number sets = 0 added to General Electrolyte SIMMOD.
+# Prior pinned SHA was e645ab18ad5da81b8a90646743051e8a2e3259d745a2d683589154ad68c12b26 (V2 base, S3=5, no TN sets).
+# BASE_SHA256 must be updated after running generate_tbm_v4_candidate.py to get the new V4/v3 SHA.
+BASE_SHA256 = "2cd3b503559e5ed0dd060d7b26cd555121cd224e40d91fe6c2b96dc23a7c8afd"
 EXPECTED_OLD_IET = b"Distributed 3D"
 EXPECTED_NEW_IET = b"RCRTable 3D"
 

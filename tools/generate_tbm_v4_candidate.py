@@ -86,6 +86,17 @@ def sub_first(content: bytes, field: str, new_val) -> tuple[bytes, bool]:
     return new_content, n > 0
 
 
+def insert_after_first(content: bytes, anchor_field: str, new_line: bytes) -> tuple[bytes, bool]:
+    """Insert new_line (including newline) immediately after the first line matching anchor_field."""
+    anchor_bytes = re.escape(anchor_field.encode('latin-1'))
+    pattern = re.compile(b'(' + anchor_bytes + rb'[ \t]*=[^\r\n]*[\r\n]+)')
+    m = pattern.search(content)
+    if m is None:
+        return content, False
+    pos = m.end()
+    return content[:pos] + new_line + content[pos:], True
+
+
 def apply_v3_fixes(content: bytes) -> tuple[bytes, list[str]]:
     """Fixes shared with V3 — do not change without updating V3 documentation."""
     log = ["[V3 fixes]"]
@@ -106,6 +117,26 @@ def apply_v3_fixes(content: bytes) -> tuple[bytes, list[str]]:
 
     content, n = sub_all(content, 'm_bOnly1D', 0)
     log.append(f"  m_bOnly1D → 0  ({n} occurrences; source had 1 = 1D-only mode)")
+
+    # Transport Number sets = 0 — STAR cylindrical RCR release profile requirement.
+    # Evidence: all 4 STAR-install cylindrical references (validationBattery, testTBM,
+    # LiIonSpiral, tutorialCylindricalCell) contain this field in the General Electrolyte
+    # SIMMOD block with value 0. Source TBM (BDS-generated, m_bOnly1D=1 origin) lacks it.
+    # Robert's runtime log on V1 RCR candidate (2026-09-09) reported:
+    #   "Transport Number sets not found in the file, defaulting to 0."
+    # This is the explicit runtime evidence that the field is consumed by STAR's importer.
+    # Value 0 is safe: it matches what STAR defaulted to anyway; no physics change.
+    # Insert immediately after the Transport# parametrization anchor (unique in source).
+    anchor = 'INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR6'
+    new_field_line = b'\tTransport Number sets\t=\t0\t!\n'
+    content, hit = insert_after_first(content, anchor, new_field_line)
+    if hit:
+        log.append("  Transport Number sets → 0 inserted in General Electrolyte SIMMOD  "
+                   "(STAR_IMPORTER_COMPLETENESS: all 4 STAR-install cylindrical refs have this field; "
+                   "Robert's runtime log confirmed 'defaulting to 0' when absent)")
+    else:
+        print(f"  WARNING: anchor not found for Transport Number sets insertion — {anchor}")
+
     return content, log
 
 

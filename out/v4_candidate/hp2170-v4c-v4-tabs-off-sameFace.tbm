@@ -2165,6 +2165,7 @@ Electrolyte
 	INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR4	=	653	!		!	 r4
 	INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR5	=	0.517	!		!	 r5
 	INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR6	=	-49.6	!		!	 r6
+	Transport Number sets	=	0	!
 	m_bActivitySimple	=	0	!	
 	m_bConductivitySimple	=	0	!	
 	m_bDensitySimple	=	1	!	

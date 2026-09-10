@@ -1,22 +1,39 @@
-hp2170NCA-RCR-distributed-S3fix.tbm — STAR-CCM+ import test candidate
+hp2170NCA-RCR-distributed-final-preflight.tbm
 2026-09-10
 
 WHAT THIS IS
-This is the next controlled STAR-CCM+ import test candidate for the 2170 NCA cell with RCR electrochemical model (distributed 3D mode). It differs from the previous tested file (hp2170-rcr-v1, tested 2026-09-09) by one geometry parameter only.
 
-WHAT CHANGED
-Positive-electrode root/extension dimension S3 was changed from 0 mm to 5 mm. This is the only change.
+This is the 2170 NCA cell TBM with RCR electrochemical model (distributed 3D mode, IET = RCRTable 3D, Thermal = Distributed). It has completed the full static STAR-CCM+ compatibility preflight against the available Siemens cylindrical reference set (validationBattery.tbm, testTBM.tbm, LiIonSpiral.tbm, tutorialCylindricalCell.tbm). Validator result: 0 FAIL, 4 WARN (all pre-existing unresolved items, none linked to a known runtime failure).
 
-Reason: comparison with Siemens STAR-CCM+ cylindrical reference TBM files (validationBattery.tbm, testTBM.tbm, LiIonSpiral.tbm, tutorialCylindricalCell.tbm) showed that all of them use +Electrode m_dS3 = 5. The previous candidate had the value at 0 (inherited from the BDS-generated source TBM which was configured for 1D-only mode). The 2026-09-09 runtime failure "Electrode Root 1 : Extrusion distance can not be 0" is consistent with this zero-length segment.
+CHANGE HISTORY
 
-All RCR tables, model data, package dimensions, mandrel, jelly-roll diameter, separator, tab configuration, offsets, and MODELMAP (IET = RCRTable 3D, Thermal = Distributed) are unchanged.
+This is V3 of the RCR distributed candidate.
 
-SHA-256: 372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b
+V1 (2026-09-09, FAILED): +Electrode m_dS3 = 0. Runtime error: "Electrode Root 1 : Extrusion distance can not be 0."
+V2 (2026-09-10, S3 fix): +Electrode m_dS3 = 0 → 5. Resolved the geometry extrusion error. Static preflight was not yet complete.
+V3 (2026-09-10, full preflight): Added Transport Number sets = 0 to General Electrolyte SIMMOD. All 4 STAR-install cylindrical references contain this field. Robert's runtime log on V1 explicitly reported "Transport Number sets not found in the file, defaulting to 0." — this confirms the field is consumed by the STAR importer and that the value 0 is correct. This is the only additional change from V2.
+
+SHA-256 (V3): 91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4
+
+PROTECTED CONFIGURATION (unchanged from About-Energy specification)
+
+IET = RCRTable 3D
+Thermal = Distributed
+m_bOnly1D = 0
+m_bLumpedEnergyBalance = 0
+m_dAhCell = 5.0
+m_nRCRParameterSets = 3
+OD = 21.09 mm, height = 70.02 mm, can ID = 20.6274 mm, JR OD = 19.25 mm
++Electrode m_dS3 = 5 mm, -Electrode m_dS3 = 50 mm
+Tabs: positive and negative on same face (top)
+Three temperature sets (RCR data from About-Energy characterisation)
 
 WHAT TO DO
-1. Run: Batteries > Battery Cell > Create from Tbm
-2. Select hp2170NCA-RCR-distributed-S3fix.tbm
-3. If it fails: send us the exact next error message from STAR-CCM+.
-4. If it succeeds: send a screenshot or STEP export of the generated geometry before further modification.
 
-We have not yet proven that S3=5 is the sole cause — we will know after this test.
+Please run: Batteries > Battery Cell > Create from Tbm, and select hp2170NCA-RCR-distributed-final-preflight.tbm.
+
+If creation succeeds, please send:
+  - A screenshot of the generated cell geometry/topology
+  - Preferably a STEP export before further modification
+
+If STAR reports any message that prevents creation, please send the complete message/log.

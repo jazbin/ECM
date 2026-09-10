@@ -603,6 +603,36 @@ class TBMValidator:
                 self._add("INFO", "offset_pos_avg",
                           f"m_dOffsetPosAvg = {offset_pos}. Reference values are 0.5 (HE18650/Tutorial) and 1e-06 (HP18650-DIST/our source).")
 
+        # Transport Number sets — STAR cylindrical RCR release profile importer completeness.
+        # All 4 STAR-install cylindrical references contain this field in the General Electrolyte
+        # SIMMOD with value 0. Robert's runtime log (V1 RCR candidate, 2026-09-09) reported:
+        #   "Transport Number sets not found in the file, defaulting to 0."
+        # This is the explicit runtime evidence that the field is consumed by STAR's importer.
+        # BDS-origin references (HE18650, HP18650-DIST, HP18650-RCR25deg) lack this field —
+        # they use an older format that predates the STAR-install version. Absence will not crash
+        # the importer (STAR defaults to 0), but it triggers a runtime warning that may obscure
+        # other issues and represents a structural divergence from the STAR-install standard.
+        tn_val = t.get_simmod_field("General Electrolyte", "Transport Number sets")
+        if tn_val is None:
+            self._add("WARN", "transport_number_sets",
+                      "Transport Number sets not found in General Electrolyte SIMMOD. "
+                      "All 4 STAR-install cylindrical references (validationBattery, testTBM, LiIonSpiral, "
+                      "tutorialCylindricalCell) contain this field with value 0. "
+                      "Robert's runtime log (V1 RCR candidate, 2026-09-09) reported: "
+                      "'Transport Number sets not found in the file, defaulting to 0.' "
+                      "Fix: add 'Transport Number sets = 0' to the General Electrolyte SIMMOD block "
+                      "after INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR6.",
+                      field="Transport Number sets", value="missing", expected="0")
+        elif tn_val.strip() == "0":
+            self._add("PASS", "transport_number_sets",
+                      "Transport Number sets = 0 present in General Electrolyte SIMMOD. "
+                      "Matches all 4 STAR-install cylindrical references. "
+                      "Runtime default confirmed in Robert's 2026-09-09 log (V1 RCR candidate).")
+        else:
+            self._add("WARN", "transport_number_sets",
+                      f"Transport Number sets = {tn_val!r}. STAR cylindrical references use 0.",
+                      field="Transport Number sets", value=str(tn_val), expected="0")
+
         # Electrode overlap at end — unverified, flag for review
         ovlp_end = t.get_builder_float("m_dElectrodeOverlapAtEnd_mm")
         if ovlp_end is not None:

@@ -101,6 +101,17 @@ def sub_first(content: bytes, field: str, new_val) -> tuple[bytes, bool]:
     return new_content, n > 0
 
 
+def insert_after_first(content: bytes, anchor_field: str, new_line: bytes) -> tuple[bytes, bool]:
+    """Insert new_line (including newline) immediately after the first line matching anchor_field."""
+    anchor_bytes = re.escape(anchor_field.encode('latin-1'))
+    pattern = re.compile(b'(' + anchor_bytes + rb'[ \t]*=[^\r\n]*[\r\n]+)')
+    m = pattern.search(content)
+    if m is None:
+        return content, False
+    pos = m.end()
+    return content[:pos] + new_line + content[pos:], True
+
+
 def apply_common_fixes(content: bytes) -> tuple[bytes, list[str]]:
     """Fixes applied to all variants: 2170 Package dims + Detailed Builder geometry.
 
@@ -138,6 +149,19 @@ def apply_common_fixes(content: bytes) -> tuple[bytes, list[str]]:
     # and fails to create 3D geometry. Set to 0 in all 4 UnitCellModel sections.
     content, n = sub_all(content, 'm_bOnly1D', 0)
     log.append(f"  m_bOnly1D → 0  ({n} occurrences; source had 1 = 1D-only ECM mode, not supported by BDS 3D builder)")
+
+    # Transport Number sets = 0 — STAR cylindrical RCR release profile requirement.
+    # All 4 STAR-install cylindrical references contain this field in General Electrolyte SIMMOD.
+    # Robert's runtime log (V1 RCR candidate, 2026-09-09):
+    #   "Transport Number sets not found in the file, defaulting to 0."
+    anchor = 'INL(Kevin_L_Gering)_EC:DMC_Transport# m_dR6'
+    content, hit = insert_after_first(content, anchor, b'\tTransport Number sets\t=\t0\t!\n')
+    if hit:
+        log.append("  Transport Number sets → 0 inserted in General Electrolyte SIMMOD  "
+                   "(STAR_IMPORTER_COMPLETENESS: all 4 STAR-install cylindrical refs have this field; "
+                   "Robert runtime confirmed 'defaulting to 0' when absent)")
+    else:
+        print(f"  WARNING: anchor not found for Transport Number sets — {anchor}")
 
     return content, log
 
