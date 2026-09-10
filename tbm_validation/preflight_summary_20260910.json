@@ -1,0 +1,16 @@
+{
+  "original_sha": "2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5",
+  "audit_sha": "2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5",
+  "sha_match": true,
+  "tbm_field_changed": false,
+  "action_required": 0,
+  "unresolved_blockers": 0,
+  "fail": 0,
+  "warn": 1,
+  "info": 7,
+  "pass": 118,
+  "can_promote": true,
+  "candidate_path": "out/rcr_candidate/hp2170-rcr-v4-exact-contact-final.tbm",
+  "client_path": "out/hp2170NCA-RCR-distributed-exact-contact-final.tbm",
+  "zip_path": "out/hp2170NCA-RCR-STAR-exact-contact-final-20260910.zip"
+}
