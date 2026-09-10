@@ -7,6 +7,31 @@ STATE SUMMARY
 We are in the middle of qualifying the hp2170 NCA RCR distributed TBM for
 Robert's STAR-CCM+ import. Three things are currently pending Robert's response.
 
+GOVERNING MODELLING OBJECTIVE — DO NOT LOSE THIS
+-------------------------------------------------
+For this project, we are NOT trying to reconstruct the physically realistic
+internal clearances of a manufactured 2170 cell. The target is to reproduce
+the already-defined OpenFOAM–ECM reference model in STAR-CCM+.
+
+The OpenFOAM–ECM case is therefore the reference definition for geometry and
+thermal coupling. Where that model has ideal/shared contact, STAR should match
+that condition as closely as its geometry engine permits. Do not introduce
+realistic air gaps, liners, clearances, or contact imperfections unless they
+already exist in the reference model.
+
+In particular, the radial reference target is JR OD = can ID = 20.6274 mm,
+i.e. zero radial gap / ideal contact. The previous 19.25 mm JR OD is not the
+final equivalence target because it creates a 1.3774 mm diametral gap absent
+from the reference case. The 20.55 mm variant is only a STAR CAD-feasibility
+fallback/probe if exact equality is rejected; it is not the preferred model
+value. If a finite geometric clearance is unavoidable in STAR, thermal
+coupling must still be configured to reproduce the OpenFOAM ideal-contact
+condition. Any interface/contact resistance should be introduced explicitly
+as a controlled model parameter later, not implicitly through an air gap.
+
+Permanent requirement document:
+  tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md
+
 PENDING FROM ROBERT (do not send anything further until he replies)
 -------------------------------------------------------------------
 1. V3 RCR preflight candidate (MAIN):
@@ -41,7 +66,8 @@ Case A — V3 import succeeds:
     to 20.6274 mm in V4 RCR candidate and close WARN 1.
   - If perfect_contact fails but safe_20p55 succeeds: use the measured
     realised OD from the STEP export as the V4 value. Close WARN 1 with
-    the measured value.
+    the measured value, but retain the modelling requirement that the final
+    STAR setup reproduce ideal JR-can thermal contact from the OpenFOAM case.
   - Update TBM_INVENTORY.md, close WARN 1 in validator (change WARN →
     PASS or updated WARN with measured value), regenerate V4, validate,
     send V4 to Robert.
@@ -56,9 +82,11 @@ Case B — V3 import fails:
 OPEN WANS (all 4, non-blocking for import)
 ------------------------------------------
 WARN 1: jr_od — m_dJellyrollThickness_mm = 19.25 mm
-  STATUS: RESOLVED_PENDING_RUNTIME_TEST
-  Source: wedge_2170 mesh JR OD = 20.6274 mm. JR OD test pair sent.
-  Action: update to realised value when Robert's STEP result arrives.
+  STATUS: REFERENCE_MODEL_TARGET_RESOLVED / STAR_FEASIBILITY_PENDING
+  Source: wedge_2170 mesh JR OD = 20.6274 mm = can ID, representing ideal
+  contact in the OpenFOAM reference model. JR OD test pair sent.
+  Target: 20.6274 mm. If STAR rejects exact equality, 20.55 mm is only a
+  CAD-feasibility surrogate; preserve ideal thermal coupling explicitly.
 
 WARN 2: report_jr_diameter — REPORT block 17.8064 mm vs Builder 19.25 mm
   STATUS: UNRESOLVED_NONBLOCKING
@@ -100,6 +128,7 @@ JR OD perfect-contact variant:
 
 KEY DOCUMENTS
 -------------
+tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md         — governing modelling objective; STAR must reproduce OpenFOAM–ECM reference geometry/contact rather than realistic internal clearances
 tbm_validation/STAR_MAXIMUM_STATIC_PREFLIGHT_20260910.md — full audit + JR OD addendum
 tbm_validation/RCR_V2_TO_V3_TRANSPORT_NUM_DELTA.md      — V2→V3 delta proof
 tbm_validation/TBM_INVENTORY.md                          — all TBM hashes + JR OD test section
@@ -110,6 +139,10 @@ tools/generate_tbm_jr_od_test.py                        — generates JR OD test
 
 PROTECTED (do not change without explicit authorisation)
 ---------------------------------------------------------
+PROJECT OBJECTIVE: reproduce OpenFOAM–ECM reference model, not realistic cell clearances
+REFERENCE CONTACT: JR-can and applicable JR-cap/end interfaces ideal/shared contact
+REFERENCE JR TARGET: JR OD = can ID = 20.6274 mm; no artificial air gap
+CONTACT RESISTANCE: zero by default; add explicitly later only if required
 IET = RCRTable 3D, Thermal = Distributed
 m_bOnly1D = 0 (all blocks), m_bLumpedEnergyBalance = 0
 m_dAhCell = 5.0, m_nRCRParameterSets = 3
