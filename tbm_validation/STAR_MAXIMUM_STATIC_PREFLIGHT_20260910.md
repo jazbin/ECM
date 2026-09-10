@@ -39,7 +39,7 @@ Every structural feature of V2 was compared field-by-field against the 4 STAR-in
 | 14 | RCR data | 3 temperature sets | present | cell-specific | — | VALID (AE data protected) | None |
 | 15 | REPORT block | JR diameter / height / capacity | stale values | cell-specific | stale | UNRESOLVED_NONBLOCKING | 4 WARNs in validator |
 | 16 | Tab topology | same-face, +/- on top | same-face | varies | — | VALID (project requirement) | None |
-| 17 | JR OD | `m_dJellyrollThickness_mm` | 19.25 | cell-specific | — | UNRESOLVED (1.38 mm gap) | WARN in validator |
+| 17 | JR OD | `m_dJellyrollThickness_mm` | 19.25 | cell-specific | — | RESOLVED_PENDING_RUNTIME_TEST | JR OD test variants created 2026-09-10 |
 
 ---
 
@@ -99,7 +99,26 @@ V3 achieves the maximum reachable preflight quality given current available refe
 
 **V3 is the maximum static preflight candidate.** One CHANGE_REQUIRED item was identified and implemented (Transport Number sets = 0). All other discrepancies are either safe differences from the BDS/STAR-install format split or unresolved non-blockers without runtime evidence.
 
-**All TBM changes are frozen pending Robert's runtime result on V3.**
+**All RCR candidate TBM changes are frozen pending Robert's runtime result on V3.**
 
 Client package: `out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip`
 Client TBM: `hp2170NCA-RCR-distributed-final-preflight.tbm` (byte-identical to V3, SHA `91cb8f8a...`)
+
+---
+
+## Addendum — JR OD resolved (2026-09-10)
+
+WARN 1 (`jr_od`, `m_dJellyrollThickness_mm = 19.25 mm`) was resolved by reading the OpenFOAM-ECM `wedge_2170` mesh directly.
+
+**Evidence:** `cases/wedge_2170/constant/jellyRoll_rotated/polyMesh/points` — max radial coordinate = 0.010314 m → JR OD = 20.6274 mm = Package m_dintDiameter (can ID). The OpenFOAM thermal model has zero gap between JR outer face and can inner face. The 19.25 mm in the current TBM creates a 1.3774 mm diametral air gap with no equivalent in the validated OpenFOAM model.
+
+**Target value:** 20.6274 mm (= can ID, matching OpenFOAM). Subject to STAR winding feasibility guard.
+
+**Test package sent alongside V3:** `out/hp2170NCA-JR-OD-test-20260910.zip`
+
+| Variant | Input JR OD | Rationale |
+|---|---|---|
+| `hp2170-jr-safe_20p55.tbm` | 20.55 mm | 0.077 mm below can ID; winding discretisation should keep realised OD within can |
+| `hp2170-jr-perfect_contact_20p6274.tbm` | 20.6274 mm | Exact can ID; equivalent to OpenFOAM shared face; may trigger feasibility guard |
+
+Decision: if `perfect_contact` succeeds → 20.6274 mm into V4. If it fails → `safe_20p55` realised OD into V4.

@@ -154,4 +154,29 @@ See `RCR_V2_TO_V3_TRANSPORT_NUM_DELTA.md` and `STAR_MAXIMUM_STATIC_PREFLIGHT_202
 Client copy: `out/hp2170NCA-RCR-distributed-final-preflight.tbm` (byte-identical; SHA `91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4`)
 Client package: `out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip`
 
-**FREEZE: no further TBM changes until Robert returns runtime evidence on V3.**
+**FREEZE: no further RCR candidate TBM changes until Robert returns runtime evidence on V3.**
+
+---
+
+## JR OD Test Variants (`out/jr_od_test/`) — 2026-09-10
+
+Purpose: determine the correct `m_dJellyrollThickness_mm` value for the 2170 NCA cell. The OpenFOAM-ECM `wedge_2170` case has JR OD = can ID = 20.6274 mm (zero gap, shared face). The current V3 TBM has 19.25 mm, leaving a 1.3774 mm diametral gap with no equivalent in the OpenFOAM thermal model.
+
+**Evidence source:** `cases/wedge_2170/constant/jellyRoll_rotated/polyMesh/points` — max radial coordinate = 0.010314 m → JR OD = 20.6274 mm = Package m_dintDiameter (can ID). Measured directly from the mesh, 2026-09-10.
+
+**Winding formula (from August 2026 characterisation):** realised OD = Detailed Builder `m_dJellyrollThickness_mm` ± <0.1 mm (monotonic, Detailed Builder is the sole driver — REPORT and Simple Builder fields not consumed).
+
+Both variants are based on the frozen V3 preflight TBM (SHA `91cb8f8a...`). Only `m_dJellyrollThickness_mm` differs (line 2110).
+
+| File | Input JR OD | Gap to can ID | SHA-256 | STAR import |
+|---|---|---|---|---|
+| `hp2170-jr-safe_20p55.tbm` | 20.55 mm | 0.077 mm | `62a11705f39890d1fe5d27c7ef98f7ce8155cb8acc4e7b2b746cb95adfea37f6` | PENDING |
+| `hp2170-jr-perfect_contact_20p6274.tbm` | 20.6274 mm | 0.000 mm | `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5` | PENDING |
+
+Package: `out/hp2170NCA-JR-OD-test-20260910.zip`
+Generator: `tools/generate_tbm_jr_od_test.py` (SHA-pinned to V3 base)
+
+**Decision tree on Robert's result:**
+- `perfect_contact` succeeds → 20.6274 mm is the production value; WARN 1 (`jr_od`) closes
+- `perfect_contact` fails with feasibility guard → `safe_20p55` is the production value; request STEP + JR OD measurement
+- Either way, 19.25 mm is retired in V4 RCR candidate

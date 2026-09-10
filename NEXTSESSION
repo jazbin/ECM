@@ -1,0 +1,120 @@
+NEXT SESSION START — 2026-09-10
+================================
+Branch: tbm-rcr-modelmap-fix-exec (pushed; last commit bc0118f)
+
+STATE SUMMARY
+-------------
+We are in the middle of qualifying the hp2170 NCA RCR distributed TBM for
+Robert's STAR-CCM+ import. Three things are currently pending Robert's response.
+
+PENDING FROM ROBERT (do not send anything further until he replies)
+-------------------------------------------------------------------
+1. V3 RCR preflight candidate (MAIN):
+   File: out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip
+         → hp2170NCA-RCR-distributed-final-preflight.tbm
+   SHA:  91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4
+   V3 validator: 0 FAIL | 4 WARN | 14 INFO | 37 PASS
+   Delta vs V2: one field inserted — Transport Number sets = 0 in General
+   Electrolyte SIMMOD (Robert's V1 log confirmed this field was missing).
+   Expected result: import succeeds (S3=5 + Transport Number sets fixes
+   address the two known failure modes from V1 runtime log).
+
+2. JR OD test pair:
+   File: out/hp2170NCA-JR-OD-test-20260910.zip
+         → hp2170-jr-safe_20p55.tbm             (20.55 mm JR OD)
+         → hp2170-jr-perfect_contact_20p6274.tbm (20.6274 mm JR OD = can ID)
+   Purpose: determine the correct m_dJellyrollThickness_mm for V4.
+   Evidence: OpenFOAM wedge_2170 mesh has JR OD = can ID = 20.6274 mm
+   (zero gap, shared face). Current TBM has 19.25 mm (1.38 mm gap).
+   Robert should run Create from Tbm on both. For whichever succeeds,
+   export STEP and measure the realised JR OD.
+
+3. Package_rev3 geometry test (older, status unclear):
+   File: out/tbm_geometry_test_20260909.zip (4 tab/orientation variants)
+   Status: sent 2026-09-09 but may be superseded. If Robert has not replied
+   to this, it can be deprioritised in favour of items 1 and 2 above.
+
+WHEN ROBERT REPLIES
+-------------------
+Case A — V3 import succeeds:
+  - If perfect_contact JR OD also succeeds: update m_dJellyrollThickness_mm
+    to 20.6274 mm in V4 RCR candidate and close WARN 1.
+  - If perfect_contact fails but safe_20p55 succeeds: use the measured
+    realised OD from the STEP export as the V4 value. Close WARN 1 with
+    the measured value.
+  - Update TBM_INVENTORY.md, close WARN 1 in validator (change WARN →
+    PASS or updated WARN with measured value), regenerate V4, validate,
+    send V4 to Robert.
+
+Case B — V3 import fails:
+  - Read the exact STAR error message.
+  - Check STAR_IMPORT_ERROR_HISTORY.md for pattern match.
+  - Add the error to STAR_IMPORT_ERROR_HISTORY.md.
+  - Identify the offending field, implement fix in generator, produce V4.
+  - Do NOT guess — require the verbatim error text before diagnosing.
+
+OPEN WANS (all 4, non-blocking for import)
+------------------------------------------
+WARN 1: jr_od — m_dJellyrollThickness_mm = 19.25 mm
+  STATUS: RESOLVED_PENDING_RUNTIME_TEST
+  Source: wedge_2170 mesh JR OD = 20.6274 mm. JR OD test pair sent.
+  Action: update to realised value when Robert's STEP result arrives.
+
+WARN 2: report_jr_diameter — REPORT block 17.8064 mm vs Builder 19.25 mm
+  STATUS: UNRESOLVED_NONBLOCKING
+  Note: August 2026 characterisation confirmed REPORT JR diameter is NOT
+  consumed by STAR (Detailed Builder wins). Safe to leave stale for now.
+  Will become even more stale once WARN 1 is resolved (17.8064 vs ~20.6).
+
+WARN 3: report_jr_height — REPORT block 52.5 mm vs Package 65.11 mm
+  STATUS: UNRESOLVED_NONBLOCKING (same reasoning as WARN 2)
+
+WARN 4: report_capacity — REPORT 1.14762 Ahr vs RCRTable 5.0 Ahr
+  STATUS: UNRESOLVED_NONBLOCKING
+  Note: REPORT capacity is BDS-computed and believed to be recomputed at
+  import. Not documented as consumed by STAR.
+
+KEY FILE HASHES
+---------------
+V1 RCR candidate (FAILED — do not use):
+  out/rcr_candidate/hp2170-rcr-v1-tabs-on-sameFace.tbm
+  SHA: 7d5850b628389e713e83468d27e45600942b1deb1e23e672f9d18c4f580d6940
+  Failure: +Electrode m_dS3 = 0 → "Electrode Root 1: Extrusion distance = 0"
+
+V2 RCR candidate (frozen intermediate — do not overwrite):
+  out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm
+  SHA: 372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b
+
+V3 RCR candidate / client copy (current preflight — frozen):
+  out/rcr_candidate/hp2170-rcr-v3-star-preflight-tabs-on-sameFace.tbm
+  out/hp2170NCA-RCR-distributed-final-preflight.tbm
+  SHA: 91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4
+
+JR OD safe variant:
+  out/jr_od_test/hp2170-jr-safe_20p55.tbm
+  SHA: 62a11705f39890d1fe5d27c7ef98f7ce8155cb8acc4e7b2b746cb95adfea37f6
+
+JR OD perfect-contact variant:
+  out/jr_od_test/hp2170-jr-perfect_contact_20p6274.tbm
+  SHA: 2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5
+
+KEY DOCUMENTS
+-------------
+tbm_validation/STAR_MAXIMUM_STATIC_PREFLIGHT_20260910.md — full audit + JR OD addendum
+tbm_validation/RCR_V2_TO_V3_TRANSPORT_NUM_DELTA.md      — V2→V3 delta proof
+tbm_validation/TBM_INVENTORY.md                          — all TBM hashes + JR OD test section
+tbm_validation/STAR_IMPORT_ERROR_HISTORY.md             — runtime error log
+tools/generate_tbm_rcr_candidate.py                     — generates RCR candidate from V4 base
+tools/generate_tbm_v4_candidate.py                      — generates V4 base variants
+tools/generate_tbm_jr_od_test.py                        — generates JR OD test pair from V3
+
+PROTECTED (do not change without explicit authorisation)
+---------------------------------------------------------
+IET = RCRTable 3D, Thermal = Distributed
+m_bOnly1D = 0 (all blocks), m_bLumpedEnergyBalance = 0
+m_dAhCell = 5.0, m_nRCRParameterSets = 3
+OD = 21.09 mm, height = 70.02 mm, can ID = 20.6274 mm
++Electrode m_dS3 = 5 mm, -Electrode m_dS3 = 50 mm
+Tabs: same-face (both top)
+Transport Number sets = 0
+About-Energy RCR numerical data (three temperature sets)
