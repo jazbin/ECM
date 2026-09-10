@@ -641,13 +641,25 @@ class TBMValidator:
                       "HE18650 = 50 mm; HP18650-template = 30 mm; Tutorial = 40 mm. "
                       "Our value 20 mm is lower than all references. Not confirmed from cell spec.")
 
-        # Separator lengths
+        # Separator lengths — CONFIRMED RUNTIME BLOCKER (Error 5, 2026-09-10)
+        # Every working reference has SepFeedLength_mm >= 10, SepTailLength_mm >= 40.
+        # Zero in either field causes "Electrode Root 1: Extrusion distance can not be 0" at CreateFromTbm.
         sep_feed = t.get_builder_float("m_dSepFeedLength_mm")
         sep_tail = t.get_builder_float("m_dSepTailLength_mm")
-        if sep_feed == 0 or sep_feed is None:
-            self._add("INFO", "sep_lengths",
-                      f"m_dSepFeedLength_mm = {sep_feed!r} (= Simple: 0). HE18650 also 0; HP18650-template = 10 mm. "
-                      "Whether 0 affects 3D geometry is UNCONFIRMED.")
+        if sep_feed is None or sep_feed == 0:
+            self._add("FAIL", "sep_feed_nonzero",
+                      f"m_dSepFeedLength_mm = {sep_feed!r}. Zero confirmed to cause "
+                      "'Electrode Root 1: Extrusion distance can not be 0' at STAR CreateFromTbm. "
+                      "References: HP18650-template = 10 mm, HV-LiCoO2f = 10 mm. Set to 10.")
+        else:
+            self._add("PASS", "sep_feed_nonzero", f"m_dSepFeedLength_mm = {sep_feed} mm.")
+        if sep_tail is None or sep_tail == 0:
+            self._add("FAIL", "sep_tail_nonzero",
+                      f"m_dSepTailLength_mm = {sep_tail!r}. Zero confirmed to cause "
+                      "'Electrode Root 1: Extrusion distance can not be 0' at STAR CreateFromTbm. "
+                      "References: HP18650-template = 40 mm, hp2170 Distributed BUILDER = 85 mm.")
+        else:
+            self._add("PASS", "sep_tail_nonzero", f"m_dSepTailLength_mm = {sep_tail} mm.")
 
         # Collector widths
         for fname, expected, desc in [
