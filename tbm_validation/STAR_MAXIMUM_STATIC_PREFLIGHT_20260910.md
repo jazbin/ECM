@@ -6,6 +6,14 @@
 **V2 SHA-256:** `372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b`
 **Date:** 2026-09-10
 
+## Governing project objective
+
+For this project, **we are not trying to reconstruct the physically realistic internal clearances of the cell**. We are trying to reproduce the already-defined **OpenFOAM–ECM reference model** in STAR-CCM+.
+
+The OpenFOAM–ECM case is the reference definition for geometry and thermal coupling. Where the OpenFOAM model has ideal/shared contact, STAR should reproduce that condition as closely as its geometry engine permits. Artificial air gaps, liners, clearances, or contact imperfections must not be introduced merely to make the model more physically realistic.
+
+Permanent requirement: `tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md`.
+
 ---
 
 ## Methodology
@@ -39,7 +47,7 @@ Every structural feature of V2 was compared field-by-field against the 4 STAR-in
 | 14 | RCR data | 3 temperature sets | present | cell-specific | — | VALID (AE data protected) | None |
 | 15 | REPORT block | JR diameter / height / capacity | stale values | cell-specific | stale | UNRESOLVED_NONBLOCKING | 4 WARNs in validator |
 | 16 | Tab topology | same-face, +/- on top | same-face | varies | — | VALID (project requirement) | None |
-| 17 | JR OD | `m_dJellyrollThickness_mm` | 19.25 | cell-specific | — | RESOLVED_PENDING_RUNTIME_TEST | JR OD test variants created 2026-09-10 |
+| 17 | JR OD | `m_dJellyrollThickness_mm` | 19.25 | cell-specific | — | REFERENCE_MODEL_TARGET_RESOLVED / STAR_FEASIBILITY_PENDING | Exact target 20.6274 mm; test variants created 2026-09-10 |
 
 ---
 
@@ -106,19 +114,25 @@ Client TBM: `hp2170NCA-RCR-distributed-final-preflight.tbm` (byte-identical to V
 
 ---
 
-## Addendum — JR OD resolved (2026-09-10)
+## Addendum — JR OD reference-model target (2026-09-10)
 
-WARN 1 (`jr_od`, `m_dJellyrollThickness_mm = 19.25 mm`) was resolved by reading the OpenFOAM-ECM `wedge_2170` mesh directly.
+The OpenFOAM–ECM `wedge_2170` geometry establishes the **reference-model target**, not a realistic manufactured-cell clearance. The project objective is to reproduce this OpenFOAM–ECM case in STAR-CCM+, so the geometry should retain its ideal-contact assumptions.
 
-**Evidence:** `cases/wedge_2170/constant/jellyRoll_rotated/polyMesh/points` — max radial coordinate = 0.010314 m → JR OD = 20.6274 mm = Package m_dintDiameter (can ID). The OpenFOAM thermal model has zero gap between JR outer face and can inner face. The 19.25 mm in the current TBM creates a 1.3774 mm diametral air gap with no equivalent in the validated OpenFOAM model.
+**Evidence:** `cases/wedge_2170/constant/jellyRoll_rotated/polyMesh/points` places the jelly-roll outer boundary at approximately the package/can inner radius, corresponding to JR OD ≈ `20.6274 mm = Package m_dintDiameter`. The OpenFOAM thermal model therefore has zero radial gap between the JR outer face and can inner face. The `19.25 mm` value in the current TBM creates a `1.3774 mm` diametral gap with no equivalent in the reference model.
 
-**Target value:** 20.6274 mm (= can ID, matching OpenFOAM). Subject to STAR winding feasibility guard.
+**Reference-model target value:** `20.6274 mm` (= can ID), representing zero radial gap / ideal JR-can contact. This is the desired STAR value subject only to STAR winding/CAD feasibility.
 
-**Test package sent alongside V3:** `out/hp2170NCA-JR-OD-test-20260910.zip`
+**Thermal-interface rule:** ideal contact / zero contact resistance is the default because that is the reference model. If interface resistance is needed later, it must be introduced explicitly as a controlled interface parameter rather than implicitly via a geometric air gap.
+
+**Test package:** `out/hp2170NCA-JR-OD-test-20260910.zip`
 
 | Variant | Input JR OD | Rationale |
 |---|---|---|
-| `hp2170-jr-safe_20p55.tbm` | 20.55 mm | 0.077 mm below can ID; winding discretisation should keep realised OD within can |
-| `hp2170-jr-perfect_contact_20p6274.tbm` | 20.6274 mm | Exact can ID; equivalent to OpenFOAM shared face; may trigger feasibility guard |
+| `hp2170-jr-perfect_contact_20p6274.tbm` | 20.6274 mm | Preferred target: exact OpenFOAM-equivalent zero-gap geometry; may trigger STAR feasibility guard |
+| `hp2170-jr-safe_20p55.tbm` | 20.55 mm | CAD-feasibility probe/fallback only; not the preferred model geometry |
 
-Decision: if `perfect_contact` succeeds → 20.6274 mm into V4. If it fails → `safe_20p55` realised OD into V4.
+Decision:
+- If `perfect_contact` succeeds and topology is sane → use `20.6274 mm` in the final RCR candidate.
+- If exact equality is rejected by STAR but `20.55 mm` succeeds → treat `20.55 mm` only as a STAR CAD workaround and configure/verify the interface so the thermal coupling remains equivalent to the OpenFOAM ideal-contact condition. Do not interpret the finite clearance as a physical air gap.
+
+The previous `19.25 mm` value is retired for the final OpenFOAM-equivalent model.
