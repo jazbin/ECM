@@ -1,5 +1,9 @@
 # STAR-CCM+ / BDS Import Error History
 
+> **IMPORTANT — CANONICAL STATUS MOVED TO `STAR_IMPORT_ERROR_DATABASE.md` (2026-09-10).**
+>
+> The historical entries below are preserved as contemporaneous investigation notes. Some `Diagnosis` sections represent hypotheses that were later shown to be insufficient. In particular, neither `m_dElectrodeOverlapAtStart_mm = 0` nor `+Electrode m_dS3 = 0` is proven to be the sole cause of `Electrode Root 1 : Extrusion distance can not be 0.` The 2026-09-10 exact-contact candidate still produced the identical error after both values had been made nonzero. For current evidence, hypothesis status, negative evidence, and all client runtime events, use **`tbm_validation/STAR_IMPORT_ERROR_DATABASE.md`** and the machine-readable **`tbm_validation/STAR_IMPORT_ERROR_DATABASE.csv`**.
+
 Record of every known STAR-CCM+ or BDS import failure for this project's TBM files. Each entry is linked to the specific TBM file (by SHA-256) that triggered the error.
 
 Do not delete or modify historical entries. Add new entries as they occur.
