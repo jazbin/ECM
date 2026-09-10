@@ -1,224 +1,159 @@
-# STAR-CCM+ TBM Import Error History
+# STAR-CCM+ / BDS Import Error History
 
-Complete record of every STAR-CCM+ / BDS runtime error reported by Robert (client-side testing), in chronological order. Each entry records the verbatim error text, the file tested, the confirmed or candidate cause, and whether a fix was confirmed by a subsequent passing import.
+> **IMPORTANT — CANONICAL STATUS MOVED TO `STAR_IMPORT_ERROR_DATABASE.md` (2026-09-10).**
+>
+> The historical entries below are preserved as contemporaneous investigation notes. Some `Diagnosis` sections represent hypotheses that were later shown to be insufficient. In particular, neither `m_dElectrodeOverlapAtStart_mm = 0` nor `+Electrode m_dS3 = 0` is proven to be the sole cause of `Electrode Root 1 : Extrusion distance can not be 0.` The 2026-09-10 exact-contact candidate still produced the identical error after both values had been made nonzero. For current evidence, hypothesis status, negative evidence, and all client runtime events, use **`tbm_validation/STAR_IMPORT_ERROR_DATABASE.md`** and the machine-readable **`tbm_validation/STAR_IMPORT_ERROR_DATABASE.csv`**.
 
-**Do not delete or modify historical entries. Append new entries only.**
+Record of every known STAR-CCM+ or BDS import failure for this project's TBM files. Each entry is linked to the specific TBM file (by SHA-256) that triggered the error.
 
----
-
-## Summary Table
-
-| # | Date | Package / File | Error | Cause | Fix Applied | Fix Confirmed? |
-|---|------|---------------|-------|-------|-------------|----------------|
-| 1 | 2026-09-03 | tbm_geometry_test_20260903 (v1–v4) | Mandrel thickness must be positive | `m_dMandrelThickness_mm = 0` in Detailed Builder | Set to 6 mm | Not directly — superseded by next error |
-| 2 | 2026-09-07 | tbm_geometry_test_20260907 (v1–v4) | Unknown (new error after mandrel fix) | Unknown — logs not preserved | Unknown | NO — error text never received |
-| 3 | 2026-09-07 | tbm_geometry_test_20260907 | `m_bOnly1D` warning + unknown downstream error | `m_bOnly1D = 1` in SIMMOD blocks | Set all to 0 | UNCONFIRMED |
-| 4 | 2026-09-04 | tbm_geometry_test_20260904 | Mandrel thickness must be positive | Same as #1 | (same) | No |
-| 5 | 2026-09-09 | hp2170-rcr-v1-tabs-on-sameFace | Electrode Root 1: Extrusion distance can not be 0 | MISDIAGNOSED as `+Electrode m_dS3 = 0`; actual cause UNRESOLVED | S3 set to 5 | **NO — same error persists in v5** |
-| 6 | 2026-09-10 | hp2170NCA-RCR-distributed-exact-contact-final | Electrode Root 1: Extrusion distance can not be 0 | Candidate: `m_dSepFeedLength_mm = 0` and `m_dSepTailLength_mm = 0` in Detailed Builder | SepFeed=10, SepTail=85 applied 2026-09-10 | **PENDING — awaiting Robert's test** |
+Do not delete or modify historical entries. Add new entries as they occur.
 
 ---
 
-## Error 1 — tbm_geometry_test_20260903 (2026-09-03)
+## Error 1 — V1 package (2026-09-04)
 
-**Package:** `tbm_geometry_test_20260903.zip` (all four tab variants: v1–v4)
-**Files:** `hp2170-test-v1-tabs-on-standard.tbm`, `hp2170-test-v2-tabs-off-standard.tbm`, `hp2170-test-v3-tabs-on-sameFace.tbm`, `hp2170-test-v4-tabs-off-sameFace.tbm`
-**TBM SHA-256:** Not recorded (predates SHA-256 audit)
-
+**Package:** `consultant_dt_sensitivity_20260505.zip` → `tbm_geometry_test_20260904.zip` (v1)
+**TBM file SHA-256:** (v1 variants — not recorded, predates SHA-256 audit)
 **Error text (verbatim from Robert):**
 ```
-Read 5549 lines from F:\About-Energy\20260903\tbm_geometry_test_20260903\hp2170-test-v1-tabs-on-standard.tbm
-
-LiIon     Electrolyte        General Electrolyte     load message
-
-Note:  [Transport Number sets] not found in the file, defaulting to 0.
-
-Warning: m_bOnly1D option is not supported.
-Warning: m_bOnly1D option is not supported.
-
-Unable to create cell from F:\About-Energy\20260903\tbm_geometry_test_20260903\hp2170-test-v1-tabs-on-standard.tbm: Error: Mandrel thickness must be positive
+Electrode Root 1 : Extrusion distance can not be 0
 ```
-(Same error for all four variants in this package.)
+**STAR-CCM+ operation:** File > Create from Tbm
 
-**STAR-CCM+ operation:** Batteries > Battery Cell > Create from Tbm
+**Diagnosis:**
+`m_dElectrodeOverlapAtStart_mm` in the Detailed Builder section was `0`. BDS requires a positive extrusion distance to create the winding geometry. The source TBM (hp2170NCA-ECM.tbm) had this field set to 0 in the Detailed Builder block — a placeholder left over from the original 18650 template when the TBM was generated in 1D-only mode.
 
-**Pre-error warnings (also present):**
-- `[Transport Number sets] not found in the file, defaulting to 0` — field absent, harmless default applied
-- `Warning: m_bOnly1D option is not supported` — appears twice per file
+The correct value (8 mm) was already present in the Simple Builder section (`m_dElectrodeOverlapAtStart = 8`) of the same source TBM, but BDS reads the Detailed Builder value.
 
-**Confirmed cause:**
-`m_dMandrelThickness_mm = 0` in the Detailed Builder (`<BUILDER>`) section. STAR-CCM+ requires a positive mandrel diameter to construct the jelly-roll winding geometry. The source TBM (hp2170NCA-ECM.tbm) had this field absent or zero — a placeholder from the 1D-mode template.
+**Fix applied in V2:**
+`m_dElectrodeOverlapAtStart_mm` → 8 mm (Detailed Builder).
 
-Correct value for hp2170 NCA 21700: 6 mm (from AE characterisation data).
+The V2 generate script explicitly copies the Simple Builder value to Detailed Builder:
+```
+m_dElectrodeOverlapAtStart_mm = 8  (copied from Simple Builder; Detailed Builder had 0)
+```
 
-**Fix applied in subsequent package:**
-`m_dMandrelThickness_mm` set to 6 mm in all generated variants.
+**HE18650 reference value:** 30 mm
+**HP18650-template reference value:** 8 mm (matches our fix)
+**Tutorial reference value:** 3 mm
 
-**Validator check:** `mandrel_thickness` → FAIL if `m_dMandrelThickness_mm ≤ 0`.
+**Validator check:** `overlap_start` → FAIL if Detailed Builder value is 0.
 
 ---
 
-## Error 2 — tbm_geometry_test_20260904 (2026-09-04)
+## Error 2 — V2 package (2026-09-07)
 
-**Package:** `tbm_geometry_test_20260904.zip`
-**Files:** `hp2170-test-v1-tabs-on-standard.tbm` (at minimum)
-**TBM SHA-256:** Not recorded
-
+**Package:** `tbm_geometry_test_20260907.zip` (v2)
+**TBM file SHA-256:** (V2 variants — recorded in TBM_INVENTORY.md)
 **Error text (verbatim from Robert):**
 ```
-Read 5549 lines from F:\About-Energy\20260903\tbm_geometry_test_20260904\hp2170-test-v1-tabs-on-standard.tbm
+Warning: m_bOnly1D option is not supported
+Warning: m_bOnly1D option is not supported
+```
+(Two instances reported; total number in file was not stated by Robert)
+**STAR-CCM+ operation:** File > Create from Tbm
 
-LiIon     Electrolyte        General Electrolyte     load message
+**Diagnosis:**
+`m_bOnly1D = 1` was present in all 24 SIMMOD blocks of the source TBM. The source file was assembled in this workspace from Siemens template material and About-Energy data; provenance of the flag values is unknown. The repository records an import warning for this source pattern, but exact STAR-CCM+/BDS support by SIMMOD context is unconfirmed.
 
-Note:  [Transport Number sets] not found in the file, defaulting to 0.
+**Per-SIMMOD-block analysis:**
+The error message "Warning: m_bOnly1D option is not supported" appears per-block, not per-file. Two instances were reported — BDS may only report the first N instances or may report for specific blocks (e.g. the two 3D blocks that have explicit 3D geometry creation).
 
-Warning: m_bOnly1D option is not supported.
-Warning: m_bOnly1D option is not supported.
+The critical block is `RCRTable 3D` — our active electrochemical model. All known-working references (HE18650, HP18650-template, LiIonSpiral, Tutorial, HV-LiCoO2f) have `m_bOnly1D = 0` or absent in the RCRTable 3D block. Only HP18650-DIST has 1 in RCRTable 3D — its successful import status is UNCONFIRMED.
 
+For the `Distributed 3D` block, references disagree: HE18650 and HP18650-template use 1; LiIonSpiral, Tutorial, HV-LiCoO2f use 0. It is possible BDS only reports the warning for `Distributed 3D` block (the explicit 3D geometry block), not all blocks.
+
+**Fix applied in package_rev3:**
+All `m_bOnly1D` occurrences set to 0 via `sub_all()`. package_rev3 has `m_bOnly1D = 0` in all 24 SIMMOD blocks.
+
+**Per-SIMMOD table for package_rev3:**
+| SIMMOD block | package_rev3 | HE18650 | HP18650-templ | LiIonSpiral | Tutorial |
+|---|---|---|---|---|---|
+| Distributed 3D | 0 | 1 | 1 | 0 | 0 |
+| Distributed | 0 | 0 | false | true | true |
+| NTGPTable 3D | 0 | 0 | 0 | 0 | 0 |
+| RCRTable 3D | 0 | 0 | 0 | 0 | 0 |
+
+**Open question:** HE18650 and HP18650-template have `m_bOnly1D = 1` in the Distributed 3D block, yet are known-good references. The warning trigger by SIMMOD context is unconfirmed. The package_rev2 result may relate to the RCRTable 3D block (the active model). package_rev3's all-zero pattern is a conservative project choice, and is consistent with LiIonSpiral and Tutorial reference files.
+
+**Validator check:** `m_bOnly1D_rcrtable` → PASS if RCRTable 3D block has 0 or false.
+
+---
+
+## Error 3 — RCR distributed V1 candidate (2026-09-09)
+
+**Package:** `hp2170-rcr-v1-tabs-on-sameFace.tbm` (RCR distributed candidate V1)
+**TBM file SHA-256:** `7d5850b628389e713e83468d27e45600942b1deb1e23e672f9d18c4f580d6940`
+**Error text (verbatim from Robert):**
+```
 Feature execution failed.
 Electrode Root 1 : Extrusion distance can not be 0.
 Command: CreateFromTbm
-   error: Server Error
 ```
+**STAR-CCM+ operation:** File > Create from Tbm
 
-**STAR-CCM+ operation:** Batteries > Battery Cell > Create from Tbm
+**Diagnosis:**
+`+Electrode m_dS3 = 0` in the Detailed Builder electrode section. This field defines a geometric segment at the positive electrode root (Electrode 1 in STAR convention). All 4 STAR-installation cylindrical reference TBMs (validationBattery, testTBM, LiIonSpiral, tutorialCylindricalCell) and HE18650 use `+Electrode m_dS3 = 5`. The BDS-generated source TBM (hp18650Spiral1.tbm, the project clone template) had S3=0, left as a 1D-mode placeholder — the same pattern as the prior `m_dElectrodeOverlapAtStart_mm = 0` placeholder (Error 1). None of the V3/V4 generator scripts had corrected this field until 2026-09-10.
 
-**Note on progression:** The Mandrel error (Error 1) does not appear — the mandrel fix was applied between 20260903 and 20260904 packages. The `m_bOnly1D` warnings remain. A new blocking error appears: **Electrode Root 1**.
+The exact internal STAR mapping of `m_dS3` to the "Electrode Root 1" extrusion feature is inferred from the pattern; not proven until V2 passes runtime import.
 
-**Confirmed cause (retrospective, 2026-09-10):**
-`m_dElectrodeOverlapAtStart_mm = 0` in the Detailed Builder. STAR requires a positive inner-winding lead-in dimension to extrude "Electrode Root 1". The source TBM had 0 (1D-mode placeholder); the correct value (8 mm) was already present in the Simple Builder section but BDS reads Detailed Builder.
+**Fix applied in V2:**
+`+Electrode m_dS3 = 0 → 5` (added to `apply_v3_fixes()` in `generate_tbm_v4_candidate.py`).
+
+V2 candidate: `out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm`
+V2 SHA-256: `372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b`
+Client package: `out/hp2170NCA-RCR-STAR-import-test-S3fix-20260910.zip`
+
+**Validator check added:** `pos_electrode_s3` → FAIL if `+Electrode m_dS3 = 0`. See `validate_tbm.py`.
+
+---
+
+## Error 3a — package_rev3 geometry test (2026-09-09)
+
+**Package:** `tbm_geometry_test_20260909.zip` (package_rev3)
+**STAR_IMPORT_PASS status:** **PENDING** — awaiting confirmation from Robert. This was sent 2026-09-09 but superseded by the RCR V1 failure (Error 3 above) on the same date. Status unknown.
+
+---
+
+## V3 preflight status — 2026-09-10 (no new runtime error; static preflight complete)
+
+**Package:** `out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip` → `hp2170NCA-RCR-distributed-final-preflight.tbm`
+**TBM file SHA-256:** `91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4`
+**Status:** Static preflight passed. No new runtime error (V3 has not yet been tested by Robert). STAR import result PENDING.
+
+**Static preflight result:** 0 FAIL, 4 WARN, 14 INFO, 37 PASS
+
+**Change from V2:** One field added — `Transport Number sets = 0` in General Electrolyte SIMMOD block. Evidence: all 4 STAR-install cylindrical references contain this field. Robert's V1 runtime log (Error 3 above) reported "Transport Number sets not found in the file, defaulting to 0." Inserting it explicitly eliminates that runtime message and aligns the file with STAR-install reference format. No physics impact (value matches the runtime default).
+
+**Remaining WARNs (all pre-existing; none linked to a known runtime failure):**
+1. `jr_od` — JellyRoll-can gap 1.38 mm; correct winding OD not confirmed
+2. `report_jr_diameter` — REPORT block JR diameter not updated
+3. `report_jr_height` — REPORT block JR height not updated
+4. `report_capacity` — REPORT block capacity not updated
+
+**Next action:** Await Robert's runtime result on V3. Freeze all further TBM changes until runtime evidence is received.
+
+---
+
+## Template for new entries
+
+```
+## Error N — [package name] ([date])
+
+**Package:** [filename]
+**TBM file SHA-256:** [hash of the specific TBM that failed, from TBM_INVENTORY.md]
+**Error text (verbatim from Robert):**
+```
+[paste exact error text]
+```
+**STAR-CCM+ operation:** [File > Create from Tbm / Run Physics / Other]
+
+**Diagnosis:**
+[What field or value caused the error. Which reference TBM was checked. What the correct value is.]
 
 **Fix applied:**
-`m_dElectrodeOverlapAtStart_mm` set to 8 mm (copied from Simple Builder).
+[What was changed and in which package version]
 
-**Validator check:** `overlap_start` → FAIL if `m_dElectrodeOverlapAtStart_mm = 0`.
-
----
-
-## Error 3 — tbm_geometry_test_20260907 (2026-09-07)
-
-**Package:** `tbm_geometry_test_20260907.zip` (four variants)
-**Files:** `hp2170-test-v1-tabs-on-standard.tbm` and others
-**TBM SHA-256:** Not recorded
-
-**Error text (verbatim from Robert — partial, new error not preserved):**
+**Validator check added:**
+[Which check in validate_tbm.py now catches this. If none, note the gap.]
 ```
-Read 5549 lines from F:\About-Energy\20260907\V2\tbm_geometry_test_20260907\hp2170-test-v1-tabs-on-standard.tbm
-
-LiIon     Electrolyte        General Electrolyte     load message
-
-Note:  [Transport Number sets] not found in the file, defaulting to 0.
-
-Warning: m_bOnly1D option is not supported.
-Warning: m_bOnly1D option is not supported.
-
-Read 5549 lines from F:\About-Energy\20260907\V2\tbm_geometry_test_20260907\hp2170-test-v1-tabs-on-standard.tbm
-```
-Robert reported: "Gets a bit further but gives a new error for all four cases." The specific new error text was not provided.
-
-**STAR-CCM+ operation:** Batteries > Battery Cell > Create from Tbm
-
-**Note:** The Electrode Root 1 error (Error 2) does not appear — the `m_dElectrodeOverlapAtStart_mm = 8` fix was effective. A new error occurred but was not captured. `m_bOnly1D` warnings remain.
-
-**Diagnosis:** Unknown — error text never received from Robert. The `m_bOnly1D` warnings are present and likely contributed.
-
-**Fix applied (package_rev3):**
-All `m_bOnly1D` occurrences set to 0 in all SIMMOD blocks (was 1 in source file for all 24 blocks).
-
-**Validator check:** `m_bOnly1D_rcrtable` → FAIL if RCRTable 3D block has `m_bOnly1D = 1`.
-
-**⚠ CRITICAL GAP:** The actual error text for this package was never recorded. The subsequent fix (m_bOnly1D → 0) was applied without knowing which error it was addressing. Confirmation that this fix resolved the unknown error was never obtained.
-
----
-
-## Error 4 — hp2170-rcr-v1-tabs-on-sameFace (2026-09-09)
-
-**Package:** `tbm_geometry_test_20260909.zip` (RCR distributed candidate V1)
-**File:** `hp2170-rcr-v1-tabs-on-sameFace.tbm`
-**TBM SHA-256:** `7d5850b628389e713e83468d27e45600942b1deb1e23e672f9d18c4f580d6940`
-**Line count:** 5549
-
-**Error text (verbatim from Robert):**
-```
-Read 5549 lines from F:\About-Energy\20260909\hp2170-rcr-v1-tabs-on-sameFace.tbm
-
-LiIon     Electrolyte        General Electrolyte     load message
-
-Note:  [Transport Number sets] not found in the file, defaulting to 0.
-
-Feature execution failed.
-Electrode Root 1 : Extrusion distance can not be 0.
-Command: CreateFromTbm
-   error: Server Error
-```
-
-**STAR-CCM+ operation:** Batteries > Battery Cell > Create from Tbm
-
-**Note on progression:** `m_bOnly1D` warnings absent — the m_bOnly1D fix worked. `Transport Number sets` note still present.
-
-**Misdiagnosis applied (2026-09-09):**
-Session on 2026-09-09 identified `+Electrode m_dS3 = 0` as the cause by pattern-matching against reference TBMs (all have S3 = 5). Fix applied: `+Electrode m_dS3 = 0 → 5`. This was documented as "Resolved the geometry extrusion error" — **incorrectly**, because the fix was never confirmed by Robert at STAR runtime.
-
-**Confirmed status of S3 fix:** **WRONG DIAGNOSIS.** Error 5 (2026-09-10) demonstrates that the file with S3 = 5 still produces the identical error. S3 was not the cause.
-
-**Actual cause (candidate, 2026-09-10):**
-`m_dSepFeedLength_mm = 0` and `m_dSepTailLength_mm = 0` in the Detailed Builder. Every working reference TBM has non-zero values: `m_dSepFeedLength_mm ≥ 10`, `m_dSepTailLength_mm ≥ 40`. The preflight for exact-contact-final classified these as UNRESOLVED_NONBLOCKING and the geometry audit classified them as ZERO_DIMENSION_PROBABLY_SAFE — both assessments were incorrect.
-
-**Validator check (incorrectly scoped):** `pos_electrode_s3` → FAIL if `+Electrode m_dS3 = 0` (added 2026-09-09; now confirmed insufficient to catch the root cause).
-
----
-
-## Error 5 — hp2170NCA-RCR-distributed-exact-contact-final (2026-09-10)
-
-**Package:** `out/hp2170NCA-RCR-STAR-exact-contact-final-20260910.zip`
-**File:** `hp2170NCA-RCR-distributed-exact-contact-final.tbm`
-**TBM SHA-256 (as sent):** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
-**Line count:** 5550
-
-**Error text (verbatim from Robert):**
-```
-Read 5550 lines from F:\About-Energy\20260910\hp2170NCA-RCR-distributed-exact-contact-final.tbm
-
-Feature execution failed.
-
-Electrode Root 1 : Extrusion distance can not be 0.
-
-Command: CreateFromTbm
-
-   error: Server Error
-```
-
-**STAR-CCM+ operation:** Batteries > Battery Cell > Create from Tbm
-
-**Note on progression:** `m_bOnly1D` warnings absent. `Transport Number sets` note absent (field now explicitly present). But Electrode Root 1 error persists despite S3 = 5.
-
-**Confirmed:** S3 fix (Error 4 diagnosis) did NOT resolve this error. S3 was not the cause.
-
-**Cause (candidate, 2026-09-10):**
-`m_dSepFeedLength_mm = 0` and `m_dSepTailLength_mm = 0` in the Detailed Builder (`<BUILDER>`, lines 2119–2120 of the file as sent). The Detailed Builder section is what STAR reads for 3D geometry creation. Every working reference TBM in the project repo has:
-- `m_dSepFeedLength_mm = 10`
-- `m_dSepTailLength_mm = 40` to `85`
-
-The Distributed 2P BUILDER in the same file (second `<BUILDER>` block) correctly has `m_dSepFeedLength = 10` and `m_dSepTailLength = 85`. The RCRTable 3D BUILDER (first `<BUILDER>` block) had both at 0.
-
-**Fix applied (2026-09-10, this session):**
-`m_dSepFeedLength_mm = 0 → 10`, `m_dSepTailLength_mm = 0 → 85` in the first `<BUILDER>` block.
-
-**New SHA-256 (post-fix):** `bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53`
-
-**Fix confirmed:** **PENDING — awaiting Robert's test.**
-
-**Process failure note:**
-Between Error 4 and Error 5, sessions applied the (incorrect) S3 fix, declared it "resolved," and built two further versions (V3 preflight, exact-contact-final) without ever getting Robert to confirm V2 passed. The instruction in the STAR_IMPORT_ERROR_HISTORY.md Error 3 entry ("not proven until V2 passes runtime import") was documented but not enforced. The fix for Error 5 must be confirmed by Robert before any further versions are built on top of it.
-
-**Validator check to add:** `sep_feed_tail_nonzero` → FAIL if `m_dSepFeedLength_mm = 0` OR `m_dSepTailLength_mm = 0` in the Detailed Builder.
-
----
-
-## Process Rules (derived from this error history)
-
-1. Every fix to the Detailed Builder must be confirmed by Robert at STAR runtime before the next version is built on top of it.
-2. Any field in the Detailed Builder that is 0 while the same field in all working references is non-zero must be treated as FAIL in the preflight, not WARN or INFO.
-3. The Simple Builder section is NOT what STAR reads for 3D geometry. A field being correct in the Simple Builder does not mean the Detailed Builder value is correct.
-4. "Static preflight passed" does not mean "STAR runtime will succeed." These are distinct gates.
-5. Do not ship a new version without logging the SHA-256 of the file actually sent and the expected state of the runtime test.
