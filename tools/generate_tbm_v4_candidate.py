@@ -96,6 +96,7 @@ def apply_v3_fixes(content: bytes) -> tuple[bytes, list[str]]:
         ('Package m_strName',             '2170',        'cell format label'),
         ('m_dElectrodeOverlapAtStart_mm', 8,             'copied from Simple Builder (source had 0)'),
         ('m_dMandrelWidth_mm',            6,             'set equal to mandrel thickness (cylindrical)'),
+        ('+Electrode m_dS3',              5,             'STAR cylindrical refs all use 5; source/BDS-gen had 0 (1D-mode placeholder); 0 triggers "Electrode Root 1: Extrusion distance can not be 0"'),
     ]:
         content, hit = sub_first(content, field, val)
         if hit:

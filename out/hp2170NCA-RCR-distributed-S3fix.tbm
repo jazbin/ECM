@@ -3032,7 +3032,7 @@ IET
 </REPORT>
 <MODELMAP>
 	Electrolyte	=	General Electrolyte
-	IET	=	Distributed 3D
+	IET	=	RCRTable 3D
 	Thermal	=	Distributed
 </MODELMAP>
 <DEFAULT BUILDER>

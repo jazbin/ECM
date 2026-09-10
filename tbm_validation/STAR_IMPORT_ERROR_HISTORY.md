@@ -76,12 +76,38 @@ All `m_bOnly1D` occurrences set to 0 via `sub_all()`. package_rev3 has `m_bOnly1
 
 ---
 
-## Error 3 — package_rev3 package (2026-09-09)
+## Error 3 — RCR distributed V1 candidate (2026-09-09)
+
+**Package:** `hp2170-rcr-v1-tabs-on-sameFace.tbm` (RCR distributed candidate V1)
+**TBM file SHA-256:** `7d5850b628389e713e83468d27e45600942b1deb1e23e672f9d18c4f580d6940`
+**Error text (verbatim from Robert):**
+```
+Feature execution failed.
+Electrode Root 1 : Extrusion distance can not be 0.
+Command: CreateFromTbm
+```
+**STAR-CCM+ operation:** File > Create from Tbm
+
+**Diagnosis:**
+`+Electrode m_dS3 = 0` in the Detailed Builder electrode section. This field defines a geometric segment at the positive electrode root (Electrode 1 in STAR convention). All 4 STAR-installation cylindrical reference TBMs (validationBattery, testTBM, LiIonSpiral, tutorialCylindricalCell) and HE18650 use `+Electrode m_dS3 = 5`. The BDS-generated source TBM (hp18650Spiral1.tbm, the project clone template) had S3=0, left as a 1D-mode placeholder — the same pattern as the prior `m_dElectrodeOverlapAtStart_mm = 0` placeholder (Error 1). None of the V3/V4 generator scripts had corrected this field until 2026-09-10.
+
+The exact internal STAR mapping of `m_dS3` to the "Electrode Root 1" extrusion feature is inferred from the pattern; not proven until V2 passes runtime import.
+
+**Fix applied in V2:**
+`+Electrode m_dS3 = 0 → 5` (added to `apply_v3_fixes()` in `generate_tbm_v4_candidate.py`).
+
+V2 candidate: `out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm`
+V2 SHA-256: `372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b`
+Client package: `out/hp2170NCA-RCR-STAR-import-test-S3fix-20260910.zip`
+
+**Validator check added:** `pos_electrode_s3` → FAIL if `+Electrode m_dS3 = 0`. See `validate_tbm.py`.
+
+---
+
+## Error 3a — package_rev3 geometry test (2026-09-09)
 
 **Package:** `tbm_geometry_test_20260909.zip` (package_rev3)
-**STAR_IMPORT_PASS status:** **PENDING** — awaiting confirmation from Robert.
-
-No errors reported as of 2026-09-09 (package just sent). When Robert reports results, add an entry here.
+**STAR_IMPORT_PASS status:** **PENDING** — awaiting confirmation from Robert. This was sent 2026-09-09 but superseded by the RCR V1 failure (Error 3 above) on the same date. Status unknown.
 
 ---
 

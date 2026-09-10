@@ -21,8 +21,10 @@ import sys
 from pathlib import Path
 
 BASE = Path("out/v4_candidate/hp2170-v4c-v3-tabs-on-sameFace.tbm")
-OUT = Path("out/rcr_candidate/hp2170-rcr-v1-tabs-on-sameFace.tbm")
-BASE_SHA256 = "24eacae56e40d826f162046bc63131f7c590b3c5d72dec80828c7e6a5520667f"
+OUT = Path("out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm")
+# V2 base: V4/v3 regenerated with +Electrode m_dS3 = 0 -> 5 (S3 geometry fix).
+# Prior pinned SHA was 24eacae56e40d826f162046bc63131f7c590b3c5d72dec80828c7e6a5520667f (V1 base, S3=0).
+BASE_SHA256 = "e645ab18ad5da81b8a90646743051e8a2e3259d745a2d683589154ad68c12b26"
 EXPECTED_OLD_IET = b"Distributed 3D"
 EXPECTED_NEW_IET = b"RCRTable 3D"
 

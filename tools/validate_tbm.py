@@ -552,6 +552,39 @@ class TBMValidator:
             self._add("INFO", "overlap_start",
                       f"m_dElectrodeOverlapAtStart_mm absent; Simple Builder m_dElectrodeOverlapAtStart = {ovlp_sim}.")
 
+        # +Electrode m_dS3 — must be > 0 for STAR cylindrical 3D import.
+        # Evidence: all 4 STAR-install cylindrical references (validationBattery, testTBM,
+        # LiIonSpiral, tutorialCylindricalCell) and HE18650 use S3=5. BDS-generated source
+        # files (hp18650Spiral1, hp18650Spiral-DIST, hp18650Spiral1-1D) have S3=0 and have
+        # UNCONFIRMED 3D import status. Robert's V1 RCR candidate (2026-09-09) had S3=0 and
+        # failed with "Electrode Root 1 : Extrusion distance can not be 0".
+        # V2 sets S3=5 as the controlled fix.
+        # NOTE: the exact internal STAR mapping of S3 to "Electrode Root 1" is inferred from
+        # the pattern; not proven until V2 passes runtime import. Do not update this comment
+        # to say "proven" until Robert confirms a successful CreateFromTbm with S3=5.
+        pos_s3 = t.get_float("+Electrode m_dS3")
+        if pos_s3 is None:
+            self._add("WARN", "pos_electrode_s3",
+                      "+Electrode m_dS3 not found. All STAR cylindrical references have this field set to 5.")
+        elif pos_s3 == 0:
+            self._add("FAIL", "pos_electrode_s3",
+                      "+Electrode m_dS3 = 0. All 4 STAR-install cylindrical references use S3=5; "
+                      "Robert's V1 RCR candidate failed with 'Electrode Root 1 : Extrusion distance can not be 0' "
+                      "when this field was 0 (2026-09-09). The BDS-generated source files also have S3=0 but "
+                      "their 3D import status is unconfirmed. Fix: set to 5 (matches STAR references).",
+                      field="+Electrode m_dS3", value="0", expected="> 0 (reference value: 5)")
+        elif pos_s3 > 0:
+            self._add("PASS", "pos_electrode_s3",
+                      f"+Electrode m_dS3 = {pos_s3} mm. "
+                      "STAR cylindrical references use 5 mm. V2 RCR candidate uses 5 mm.")
+        neg_s3 = t.get_float("-Electrode m_dS3")
+        if neg_s3 is not None and neg_s3 > 0:
+            self._add("PASS", "neg_electrode_s3",
+                      f"-Electrode m_dS3 = {neg_s3} mm (nonzero; consistent with STAR references).")
+        elif neg_s3 == 0:
+            self._add("WARN", "neg_electrode_s3",
+                      "-Electrode m_dS3 = 0. STAR references use 50 mm for -Electrode S3.")
+
         # m_dOffsetPosAvg — critical: references use 0.5; our source and HP18650-DIST use 1e-06
         offset_pos = t.get_builder_float("m_dOffsetPosAvg", index=0)
         if offset_pos is not None:
