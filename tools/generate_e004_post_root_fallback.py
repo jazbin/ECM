@@ -1,377 +1,200 @@
 #!/usr/bin/env python3
-"""
-Generate the post-ROOT E004 fallback campaign.
-
-Use only if ROOT_A and ROOT_B both return the identical:
-    Electrode Root 1 : Extrusion distance can not be 0.
-
-Outputs a small, conditional campaign:
-  TL_A / TL_B              - tab-length headroom discriminators
-  HP_CONTROL               - unmodified verified-clean Siemens HP18650 source
-  HP_SHELL_PROJECT_RCR     - HP18650 PCD+Detailed Builder with project model context
-  C10                      - project PCD with broad Siemens-like Builder pattern
-  C13                      - validationBattery PCD+Detailed Builder with project model context
-
-All project-derived files start from immutable R005, verified by SHA-256.
-"""
+"""Generate the conditional E004 fallback package after ROOT_A/ROOT_B both fail."""
 from __future__ import annotations
+import csv, hashlib, pathlib, re, subprocess, sys, zipfile
 
-import csv
-import hashlib
-import pathlib
-import re
-import subprocess
-import sys
-import zipfile
-
-REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-VALIDATOR = REPO_ROOT / "tools/validate_tbm.py"
-
-BASELINE_COMMIT = "d74b3283cb5d73e114bc141f3f0d18e7c7ed5463"
-BASELINE_PATH = "out/hp2170NCA-RCR-distributed-exact-contact-final.tbm"
-BASELINE_SHA256 = "2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5"
-
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+VALIDATOR = ROOT / "tools/validate_tbm.py"
+BASE_REF = "d74b3283cb5d73e114bc141f3f0d18e7c7ed5463"
+BASE_PATH = "out/hp2170NCA-RCR-distributed-exact-contact-final.tbm"
+BASE_SHA = "2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5"
 HP_REF = "tbm-siemens-reference-corpus"
 HP_PATH = "tbm_validation/reference/HP18650/hp18650Spiral-DIST.tbm"
-
 VAL_REF = "tbm-rcr-modelmap-fix-exec"
 VAL_PATH = "tbm_validation/in_StarCCM_bds/validationBattery.tbm"
+OUT = ROOT / "out/e004_post_root_fallback_20260911"
+ZIP = ROOT / "out/hp2170NCA-STAR-E004-post-root-fallback-20260911.zip"
 
-OUT_DIR = REPO_ROOT / "out/e004_post_root_fallback_20260911"
-ZIP_PATH = REPO_ROOT / "out/hp2170NCA-STAR-E004-post-root-fallback-20260911.zip"
-
-TL_CASES = [
-    (
-        "TL_A",
-        "TL_A_TAB_HEADROOM_0p10.tbm",
-        {"+Electrode Tab m_dLength_mm": ("60", "64.21"),
-         "-Electrode Tab m_dLength_mm": ("60", "65.21")},
-        "+0.10 mm tab-length headroom over each corresponding electrode width",
-    ),
-    (
-        "TL_B",
-        "TL_B_TAB_HEADROOM_0p70.tbm",
-        {"+Electrode Tab m_dLength_mm": ("60", "64.81"),
-         "-Electrode Tab m_dLength_mm": ("60", "65.81")},
-        "+0.70 mm tab-length headroom over each corresponding electrode width",
-    ),
-]
-
-C10_DELTAS = {
-    "m_dSepFeedLength_mm": ("0", "10"),
-    "m_dSepTailLength_mm": ("0", "85"),
-    "m_dElectrodeOverlapAtStart_mm": ("8", "3"),
-    "m_dElectrodeOverlapAtEnd_mm": ("20", "40"),
-    "m_dMandrelWidth_mm": ("6", "0"),
+TL = {
+ "TL_A_TAB_RELATION_0p10.tbm": {
+   "+Electrode Tab m_dLength_mm": ("60","64.21"),
+   "-Electrode Tab m_dLength_mm": ("60","65.21")},
+ "TL_B_TAB_RELATION_0p70.tbm": {
+   "+Electrode Tab m_dLength_mm": ("60","64.81"),
+   "-Electrode Tab m_dLength_mm": ("60","65.81")},
+}
+C10 = {
+ "m_dSepFeedLength_mm": ("0","10"),
+ "m_dSepTailLength_mm": ("0","85"),
+ "m_dElectrodeOverlapAtStart_mm": ("8","3"),
+ "m_dElectrodeOverlapAtEnd_mm": ("20","40"),
+ "m_dMandrelWidth_mm": ("6","0"),
 }
 
-MANIFEST_FIELDS = [
-    "id", "filename", "sha256", "source", "changed_scope", "purpose",
-    "validator_fail", "validator_warn",
-]
+def sha(b): return hashlib.sha256(b).hexdigest()
 
+def git_show(ref, path):
+    refs = [ref]
+    if not ref.startswith("origin/"): refs.append("origin/" + ref)
+    last = None
+    for r in refs:
+        try:
+            return subprocess.check_output(["git","show",f"{r}:{path}"], cwd=ROOT)
+        except subprocess.CalledProcessError as e:
+            last = e
+    raise last
 
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+def block_span(s, a, b):
+    i=s.index(a); j=s.index(b,i)+len(b); return i,j
+def pcd_span(s): return block_span(s,"<Physical Cell Description>","</Physical Cell Description>")
+def builder_span(s): return block_span(s,"<BUILDER>","</BUILDER>")
 
+def replace_field(s, sp, field, old, new):
+    a,b=sp; blk=s[a:b]
+    pat=r"(\t"+re.escape(field)+r"\t=\t)"+re.escape(old)+r"(?=[\t\r\n])"
+    nblk,n=re.subn(pat,r"\g<1>"+new,blk)
+    if n != 1: raise RuntimeError(f"{field}: expected one {old!r}, got {n}")
+    return s[:a]+nblk+s[b:]
 
-def git_show(ref: str, path: str) -> bytes:
-    return subprocess.check_output(["git", "show", f"{ref}:{path}"], cwd=REPO_ROOT)
+def deltas_pcd(s, ds):
+    for f,(o,n) in ds.items(): s=replace_field(s,pcd_span(s),f,o,n)
+    return s
+def deltas_builder(s, ds):
+    for f,(o,n) in ds.items(): s=replace_field(s,builder_span(s),f,o,n)
+    return s
 
-
-def span(text: str, start_tag: str, end_tag: str, start_at: int = 0) -> tuple[int, int]:
-    a = text.index(start_tag, start_at)
-    b = text.index(end_tag, a) + len(end_tag)
-    return a, b
-
-
-def pcd_span(text: str) -> tuple[int, int]:
-    return span(text, "<Physical Cell Description>", "</Physical Cell Description>")
-
-
-def first_builder_span(text: str) -> tuple[int, int]:
-    return span(text, "<BUILDER>", "</BUILDER>")
-
-
-def exact_field_replace_in_span(
-    text: str, block_span: tuple[int, int], field: str, old: str, new: str
-) -> str:
-    a, b = block_span
-    block = text[a:b]
-    pattern = r"(\t" + re.escape(field) + r"\t=\t)" + re.escape(old) + r"(?=[\t\r\n])"
-    new_block, n = re.subn(pattern, r"\g<1>" + new, block)
-    if n != 1:
-        raise RuntimeError(f"{field}: expected exactly one {old!r} in target block, got {n}")
-    return text[:a] + new_block + text[b:]
-
-
-def apply_pcd_deltas(text: str, deltas: dict[str, tuple[str, str]]) -> str:
-    out = text
-    for field, (old, new) in deltas.items():
-        out = exact_field_replace_in_span(out, pcd_span(out), field, old, new)
+def shell(project, source):
+    p0,p1=pcd_span(project); b0,b1=builder_span(project)
+    s0,s1=pcd_span(source); t0,t1=builder_span(source)
+    out=project[:p0]+source[s0:s1]+project[p1:b0]+source[t0:t1]+project[b1:]
+    op1=pcd_span(out)[1]; ob0=builder_span(out)[0]; ob1=builder_span(out)[1]
+    if project[p1:b0] != out[op1:ob0]: raise RuntimeError("middle changed")
+    if project[b1:] != out[ob1:]: raise RuntimeError("suffix changed")
     return out
 
+def validate(path):
+    p=subprocess.run([sys.executable,str(VALIDATOR),str(path)],cwd=ROOT,
+                     capture_output=True,text=True)
+    text=(p.stdout or "")+(p.stderr or "")
+    return text.count("\nFAIL "), text.count("\nWARN "), text
 
-def apply_builder_deltas(text: str, deltas: dict[str, tuple[str, str]]) -> str:
-    out = text
-    for field, (old, new) in deltas.items():
-        out = exact_field_replace_in_span(out, first_builder_span(out), field, old, new)
-    return out
+def assert_two_lines(base, var, fields):
+    a=base.splitlines(); b=var.splitlines()
+    if len(a)!=len(b): raise RuntimeError("TL line count changed")
+    d=[(x,y) for x,y in zip(a,b) if x!=y]
+    if len(d)!=2: raise RuntimeError(f"TL expected 2 changed lines, got {len(d)}")
+    hit={f for x,y in d for f in fields if f in x and f in y}
+    if hit != set(fields): raise RuntimeError(f"TL fields mismatch: {hit}")
 
+def emit(name, raw, source, scope, purpose, rows, logs):
+    p=OUT/name; p.write_bytes(raw)
+    fail,warn,log=validate(p)
+    rows.append(dict(filename=name,sha256=sha(raw),source=source,
+                     changed_scope=scope,purpose=purpose,
+                     validator_fail=fail,validator_warn=warn))
+    logs.append((name,log))
 
-def replace_pcd_and_first_builder(project: str, source: str) -> str:
-    pp0, pp1 = pcd_span(project)
-    pb0, pb1 = first_builder_span(project)
-    sp0, sp1 = pcd_span(source)
-    sb0, sb1 = first_builder_span(source)
-    # Preserve every character of the project outside the two replaced blocks.
-    # Source block line endings are intentionally retained.
-    return (
-        project[:pp0]
-        + source[sp0:sp1]
-        + project[pp1:pb0]
-        + source[sb0:sb1]
-        + project[pb1:]
-    )
+def main():
+    OUT.mkdir(parents=True,exist_ok=True)
+    base_raw=git_show(BASE_REF,BASE_PATH)
+    if sha(base_raw)!=BASE_SHA: raise RuntimeError(f"baseline SHA mismatch: {sha(base_raw)}")
+    base=base_raw.decode("latin-1")
+    hp_raw=git_show(HP_REF,HP_PATH); hp=hp_raw.decode("latin-1")
+    val_raw=git_show(VAL_REF,VAL_PATH); val=val_raw.decode("latin-1")
+    rows=[]; logs=[]
 
+    # 1) Unmodified known-good geometry control.
+    emit("HP_CONTROL_hp18650Spiral-DIST.tbm",hp_raw,f"{HP_REF}:{HP_PATH}",
+         "none","Current STAR/CreateFromTbm environment control",rows,logs)
 
-def run_validator(path: pathlib.Path) -> tuple[int, int, str]:
-    p = subprocess.run(
-        [sys.executable, str(VALIDATOR), str(path)],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-    )
-    out = (p.stdout or "") + (p.stderr or "")
-    return out.count("\nFAIL "), out.count("\nWARN "), out.strip()
+    # 2) Known-good HP PCD+Builder surrounded by project model/RCR context.
+    hps=shell(base,hp)
+    emit("HP_SHELL_PROJECT_RCR.tbm",hps.encode("latin-1"),"R005 + HP18650",
+         "replace PCD + first active Builder",
+         "Localize project geometry versus project model/context",rows,logs)
 
+    # 3) Cleaner Builder-only rescue than old C12.
+    c10=deltas_builder(base,C10)
+    emit("C10_STAR_BUILDER_PATTERN.tbm",c10.encode("latin-1"),"R005",
+         "first active Builder: five controlled fields",
+         "Builder-only rescue while preserving project PCD/JR diameter",rows,logs)
 
-def assert_tl_only_two_lines(base: str, variant: str, expected_fields: set[str]) -> None:
-    b = base.splitlines()
-    v = variant.splitlines()
-    if len(b) != len(v):
-        raise RuntimeError("TL variant changed line count")
-    diffs = [(x, y) for x, y in zip(b, v) if x != y]
-    if len(diffs) != 2:
-        raise RuntimeError(f"TL variant expected exactly 2 changed lines, got {len(diffs)}")
-    found = set()
-    for old_line, new_line in diffs:
-        for field in expected_fields:
-            if field in old_line and field in new_line:
-                found.add(field)
-    if found != expected_fields:
-        raise RuntimeError(f"TL changed-line fields mismatch: expected {expected_fields}, found {found}")
+    # 4) Tab-length PCD probes. Numerical relation only: axis mapping is unproven.
+    for name,ds in TL.items():
+        v=deltas_pcd(base,ds); assert_two_lines(base,v,ds)
+        bp1=pcd_span(base)[1]; vp1=pcd_span(v)[1]
+        if base[bp1:] != v[vp1:]: raise RuntimeError(f"{name}: suffix changed")
+        emit(name,v.encode("latin-1"),"R005","two PCD Tab m_dLength_mm fields only",
+             "Root-specific tab-length probe; do NOT interpret Ltab-W as a proven axial clearance",
+             rows,logs)
 
+    # 5) Independent second shell lineage.
+    c13=shell(base,val)
+    emit("C13_VALIDATION_GEOMETRY_SHELL_PROJECT_RCR.tbm",c13.encode("latin-1"),
+         "R005 + validationBattery","replace PCD + first active Builder",
+         "Independent geometry-shell/project-model discriminator",rows,logs)
 
-def assert_project_suffix_after_first_builder_unchanged(base: str, variant: str) -> None:
-    _, bb1 = first_builder_span(base)
-    _, vb1 = first_builder_span(variant)
-    if base[bb1:] != variant[vb1:]:
-        raise RuntimeError("Project content after first BUILDER changed unexpectedly")
+    with (OUT/"MANIFEST.csv").open("w",newline="",encoding="utf-8") as f:
+        w=csv.DictWriter(f,fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+    with (OUT/"VALIDATOR_LOG.txt").open("w",encoding="utf-8") as f:
+        for n,l in logs: f.write(f"===== {n} =====\n{l}\n\n")
 
+    readme=f"""hp2170 NCA — STAR E004 POST-ROOT FALLBACK
+USE ONLY IF ROOT_A AND ROOT_B BOTH RETURN THE IDENTICAL E004.
 
-def assert_project_middle_between_pcd_builder_unchanged(base: str, variant: str) -> None:
-    _, bp1 = pcd_span(base)
-    bb0, _ = first_builder_span(base)
-    _, vp1 = pcd_span(variant)
-    vb0, _ = first_builder_span(variant)
-    if base[bp1:bb0] != variant[vp1:vb0]:
-        raise RuntimeError("Project content between PCD and first BUILDER changed unexpectedly")
+Immutable R005 SHA-256:
+{BASE_SHA}
 
+AUTHORITATIVE CONDITIONAL ORDER
 
-def extract_field(text: str, field: str) -> str:
-    m = re.search(r"\t" + re.escape(field) + r"\t=\t([^\t\r\n]+)", text)
-    return m.group(1).strip() if m else "?"
+1) HP_CONTROL_hp18650Spiral-DIST.tbm
+   Unmodified Siemens HP18650 source. Its generated 13-solid STEP is already
+   known geometry-clean.
+   - If this fails in Robert's current STAR environment: STOP.
 
+2) HP_SHELL_PROJECT_RCR.tbm
+   HP18650 PCD + active Detailed Builder, project model/RCR context retained.
+   - If E004 clears: project geometry/PCD/Builder content is strongly implicated.
+   - If identical E004 remains while HP_CONTROL passes: investigate project
+     model/SIMMOD/MODELMAP/non-transplanted context. Run C13 if requested.
 
-def write_case(
-    case_id: str,
-    filename: str,
-    raw: bytes,
-    source: str,
-    scope: str,
-    purpose: str,
-    rows: list[dict],
-    logs: list[tuple[str, str]],
-) -> None:
-    path = OUT_DIR / filename
-    path.write_bytes(raw)
-    fail, warn, log = run_validator(path)
-    rows.append({
-        "id": case_id,
-        "filename": filename,
-        "sha256": sha256_bytes(raw),
-        "source": source,
-        "changed_scope": scope,
-        "purpose": purpose,
-        "validator_fail": fail,
-        "validator_warn": warn,
-    })
-    logs.append((case_id, log))
+IF HP_SHELL CLEARS E004 AND MORE GEOMETRY LOCALIZATION IS NEEDED:
 
+3) C10_STAR_BUILDER_PATTERN.tbm
+   Cleaner Builder-only discriminator than old C12; keeps project PCD and
+   project JR diameter.
 
-def main() -> int:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+4) TL_A_TAB_RELATION_0p10.tbm
+5) TL_B_TAB_RELATION_0p70.tbm
+   These change only the two tab-length fields. Public BDS material does NOT
+   prove Tab m_dLength_mm and electrode m_dWidth share the same construction
+   axis. Treat these as root-specific correlation probes, not axial-clearance
+   tests. Stop as soon as E004 clears or changes.
 
-    baseline_raw = git_show(BASELINE_COMMIT, BASELINE_PATH)
-    got = sha256_bytes(baseline_raw)
-    if got != BASELINE_SHA256:
-        raise RuntimeError(f"R005 baseline SHA mismatch: expected {BASELINE_SHA256}, got {got}")
-    baseline = baseline_raw.decode("latin-1")
+IF HP_CONTROL PASSES BUT HP_SHELL STILL HAS IDENTICAL E004:
 
-    hp_raw = git_show(HP_REF, HP_PATH)
-    hp = hp_raw.decode("latin-1")
-    validation_raw = git_show(VAL_REF, VAL_PATH)
-    validation = validation_raw.decode("latin-1")
+6) C13_VALIDATION_GEOMETRY_SHELL_PROJECT_RCR.tbm
+   Independent validationBattery geometry shell with project model/RCR context.
 
-    rows: list[dict] = []
-    logs: list[tuple[str, str]] = []
+C12 is intentionally omitted from the primary sequence because its transplanted
+17.9-mm Builder JR target is inconsistent with the project 20.6274-mm PCD/cavity.
 
-    # TL_A / TL_B: exactly two PCD tab-length lines change from R005.
-    for case_id, filename, deltas, purpose in TL_CASES:
-        variant = apply_pcd_deltas(baseline, deltas)
-        assert_tl_only_two_lines(baseline, variant, set(deltas))
-        _, bp1 = pcd_span(baseline)
-        _, vp1 = pcd_span(variant)
-        if baseline[bp1:] != variant[vp1:]:
-            raise RuntimeError(f"{case_id}: content after PCD changed unexpectedly")
-        write_case(
-            case_id, filename, variant.encode("latin-1"),
-            f"R005 {BASELINE_SHA256}", "PCD: two tab-length fields only",
-            purpose, rows, logs,
-        )
+For every tested file return complete STAR console output. If CreateFromTbm
+succeeds, export STEP. A different downstream error counts as clearing E004 for
+localization, not as a production pass.
 
-    # Known-clean Siemens control, byte-for-byte from the corpus branch.
-    write_case(
-        "HP_CONTROL", "HP_CONTROL_hp18650Spiral-DIST.tbm", hp_raw,
-        f"{HP_REF}:{HP_PATH}", "none (unmodified Siemens source)",
-        "Environment/CreateFromTbm control; source lineage has verified-clean 13-solid STEP",
-        rows, logs,
-    )
-
-    # HP geometry shell + project non-geometry/model context.
-    hp_shell = replace_pcd_and_first_builder(baseline, hp)
-    assert_project_middle_between_pcd_builder_unchanged(baseline, hp_shell)
-    assert_project_suffix_after_first_builder_unchanged(baseline, hp_shell)
-    write_case(
-        "HP_SHELL", "HP_SHELL_PROJECT_RCR.tbm", hp_shell.encode("latin-1"),
-        f"R005 + {HP_REF}:{HP_PATH}",
-        "replace complete PCD + first/active Detailed Builder; retain project suffix/model context",
-        "Known-clean HP18650 geometry shell with project RCR/SIMMOD/MODELMAP context",
-        rows, logs,
-    )
-
-    # Cleaner Builder-only rescue than old C12: preserve R005 JR diameter/PCD.
-    c10 = apply_builder_deltas(baseline, C10_DELTAS)
-    write_case(
-        "C10", "C10_STAR_BUILDER_PATTERN.tbm", c10.encode("latin-1"),
-        f"R005 {BASELINE_SHA256}", "first/active Detailed Builder: 5 controlled fields",
-        "Builder-only broad Siemens-like pattern while preserving project PCD and JR diameter",
-        rows, logs,
-    )
-
-    # Independent second geometry-shell lineage using validationBattery.
-    c13 = replace_pcd_and_first_builder(baseline, validation)
-    assert_project_middle_between_pcd_builder_unchanged(baseline, c13)
-    assert_project_suffix_after_first_builder_unchanged(baseline, c13)
-    write_case(
-        "C13", "C13_VALIDATION_GEOMETRY_SHELL_PROJECT_RCR.tbm", c13.encode("latin-1"),
-        f"R005 + {VAL_REF}:{VAL_PATH}",
-        "replace complete PCD + first/active Detailed Builder; retain project suffix/model context",
-        "Independent validationBattery geometry shell with project RCR/SIMMOD/MODELMAP context",
-        rows, logs,
-    )
-
-    # Record compact geometry discriminators.
-    audit_lines = [
-        "case,+electrode_width,+tab_length,+headroom,-electrode_width,-tab_length,-headroom,package_int_height,jr_builder",
-        "R005,64.11,60,-4.11,65.11,60,-5.11,65.11,20.6274",
-        "TL_A,64.11,64.21,+0.10,65.11,65.21,+0.10,65.11,20.6274",
-        "TL_B,64.11,64.81,+0.70,65.11,65.81,+0.70,65.11,20.6274",
-        f"HP_CONTROL,{extract_field(hp, '+Electrode m_dWidth')},{extract_field(hp, '+Electrode Tab m_dLength_mm')},"
-        f"{float(extract_field(hp, '+Electrode Tab m_dLength_mm')) - float(extract_field(hp, '+Electrode m_dWidth')):+.2f},"
-        f"{extract_field(hp, '-Electrode m_dWidth')},{extract_field(hp, '-Electrode Tab m_dLength_mm')},"
-        f"{float(extract_field(hp, '-Electrode Tab m_dLength_mm')) - float(extract_field(hp, '-Electrode m_dWidth')):+.2f},"
-        f"{extract_field(hp, 'Package m_dintHeight')},{extract_field(hp, 'm_dJellyrollThickness_mm')}",
-    ]
-    (OUT_DIR / "GEOMETRY_AUDIT.csv").write_text("\n".join(audit_lines) + "\n", encoding="utf-8")
-
-    with (OUT_DIR / "MANIFEST.csv").open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=MANIFEST_FIELDS)
-        w.writeheader()
-        w.writerows(rows)
-
-    with (OUT_DIR / "VALIDATOR_LOG.txt").open("w", encoding="utf-8") as f:
-        for case_id, log in logs:
-            f.write(f"===== {case_id} =====\n{log}\n\n")
-
-    readme = f"""hp2170 NCA — STAR E004 POST-ROOT FALLBACK
-Generated by tools/generate_e004_post_root_fallback.py
-
-USE THIS PACKAGE ONLY IF ROOT_A AND ROOT_B BOTH RETURN THE IDENTICAL:
-    Electrode Root 1 : Extrusion distance can not be 0.
-
-Immutable project baseline SHA-256:
-    {BASELINE_SHA256}
-
-TEST ORDER / STOP RULES
-
-1. TL_A_TAB_HEADROOM_0p10.tbm
-   - If E004 disappears or changes to a downstream error: STOP.
-     Return the complete console output and, if geometry is created, export STEP.
-   - If identical E004 remains: continue.
-
-2. TL_B_TAB_HEADROOM_0p70.tbm
-   - If E004 disappears or changes: STOP and return output/STEP.
-   - If identical E004 remains: continue.
-
-3. HP_CONTROL_hp18650Spiral-DIST.tbm
-   - This is an unmodified Siemens HP18650 source whose generated 13-solid STEP is
-     already known geometry-clean.
-   - If it fails in the current STAR environment: STOP. Do not interpret hybrids.
-   - If it passes: continue.
-
-4. HP_SHELL_PROJECT_RCR.tbm
-   - Siemens HP18650 PCD + active Detailed Builder with the project model/RCR context.
-   - If it passes while project cases fail, the project geometry content is implicated.
-   - If HP_CONTROL passes but this fails with E004, investigate project model/context
-     coupling or non-transplanted sections.
-
-ONLY IF REQUESTED AFTER THE ABOVE RESULTS:
-5. C10_STAR_BUILDER_PATTERN.tbm
-6. C13_VALIDATION_GEOMETRY_SHELL_PROJECT_RCR.tbm
-
-IMPORTANT
-- Every file here is diagnostic only except the unmodified HP_CONTROL.
-- TL_A/TL_B are not approved production tab dimensions.
-- A different downstream error counts as clearing E004 for localization purposes.
-- Do not reduce a different error to just FAIL; return exact text.
+All hybrids/probes are diagnostic only.
 """
-    (OUT_DIR / "README.txt").write_text(readme, encoding="utf-8")
+    (OUT/"README.txt").write_text(readme,encoding="utf-8")
 
-    include_names = [
-        "TL_A_TAB_HEADROOM_0p10.tbm",
-        "TL_B_TAB_HEADROOM_0p70.tbm",
-        "HP_CONTROL_hp18650Spiral-DIST.tbm",
-        "HP_SHELL_PROJECT_RCR.tbm",
-        "C10_STAR_BUILDER_PATTERN.tbm",
-        "C13_VALIDATION_GEOMETRY_SHELL_PROJECT_RCR.tbm",
-        "README.txt",
-        "MANIFEST.csv",
-        "GEOMETRY_AUDIT.csv",
-    ]
-    with zipfile.ZipFile(ZIP_PATH, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        for name in include_names:
-            z.write(OUT_DIR / name, arcname=name)
+    names=[r["filename"] for r in rows]+["README.txt","MANIFEST.csv"]
+    with zipfile.ZipFile(ZIP,"w",zipfile.ZIP_DEFLATED) as z:
+        for n in names: z.write(OUT/n,arcname=n)
+    print("BASE",BASE_SHA)
+    print("HP_CONTROL_SOURCE_SHA",sha(hp_raw))
+    for r in rows:
+        print(r["filename"],r["sha256"],"FAIL",r["validator_fail"],"WARN",r["validator_warn"])
+    print("ZIP",ZIP)
+    print("ZIP_SHA",sha(ZIP.read_bytes()))
 
-    print(f"Baseline: {BASELINE_SHA256}")
-    print(f"HP source SHA-256: {sha256_bytes(hp_raw)}")
-    for row in rows:
-        print(f"{row['id']}: {row['sha256']} | FAIL={row['validator_fail']} WARN={row['validator_warn']}")
-    print(f"ZIP: {ZIP_PATH}")
-    print(f"ZIP SHA-256: {sha256_bytes(ZIP_PATH.read_bytes())}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=="__main__": main()
