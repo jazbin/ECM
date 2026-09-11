@@ -301,7 +301,7 @@ Values match the second `<BUILDER>` block (Distributed 2P) in the same file, whi
 Every working reference TBM available at the time had `m_dSepFeedLength_mm ≥ 10` and `m_dSepTailLength_mm ≥ 40`. The R005 candidate (and all prior candidates) had both at 0. After R005 proved S3=5 and ElectrodeOverlapAtStart=8 insufficient, these were the remaining zero-valued geometry dimensions in the Detailed Builder.
 
 **Rationale annotation (2026-09-11 — superseded by subsequent evidence):**
-The Siemens HE18650 reference TBM (`C00_SIEMENS_CONTROL_validationBattery.tbm`) was found to use `m_dSepFeedLength = 0` and `m_dSepTailLength = 0` in its first `<BUILDER>` block and imports successfully. This counterexample undermines the original claim that zero feed/tail values alone are the cause of E004 in our file. H004-5 is retained as RUNTIME_PENDING (R006 not yet tested) but its ranking has been downgraded. H004-6 (package height / derived axial construction) is now the leading hypothesis.
+Subsequent Siemens-reference review identified valid cylindrical counterexamples to the assumption that separator feed/tail must be nonzero. The stock Siemens HP18650 Detailed Builder uses `m_dSepFeedLength_mm = 0` and `m_dSepTailLength_mm = 0` and produced the verified-clean 13-solid STEP. The HE18650 reference also carries `0/0`. Therefore zero feed/tail values alone are demonstrably compatible with valid cylindrical geometry construction. H004-5 remains `RUNTIME_PENDING` because R006 has not yet been tested, but it is downgraded as the leading explanation. H004-6 (package height / derived axial construction) is now the leading hypothesis.
 
 **Runtime result:** PENDING — awaiting Robert's test.
 
