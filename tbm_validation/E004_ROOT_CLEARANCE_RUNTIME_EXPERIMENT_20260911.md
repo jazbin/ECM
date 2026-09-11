@@ -16,13 +16,13 @@ Negative electrode width    = 65.11 mm
 Package-to-negative margin  = 0.00 mm
 ```
 
-Hypothesis: STAR's electrode-root construction algorithm computes an extrusion distance from the available axial space above the widest component. When that space is exactly zero, the extrusion distance is zero, producing:
+Hypothesis: STAR's electrode-root construction derives an extrusion distance from some function of the package internal height and/or the wound layer geometry. When package internal height equals the widest wound component exactly, that derived quantity may become zero, producing:
 
 ```
 Electrode Root 1 : Extrusion distance can not be 0.
 ```
 
-This is a geometry-kernel constraint, not an electrochemical model field issue.
+H004-6 is a geometry-construction hypothesis. All electrochemical model fields are frozen in this experiment.
 
 ---
 
@@ -97,7 +97,7 @@ RESULT: 2 FAIL | 3 WARN | 13 INFO | 38 PASS
 
 The two FAILs are `sep_feed_nonzero` and `sep_tail_nonzero` — present in the immutable baseline and in every prior tested candidate. These are intentionally retained. This experiment tests only the package-height variable; modifying sep_feed/tail simultaneously would confound the result.
 
-The WARNs are REPORT-block staleness flags (JR diameter, JR height, capacity) — pre-existing and not consumed by STAR's geometry kernel.
+The WARNs are REPORT-block staleness flags (JR diameter, JR height, capacity) — pre-existing. Whether STAR consumes these fields at import is unconfirmed; they have not been observed to control the relevant geometry in prior characterisation work.
 
 Detailed Builder sections: byte-identical to baseline (verified).
 MODELMAP block: byte-identical to baseline (verified).
@@ -110,7 +110,7 @@ All physical separator/electrode widths: identical to baseline (verified).
 
 ```
 out/hp2170NCA-STAR-E004-ROOT-CLEARANCE-diagnostic-20260911.zip
-SHA-256: 71c22b6a2d3b792bdc38e7aa8528473fc1bfab18ea25d1c142f2f17d900ea3a7
+SHA-256: 42be7e3735686f8e58862940b9ecd738b7326ec3168b4d9d8dd7754344608f85
 Contents: ROOT_A, ROOT_B, ROOT_CLEARANCE_README.txt, ROOT_CLEARANCE_MANIFEST.csv
 ```
 
@@ -118,15 +118,15 @@ Contents: ROOT_A, ROOT_B, ROOT_CLEARANCE_README.txt, ROOT_CLEARANCE_MANIFEST.csv
 
 ## Interpretation tree
 
-### ROOT_A passes CreateFromTbm
+### ROOT_A passes CreateFromTbm (E004 absent)
 
-Strong evidence that exact-zero package-to-negative axial clearance is what collapses the electrode-root construction. The geometry kernel requires finite axial space above the widest wound layer to compute a nonzero extrusion distance.
+Strong runtime confirmation that `Package m_dintHeight` / derived axial construction geometry participates causally in E004. The exact internal quantity that STAR computes and that becomes nonzero remains unproven — package height may affect more than the one clearance we are tracking.
 
-Do NOT call 65.21 mm the production solution. The next task is determining how to satisfy STAR's temporary root construction requirement while restoring the desired final JellyRoll–Cap contact geometry.
+Do NOT call 65.21 mm the production solution. The next task is determining how to satisfy STAR's construction requirement while restoring the desired final JellyRoll–Cap contact geometry.
 
 ### ROOT_A fails, ROOT_B passes
 
-The root construction requires a minimum axial clearance greater than 0.10 mm, or the geometry kernel has an effective tolerance/minimum above 0.10 mm. A bounded threshold search between 0.10 and 0.70 mm follows only if knowing the threshold is useful for the production geometry decision.
+Consistent with a minimum axial construction allowance or geometry-kernel tolerance between the two tested values (+0.10 mm and +0.70 mm). A bounded threshold search between 0.10 and 0.70 mm follows only if knowing the specific threshold is useful for the production geometry decision.
 
 ### ROOT_A and ROOT_B both fail with identical E004
 

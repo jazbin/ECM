@@ -263,10 +263,12 @@ FIRST_OBSERVED = 2026-09-04
 LAST_OBSERVED = 2026-09-10
 RUNTIME_OCCURRENCES = multiple packages / multiple variants
 ROOT_CAUSE = UNRESOLVED
-LEADING_HYPOTHESIS = H004-5 (SepFeedLength_mm/SepTailLength_mm = 0)
-HYPOTHESIS_STATUS = CANDIDATE_APPLIED
-FIX_CANDIDATE_SHA256 = bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53
-FIX_CANDIDATE_RUNTIME_EVENT = R006 (PENDING — awaiting Robert)
+LEADING_HYPOTHESIS = H004-6 (Package m_dintHeight / derived axial construction geometry)
+HYPOTHESIS_STATUS = CANDIDATE_PREPARED / RUNTIME_PENDING (ROOT_A and ROOT_B — see 2026-09-11 addendum)
+H004-5_STATUS = RUNTIME_PENDING on R006 but downgraded — Siemens HE18650 reference uses feed=0 / tail=0 yet imports successfully, undermining the zero-values-alone explanation
+FIX_CANDIDATE_SHA256_H004-6 = ROOT_A c6db74313e675b618f2fb51d371e51231f9e0a2a9f26ca5bdc1f1bde48390343
+FIX_CANDIDATE_SHA256_H004-6 = ROOT_B 59f83aa875415d946b1ccb2b6f880a3a98a036e631e3d78993d14edfbbc9ee36
+PRIOR_FIX_CANDIDATE_SHA256_H004-5 = bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53 (R006 — PENDING)
 ```
 
 ## Required evidence standard for closure
@@ -295,8 +297,11 @@ m_dSepTailLength_mm  0 → 85   (Detailed Builder, first <BUILDER> block, RCRTab
 
 Values match the second `<BUILDER>` block (Distributed 2P) in the same file, which already had `m_dSepFeedLength = 10` and `m_dSepTailLength = 85`.
 
-**Rationale for H004-5 as next test:**
-Every working reference TBM in the repo has `m_dSepFeedLength_mm ≥ 10` and `m_dSepTailLength_mm ≥ 40`. The R005 candidate (and all prior candidates) had both at 0. After R005 proved S3=5 and ElectrodeOverlapAtStart=8 insufficient, these are the only remaining zero-valued geometry dimensions in the Detailed Builder.
+**Rationale for H004-5 as next test (original, 2026-09-10):**
+Every working reference TBM available at the time had `m_dSepFeedLength_mm ≥ 10` and `m_dSepTailLength_mm ≥ 40`. The R005 candidate (and all prior candidates) had both at 0. After R005 proved S3=5 and ElectrodeOverlapAtStart=8 insufficient, these were the remaining zero-valued geometry dimensions in the Detailed Builder.
+
+**Rationale annotation (2026-09-11 — superseded by subsequent evidence):**
+The Siemens HE18650 reference TBM (`C00_SIEMENS_CONTROL_validationBattery.tbm`) was found to use `m_dSepFeedLength = 0` and `m_dSepTailLength = 0` in its first `<BUILDER>` block and imports successfully. This counterexample undermines the original claim that zero feed/tail values alone are the cause of E004 in our file. H004-5 is retained as RUNTIME_PENDING (R006 not yet tested) but its ranking has been downgraded. H004-6 (package height / derived axial construction) is now the leading hypothesis.
 
 **Runtime result:** PENDING — awaiting Robert's test.
 
@@ -351,7 +356,7 @@ Every working reference TBM in the repo has `m_dSepFeedLength_mm ≥ 10` and `m_
 
 **Baseline:** `out/e004_multifile_campaign_20260910/BASELINE_2c89d2d9.tbm`, SHA `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
 
-**Package:** `out/hp2170NCA-STAR-E004-ROOT-CLEARANCE-diagnostic-20260911.zip`, SHA `71c22b6a2d3b792bdc38e7aa8528473fc1bfab18ea25d1c142f2f17d900ea3a7`
+**Package:** `out/hp2170NCA-STAR-E004-ROOT-CLEARANCE-diagnostic-20260911.zip`, SHA `42be7e3735686f8e58862940b9ecd738b7326ec3168b4d9d8dd7754344608f85`
 
 **Hypothesis tested:** H004-6 — exact-zero package-to-negative axial clearance causes E004.
 

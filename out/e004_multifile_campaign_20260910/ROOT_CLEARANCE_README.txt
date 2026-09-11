@@ -40,7 +40,8 @@ the correct production package height before considering it final.
 IMMUTABLE BASELINE
 ==========================================================================
 
-File: BASELINE_2c89d2d9.tbm (included for reference)
+Baseline: BASELINE_2c89d2d9.tbm, retained in the project repository for
+reference; not included in this client package.
 SHA-256: 2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5
 
 This is the exact file from R005 (2026-09-10). Every other field in ROOT_A
@@ -91,15 +92,12 @@ Step 1: Run "Create from Tbm" on ROOT_A_AXIAL_CLEARANCE_0p10.tbm.
 Step 2: Report the complete console/error output, including any messages
         before and after the Feature execution line.
 
-    If ROOT_A passes CreateFromTbm:
+    If ROOT_A passes CreateFromTbm, or reaches a different downstream error
+    (i.e. the Electrode Root 1 message is absent):
         Proceed to the generated-part selection screen.
         Export the generated geometry or STEP file so we can inspect the
         JellyRoll, Can, and Cap relationships.
         No need to test ROOT_B yet.
-
-    If ROOT_A reaches a DIFFERENT downstream error (not "Electrode Root 1"):
-        Report the new error text. This also means E004 is cleared for ROOT_A.
-        Proceed to ROOT_B only if we specifically ask.
 
     If ROOT_A produces the identical "Electrode Root 1 : Extrusion distance
     can not be 0" error:
@@ -111,15 +109,19 @@ Step 3: Return the complete STAR console/error text for each file tested.
 INTERPRETATION WE WILL APPLY
 ==========================================================================
 
-ROOT_A passes:
-    Strong evidence that exact-zero package-to-negative axial clearance
-    collapses the electrode root construction.
+ROOT_A passes (E004 absent):
+    Strong runtime confirmation that Package m_dintHeight / derived axial
+    construction geometry participates causally in E004. The exact internal
+    quantity that STAR uses and that becomes nonzero remains unproven — package
+    height may influence more than the one clearance we are tracking.
     Next: determine the correct production package height; 65.21 mm is NOT yet
     approved as the final value.
 
 ROOT_A fails, ROOT_B passes:
-    The root requires a finite minimum construction allowance greater than
-    0.10 mm. A bounded threshold search between 0.10 and 0.70 mm follows.
+    Consistent with a minimum axial construction allowance or geometry-kernel
+    tolerance between the two tested values (+0.10 mm and +0.70 mm).
+    A bounded threshold search follows only if knowing the specific threshold
+    is useful for the production geometry decision.
 
 Both ROOT_A and ROOT_B fail with identical E004:
     The package-internal-height hypothesis is substantially downgraded.
