@@ -32,13 +32,13 @@ Runtime result columns are blank — to be filled from Robert's test results.
 
 | Dimension | Value |
 |---|---|
-| package_int_height_mm | 65.11 |
-| separator_width_mm | 67.11 |
-| negative_width_mm | 65.11 |
-| positive_width_mm | 64.11 |
-| pkg − separator | -2.00 mm |
-| pkg − negative  | +0.00 mm |
-| pkg − positive  | +1.00 mm |
+| package_int_height_mm | 60.0 |
+| separator_width_mm | 59.0 |
+| negative_width_mm | 57.0 |
+| positive_width_mm | 56.0 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -401,7 +401,7 @@ Runtime result columns are blank — to be filled from Robert's test results.
 **SHA-256:** `94e0fef9b7cb4199103dd462b960be5a26f08d78a5829489c9683bfd25b31c8f`  
 **Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
 **Changed fields:** Complete Detailed Builder block replaced with Siemens validationBattery.tbm BUILDER
-**Purpose:** Broad localization control: full Siemens Detailed Builder in project file. If C01-C11 all fail but C12 passes, culprit is in Builder fields outside tested subset.
+**Purpose:** Broad localization control: full Siemens Detailed Builder inside project Physical Cell Description. C12 PASS: replacing the project Detailed Builder with the Siemens Builder is sufficient to clear E004 under the project PCD — strongly localizes E004 to project Detailed Builder content. C12 FAIL with C00 PASS: project Detailed Builder alone does not explain E004; see C13 result to determine whether PCD or PCD/Builder interaction is involved.
 
 | Parameter | Value |
 |---|---|
@@ -433,7 +433,7 @@ Runtime result columns are blank — to be filled from Robert's test results.
 **SHA-256:** `606b2ccd3d774e90d25f03a55157f7f6acb1dbcdf21da9274a8fab3d06c67d8d`  
 **Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
 **Changed fields:** Siemens Physical Cell Description + Detailed Builder; project SIMMOD/MODELMAP/RCR retained
-**Purpose:** Strongest geometry-vs-model localization control. Siemens geometry with project RCR model. If C12 passes but C13 fails: E004 involves Physical Cell Description interaction. If C13 passes: confirms E004 is localized to project Detailed Builder content.
+**Purpose:** Strongest geometry-vs-model localization control. Siemens PCD and Detailed Builder, project RCR/SIMMOD retained. Paired interpretation with C12: C12 PASS + C13 PASS — project Detailed Builder is the dominant localization. C12 FAIL + C13 PASS — Siemens PCD (in addition to Builder) was needed; project PCD or PCD-Builder interaction implicated. C12 PASS + C13 FAIL — anomalous: Siemens PCD plus project model/SIMMOD context introduces a failure; treat separately. C12 FAIL + C13 FAIL while C00 PASS — E004 not eliminated by Siemens geometry transplants inside project model context.
 
 | Parameter | Value |
 |---|---|
@@ -448,13 +448,13 @@ Runtime result columns are blank — to be filled from Robert's test results.
 
 | Dimension | Value |
 |---|---|
-| package_int_height_mm | 65.11 |
-| separator_width_mm | 67.11 |
-| negative_width_mm | 65.11 |
-| positive_width_mm | 64.11 |
-| pkg − separator | -2.00 mm |
-| pkg − negative  | +0.00 mm |
-| pkg − positive  | +1.00 mm |
+| package_int_height_mm | 60.0 |
+| separator_width_mm | 59.0 |
+| negative_width_mm | 57.0 |
+| positive_width_mm | 56.0 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
 
 **Runtime result:** *(pending)*
 

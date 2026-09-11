@@ -407,6 +407,52 @@ def axial_margins(pkg: float, sep_w: float, neg_w: float, pos_w: float) -> dict:
         "package_minus_positive_mm": round(pkg - pos_w, 4),
     }
 
+def parse_axial_from_content(content: str) -> dict | None:
+    """Parse the four canonical axial geometry values from TBM content.
+    Returns None if any field is missing (e.g. a geometry-less TBM section)."""
+    def extract(field):
+        m = re.search(r'\t' + re.escape(field) + r'\t=\t([0-9.+-]+)', content)
+        return float(m.group(1)) if m else None
+    pkg = extract("Package m_dintHeight")
+    sep = extract("SeparatorList1_Separator m_dWidth_mm")
+    neg = extract("-Electrode m_dWidth")
+    pos = extract("+Electrode m_dWidth")
+    if any(v is None for v in [pkg, sep, neg, pos]):
+        return None
+    return axial_margins(pkg, sep, neg, pos)
+
+def assert_axial_regression(row: dict, parsed: dict | None, vid: str) -> None:
+    """Abort if matrix axial values do not match values parsed from the emitted TBM.
+    Skips numeric check when a row field is 'N/A' (C00 builder params) or when
+    parsed is None (TBM lacks a PCD — should not occur in this campaign)."""
+    if parsed is None:
+        print(f"  ABORT [{vid}]: parse_axial_from_content returned None — "
+              f"required PCD fields missing from generated TBM")
+        sys.exit(1)
+    AXIAL_KEYS = [
+        "package_int_height_mm", "separator_width_mm",
+        "negative_width_mm", "positive_width_mm",
+        "package_minus_separator_mm", "package_minus_negative_mm",
+        "package_minus_positive_mm",
+    ]
+    mismatches = []
+    for k in AXIAL_KEYS:
+        rval = row.get(k)
+        pval = parsed.get(k)
+        if rval in ("N/A", "", None):
+            continue
+        try:
+            if abs(float(rval) - float(pval)) > 0.001:
+                mismatches.append(f"    {k}: matrix={rval}, parsed-from-TBM={pval}")
+        except (TypeError, ValueError):
+            mismatches.append(f"    {k}: cannot compare matrix={rval!r} vs parsed={pval!r}")
+    if mismatches:
+        print(f"  ABORT [{vid}]: axial regression — matrix values do not match parsed TBM:")
+        for m in mismatches:
+            print(m)
+        sys.exit(1)
+    print(f"    Axial regression: PASS")
+
 # ---------------------------------------------------------------------------
 # Baseline loading
 # ---------------------------------------------------------------------------
@@ -590,8 +636,8 @@ C11_STAR_BUILDER_PATTERN_JRWIDTH65p11.tbm
     Delta: All C10 changes plus JellyrollWidth=65.11. Maximum rescue variant.
 
 C12_FULL_SIEMENS_DETAILED_BUILDER.tbm
-    Complete Detailed Builder block from Siemens validationBattery.tbm,
-    transplanted into the project file. Project SIMMOD and RCR data retained.
+    Siemens Detailed Builder transplanted into project file; project Physical
+    Cell Description, SIMMOD, MODELMAP and RCR data retained.
     Diagnostic only.
 
 C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm
@@ -599,6 +645,33 @@ C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm
     validationBattery.tbm, with project MODELMAP, RCRTable 3D SIMMOD, General
     Electrolyte SIMMOD, and Distributed Thermal SIMMOD retained.
     Diagnostic only.
+
+C12/C13 PAIRED INTERPRETATION
+
+Use C12 and C13 results together, not individually:
+
+    C12 PASS:
+        Replacing the project Detailed Builder with the Siemens Builder is
+        sufficient to clear E004 under the project Physical Cell Description.
+        Strongly localizes E004 to project Detailed Builder content.
+
+    C12 PASS + C13 PASS:
+        Project Detailed Builder is the dominant localization result.
+
+    C12 FAIL + C13 PASS:
+        The Siemens Physical Cell Description (in addition to the Siemens
+        Builder) was needed to clear E004. Project PCD or PCD/Builder
+        interaction is implicated.
+
+    C12 PASS + C13 FAIL:
+        Anomalous cross-interaction: Siemens PCD combined with project
+        model/SIMMOD context introduces a failure. Treat separately from
+        the standard localization sequence.
+
+    C12 FAIL + C13 FAIL while C00 PASS:
+        E004 is not eliminated by Siemens geometry transplants inside the
+        project model context. Investigate geometry/model coupling or
+        non-transplanted sections.
 
 C14_AXIAL_CAVITY68p11.tbm
     Delta: Package m_dintHeight 65.11 -> 68.11 only.
@@ -847,6 +920,16 @@ def main():
     validator_log = []
     all_protected_ok = True
 
+    # C00 axial values must come from the Siemens TBM, not from project-baseline defaults.
+    siemens_axial = parse_axial_from_content(siemens_str)
+    if siemens_axial is None:
+        print("ABORT: could not parse axial fields from Siemens validationBattery.tbm")
+        sys.exit(1)
+    print(f"  Siemens axial: pkg={siemens_axial['package_int_height_mm']} "
+          f"sep={siemens_axial['separator_width_mm']} "
+          f"neg={siemens_axial['negative_width_mm']} "
+          f"pos={siemens_axial['positive_width_mm']}")
+
     c00_row = make_row(
         "C00", "C00_SIEMENS_CONTROL_validationBattery.tbm",
         "N/A — Siemens install reference", c00_sha,
@@ -854,7 +937,12 @@ def main():
         "N/A", "N/A", "N/A", "N/A", "N/A", "N/A",
         "Environment/import-path control. Proves Robert's STAR install and "
         "Create from Tbm workflow import a known Siemens cylindrical TBM.",
+        pkg=siemens_axial["package_int_height_mm"],
+        sep_w=siemens_axial["separator_width_mm"],
+        neg_w=siemens_axial["negative_width_mm"],
+        pos_w=siemens_axial["positive_width_mm"],
     )
+    assert_axial_regression(c00_row, siemens_axial, "C00")
     matrix_rows.append(c00_row)
 
     # ------------------------------------------------------------------
@@ -900,7 +988,7 @@ def main():
         print(f"    Validator: {vsummary}")
         validator_log.append((vid, filename, vsummary, val_out))
 
-        matrix_rows.append(make_row(
+        row = make_row(
             vid, filename, BASELINE_SHA256, file_sha, delta_summary(v),
             v["sep_feed"], v["sep_tail"], v["ov_start"], v["ov_end"],
             v["mw"], v["jrw"], v["purpose"],
@@ -908,7 +996,9 @@ def main():
             sep_w=v.get("sep_w", BASELINE_SEP_WIDTH),
             neg_w=v.get("neg_w", BASELINE_NEG_WIDTH),
             pos_w=v.get("pos_w", BASELINE_POS_WIDTH),
-        ))
+        )
+        assert_axial_regression(row, parse_axial_from_content(content), vid)
+        matrix_rows.append(row)
 
     # ------------------------------------------------------------------
     # 6. C12 — full Siemens Detailed Builder transplant
@@ -931,16 +1021,26 @@ def main():
         m = re.search(r'\t' + re.escape(field) + r'\t=\t([^\t\n]+)', sbi)
         return m.group(1) if m else default
 
-    matrix_rows.append(make_row(
+    # C12 retains the project PCD, so axial geometry values are project-baseline values.
+    c12_str = c12_bytes.decode("latin-1")
+    c12_axial = parse_axial_from_content(c12_str)
+    c12_row = make_row(
         "C12", "C12_FULL_SIEMENS_DETAILED_BUILDER.tbm",
         BASELINE_SHA256, c12_sha,
         "Complete Detailed Builder block replaced with Siemens validationBattery.tbm BUILDER",
         get_sv("m_dSepFeedLength_mm"), get_sv("m_dSepTailLength_mm"),
         get_sv("m_dElectrodeOverlapAtStart_mm"), get_sv("m_dElectrodeOverlapAtEnd_mm"),
         get_sv("m_dMandrelWidth_mm"), get_sv("m_dJellyrollWidth_mm"),
-        "Broad localization control: full Siemens Detailed Builder in project file. "
-        "If C01-C11 all fail but C12 passes, culprit is in Builder fields outside tested subset.",
-    ))
+        "Broad localization control: full Siemens Detailed Builder inside project Physical Cell Description. "
+        "C12 PASS: replacing the project Detailed Builder with the Siemens Builder is sufficient to clear E004 "
+        "under the project PCD — strongly localizes E004 to project Detailed Builder content. "
+        "C12 FAIL with C00 PASS: project Detailed Builder alone does not explain E004; "
+        "see C13 result to determine whether PCD or PCD/Builder interaction is involved.",
+        pkg=BASELINE_PKG_HEIGHT, sep_w=BASELINE_SEP_WIDTH,
+        neg_w=BASELINE_NEG_WIDTH, pos_w=BASELINE_POS_WIDTH,
+    )
+    assert_axial_regression(c12_row, c12_axial, "C12")
+    matrix_rows.append(c12_row)
 
     # ------------------------------------------------------------------
     # 7. C13 — Siemens geometry shell, project model/RCR retained
@@ -957,17 +1057,30 @@ def main():
     print(f"  Validator: {vsummary}")
     validator_log.append(("C13", "C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm", vsummary, val_out))
 
-    matrix_rows.append(make_row(
+    # C13 contains the Siemens PCD, so axial geometry values must be parsed from the
+    # generated C13 bytes — they are Siemens values, NOT project-baseline values.
+    c13_str = c13_bytes.decode("latin-1")
+    c13_axial = parse_axial_from_content(c13_str)
+    c13_row = make_row(
         "C13", "C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm",
         BASELINE_SHA256, c13_sha,
         "Siemens Physical Cell Description + Detailed Builder; project SIMMOD/MODELMAP/RCR retained",
         get_sv("m_dSepFeedLength_mm"), get_sv("m_dSepTailLength_mm"),
         get_sv("m_dElectrodeOverlapAtStart_mm"), get_sv("m_dElectrodeOverlapAtEnd_mm"),
         get_sv("m_dMandrelWidth_mm"), get_sv("m_dJellyrollWidth_mm"),
-        "Strongest geometry-vs-model localization control. Siemens geometry with project RCR model. "
-        "If C12 passes but C13 fails: E004 involves Physical Cell Description interaction. "
-        "If C13 passes: confirms E004 is localized to project Detailed Builder content.",
-    ))
+        "Strongest geometry-vs-model localization control. Siemens PCD and Detailed Builder, project RCR/SIMMOD retained. "
+        "Paired interpretation with C12: "
+        "C12 PASS + C13 PASS — project Detailed Builder is the dominant localization. "
+        "C12 FAIL + C13 PASS — Siemens PCD (in addition to Builder) was needed; project PCD or PCD-Builder interaction implicated. "
+        "C12 PASS + C13 FAIL — anomalous: Siemens PCD plus project model/SIMMOD context introduces a failure; treat separately. "
+        "C12 FAIL + C13 FAIL while C00 PASS — E004 not eliminated by Siemens geometry transplants inside project model context.",
+        pkg=c13_axial["package_int_height_mm"] if c13_axial else BASELINE_PKG_HEIGHT,
+        sep_w=c13_axial["separator_width_mm"] if c13_axial else BASELINE_SEP_WIDTH,
+        neg_w=c13_axial["negative_width_mm"] if c13_axial else BASELINE_NEG_WIDTH,
+        pos_w=c13_axial["positive_width_mm"] if c13_axial else BASELINE_POS_WIDTH,
+    )
+    assert_axial_regression(c13_row, c13_axial, "C13")
+    matrix_rows.append(c13_row)
 
     if not all_protected_ok:
         print("\nABORT: protected field parity failures in C01-C11 — see above.")
@@ -1059,12 +1172,14 @@ def main():
         print(f"    Validator: {vsummary}")
         validator_log.append((vid, filename, vsummary, val_out))
 
-        matrix_rows.append(make_row(
+        row = make_row(
             vid, filename, BASELINE_SHA256, file_sha, delta_summary(v),
             v["sep_feed"], v["sep_tail"], v["ov_start"], v["ov_end"],
             v["mw"], v["jrw"], v["purpose"],
             pkg=v["pkg"], sep_w=v["sep_w"], neg_w=v["neg_w"], pos_w=v["pos_w"],
-        ))
+        )
+        assert_axial_regression(row, parse_axial_from_content(content), vid)
+        matrix_rows.append(row)
 
     if not all_protected_ok:
         print("\nABORT: protected field parity failures — see above.")

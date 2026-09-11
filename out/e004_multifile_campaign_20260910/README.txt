@@ -59,8 +59,8 @@ C11_STAR_BUILDER_PATTERN_JRWIDTH65p11.tbm
     Delta: All C10 changes plus JellyrollWidth=65.11. Maximum rescue variant.
 
 C12_FULL_SIEMENS_DETAILED_BUILDER.tbm
-    Complete Detailed Builder block from Siemens validationBattery.tbm,
-    transplanted into the project file. Project SIMMOD and RCR data retained.
+    Siemens Detailed Builder transplanted into project file; project Physical
+    Cell Description, SIMMOD, MODELMAP and RCR data retained.
     Diagnostic only.
 
 C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm
@@ -68,6 +68,33 @@ C13_SIEMENS_GEOMETRY_SHELL_PROJECT_RCR.tbm
     validationBattery.tbm, with project MODELMAP, RCRTable 3D SIMMOD, General
     Electrolyte SIMMOD, and Distributed Thermal SIMMOD retained.
     Diagnostic only.
+
+C12/C13 PAIRED INTERPRETATION
+
+Use C12 and C13 results together, not individually:
+
+    C12 PASS:
+        Replacing the project Detailed Builder with the Siemens Builder is
+        sufficient to clear E004 under the project Physical Cell Description.
+        Strongly localizes E004 to project Detailed Builder content.
+
+    C12 PASS + C13 PASS:
+        Project Detailed Builder is the dominant localization result.
+
+    C12 FAIL + C13 PASS:
+        The Siemens Physical Cell Description (in addition to the Siemens
+        Builder) was needed to clear E004. Project PCD or PCD/Builder
+        interaction is implicated.
+
+    C12 PASS + C13 FAIL:
+        Anomalous cross-interaction: Siemens PCD combined with project
+        model/SIMMOD context introduces a failure. Treat separately from
+        the standard localization sequence.
+
+    C12 FAIL + C13 FAIL while C00 PASS:
+        E004 is not eliminated by Siemens geometry transplants inside the
+        project model context. Investigate geometry/model coupling or
+        non-transplanted sections.
 
 C14_AXIAL_CAVITY68p11.tbm
     Delta: Package m_dintHeight 65.11 -> 68.11 only.
