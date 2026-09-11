@@ -4,7 +4,9 @@ Baseline: `out/hp2170NCA-RCR-distributed-exact-contact-final.tbm`
 Baseline SHA-256: `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`  
 Baseline source: commit `d74b3283cb5d73e114bc141f3f0d18e7c7ed5463`
 
-Recommended test order: C00, C03, C01, C02, C10, C12, C13, C05, C07, C04, C06, C08, C09, C11
+Baseline axial margins: pkg-sep = -2.00 mm | pkg-neg = 0.00 mm | pkg-pos = +1.00 mm
+
+Recommended test order: C00, C03, C14, C15, C16, C17, C10, C12, C13, C05, C07, C04, C06, C08, C09, C11, C01, C02
 
 Runtime result columns are blank — to be filled from Robert's test results.
 
@@ -26,6 +28,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | N/A |
 | jr_width_mm | N/A |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -45,6 +59,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 20 |
 | mandrel_width_mm | 6 |
 | jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -66,6 +92,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 6 |
 | jr_width_mm | 0 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -85,6 +123,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 20 |
 | mandrel_width_mm | 6 |
 | jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -106,6 +156,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 6 |
 | jr_width_mm | 0 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -125,6 +187,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 40 |
 | mandrel_width_mm | 6 |
 | jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -146,6 +220,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 0 |
 | jr_width_mm | 0 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -165,6 +251,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 20 |
 | mandrel_width_mm | 0 |
 | jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -186,6 +284,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 6 |
 | jr_width_mm | 65.11 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -205,6 +315,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 20 |
 | mandrel_width_mm | 6 |
 | jr_width_mm | 65.11 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -226,6 +348,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 0 |
 | jr_width_mm | 0 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -245,6 +379,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 40 |
 | mandrel_width_mm | 0 |
 | jr_width_mm | 65.11 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
 
 **Runtime result:** *(pending)*
 
@@ -266,6 +412,18 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | mandrel_width_mm | 0 |
 | jr_width_mm | 0 |
 
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
 **Runtime result:** *(pending)*
 
 ---
@@ -285,6 +443,146 @@ Runtime result columns are blank — to be filled from Robert's test results.
 | overlap_end_mm | 40 |
 | mandrel_width_mm | 0 |
 | jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | -2.00 mm |
+| pkg − negative  | +0.00 mm |
+| pkg − positive  | +1.00 mm |
+
+**Runtime result:** *(pending)*
+
+---
+
+## C14 — `C14_AXIAL_CAVITY68p11.tbm`
+
+**SHA-256:** `4266c8907dcf1f6ad026756160a6a1e7e905c225722d89ff2f63950ad2d1e92c`  
+**Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+**Changed fields:** Package m_dintHeight: 65.11 -> 68.11 [PCD]
+**Purpose:** Axial cavity clearance only: Package m_dintHeight 65.11->68.11 gives pkg-sep=+1, pkg-neg=+3, pkg-pos=+4 mm (Siemens margins) while retaining all electrode/separator widths. DIAGNOSTIC ONLY — not production target.
+
+| Parameter | Value |
+|---|---|
+| sep_feed_mm | 0 |
+| sep_tail_mm | 0 |
+| overlap_start_mm | 8 |
+| overlap_end_mm | 20 |
+| mandrel_width_mm | 6 |
+| jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 68.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
+
+**Runtime result:** *(pending)*
+
+---
+
+## C15 — `C15_AXIAL_CAVITY68p11_FEED10_TAIL85.tbm`
+
+**SHA-256:** `1973b801d294163e5259cf88b218e6644ed303ca1a474aa89aa93ea74d81f1d5`  
+**Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+**Changed fields:** Package m_dintHeight: 65.11 -> 68.11 [PCD]; m_dSepFeedLength_mm: 0 -> 10 [BUILDER]; m_dSepTailLength_mm: 0 -> 85 [BUILDER]
+**Purpose:** Axial cavity clearance + feed/tail leading hypothesis: both strongest independent geometry suspects combined. If C03 fails but C15 passes, axial package clearance participates in E004. DIAGNOSTIC ONLY.
+
+| Parameter | Value |
+|---|---|
+| sep_feed_mm | 10 |
+| sep_tail_mm | 85 |
+| overlap_start_mm | 8 |
+| overlap_end_mm | 20 |
+| mandrel_width_mm | 6 |
+| jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 68.11 |
+| separator_width_mm | 67.11 |
+| negative_width_mm | 65.11 |
+| positive_width_mm | 64.11 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
+
+**Runtime result:** *(pending)*
+
+---
+
+## C16 — `C16_RECESSED_LAYERS_FIXED_CAVITY.tbm`
+
+**SHA-256:** `711a1dad4c52cbd17c3dc72d2604f9661a4dcfb065f744431c2aa4d574c2a445`  
+**Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+**Changed fields:** SeparatorList1_Separator m_dWidth_mm: 67.11 -> 64.11 [PCD]; +Electrode m_dWidth: 64.11 -> 61.11 [PCD]; +Electrode m_dCoatingWidth: 64.11 -> 61.11 [PCD]; +Electrode Collector m_dWidth_mm: 64.11 -> 61.11 [PCD]; -Electrode m_dWidth: 65.11 -> 62.11 [PCD]; -Electrode m_dCoatingWidth: 65.11 -> 62.11 [PCD]; -Electrode Collector m_dWidth_mm: 65.11 -> 62.11 [PCD]
+**Purpose:** Explicit layer recession inside original 65.11 mm cavity: all electrode/separator widths reduced by 3 mm so pkg-sep=+1, pkg-neg=+3, pkg-pos=+4 mm. DIAGNOSTIC ONLY — do not use for electrical equivalence assessment. Physical electrode widths alter active area and RCR mapping. Tab widths, tape widths, S1-S6, RCR data, radial geometry unchanged.
+
+| Parameter | Value |
+|---|---|
+| sep_feed_mm | 0 |
+| sep_tail_mm | 0 |
+| overlap_start_mm | 8 |
+| overlap_end_mm | 20 |
+| mandrel_width_mm | 6 |
+| jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 64.11 |
+| negative_width_mm | 62.11 |
+| positive_width_mm | 61.11 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
+
+**Runtime result:** *(pending)*
+
+---
+
+## C17 — `C17_RECESSED_LAYERS_FEED10_TAIL85.tbm`
+
+**SHA-256:** `71292128d4fedfb9a57cbe6361115a5016be2e59e4a91d05377b61627ae0a175`  
+**Base SHA-256:** `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+**Changed fields:** SeparatorList1_Separator m_dWidth_mm: 67.11 -> 64.11 [PCD]; +Electrode m_dWidth: 64.11 -> 61.11 [PCD]; +Electrode m_dCoatingWidth: 64.11 -> 61.11 [PCD]; +Electrode Collector m_dWidth_mm: 64.11 -> 61.11 [PCD]; -Electrode m_dWidth: 65.11 -> 62.11 [PCD]; -Electrode m_dCoatingWidth: 65.11 -> 62.11 [PCD]; -Electrode Collector m_dWidth_mm: 65.11 -> 62.11 [PCD]; m_dSepFeedLength_mm: 0 -> 10 [BUILDER]; m_dSepTailLength_mm: 0 -> 85 [BUILDER]
+**Purpose:** Maximum axial-recession rescue retaining original 65.11 mm package internal height: all C16 layer-width reductions plus feed=10 tail=85. DIAGNOSTIC ONLY — do not use for electrical equivalence assessment.
+
+| Parameter | Value |
+|---|---|
+| sep_feed_mm | 10 |
+| sep_tail_mm | 85 |
+| overlap_start_mm | 8 |
+| overlap_end_mm | 20 |
+| mandrel_width_mm | 6 |
+| jr_width_mm | 0 |
+
+**Axial geometry:**
+
+| Dimension | Value |
+|---|---|
+| package_int_height_mm | 65.11 |
+| separator_width_mm | 64.11 |
+| negative_width_mm | 62.11 |
+| positive_width_mm | 61.11 |
+| pkg − separator | +1.00 mm |
+| pkg − negative  | +3.00 mm |
+| pkg − positive  | +4.00 mm |
 
 **Runtime result:** *(pending)*
 
