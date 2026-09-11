@@ -343,6 +343,42 @@ Every working reference TBM in the repo has `m_dSepFeedLength_mm ≥ 10` and `m_
 
 ---
 
+# `EXPERIMENT_PREPARED` — 2026-09-11 — ROOT_A/ROOT_B axial-clearance discriminators
+
+**Status:** PREPARED — not yet sent to Robert. Runtime results pending.
+
+**Experiment document:** `tbm_validation/E004_ROOT_CLEARANCE_RUNTIME_EXPERIMENT_20260911.md`
+
+**Baseline:** `out/e004_multifile_campaign_20260910/BASELINE_2c89d2d9.tbm`, SHA `2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5`
+
+**Package:** `out/hp2170NCA-STAR-E004-ROOT-CLEARANCE-diagnostic-20260911.zip`, SHA `71c22b6a2d3b792bdc38e7aa8528473fc1bfab18ea25d1c142f2f17d900ea3a7`
+
+**Hypothesis tested:** H004-6 — exact-zero package-to-negative axial clearance causes E004.
+
+| File | SHA-256 | Changed field | Old value | New value | Package-to-negative margin |
+|---|---|---|---|---|---|
+| `ROOT_A_AXIAL_CLEARANCE_0p10.tbm` | `c6db7431…` | `Package m_dintHeight` | 65.11 | 65.21 | +0.10 mm |
+| `ROOT_B_AXIAL_CLEARANCE_HE_0p70.tbm` | `59f83aa8…` | `Package m_dintHeight` | 65.11 | 65.81 | +0.70 mm |
+
+Each file differs from the immutable baseline by exactly one semantic field. All Detailed Builder, MODELMAP, RCRTable 3D, separator/electrode widths, IET, and Thermal fields are byte-identical to baseline.
+
+**E004 status:** ACTIVE / UNRESOLVED. Do not mark resolved until Robert confirms STAR progresses past Electrode Root 1 for at least one of these candidates.
+
+**Interpretation:**
+- ROOT_A passes → H004-6 CONFIRMED (exact-zero margin is the cause).
+- ROOT_A fails, ROOT_B passes → minimum clearance threshold is between 0.10 and 0.70 mm.
+- Both fail with identical E004 → H004-6 substantially downgraded; next tests are C12/C13 from the multifile campaign.
+
+---
+
+# `E004` hypothesis ledger — addendum 2026-09-11
+
+| Hypothesis | Evidence when proposed | Change/test performed | Runtime result | Current status |
+|---|---|---|---|---|
+| `H004-6`: exact-zero `Package m_dintHeight` vs negative-electrode width causes `E004` | package internal height = 65.11 mm = negative electrode width = 65.11 mm → zero axial clearance | ROOT_A (+0.10 mm) and ROOT_B (+0.70 mm) prepared; not yet tested | PENDING | **`CANDIDATE_PREPARED / RUNTIME_PENDING`** |
+
+---
+
 # Next-entry template
 
 ```text
