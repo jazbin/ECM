@@ -25,7 +25,7 @@ Rules:
 | `E001` | `[Transport Number sets] not found in the file, defaulting to 0.` | NOTE | 2026-09-03 | 2026-09-09 | `RESOLVED` — absent after explicit `Transport Number sets = 0` was added |
 | `E002` | `Warning: m_bOnly1D option is not supported.` | WARNING | 2026-09-03 | 2026-09-07 | `RESOLVED` — absent in later RCR candidates after relevant flags were set to 0 |
 | `E003` | `Error: Mandrel thickness must be positive` | FATAL | 2026-09-03 | 2026-09-03 | `RESOLVED` — later files progressed beyond this check |
-| `E004` | `Electrode Root 1 : Extrusion distance can not be 0.` | FATAL | 2026-09-04 | 2026-09-10 | **`ACTIVE / UNRESOLVED`** |
+| `E004` | `Electrode Root 1 : Extrusion distance can not be 0.` | FATAL | 2026-09-04 | 2026-09-14 | **`ACTIVE / UNRESOLVED`** |
 
 ---
 
@@ -232,9 +232,10 @@ This section exists specifically to prevent future agents from converting a plau
 | `H004-2`: `+Electrode m_dS3 = 0` causes `E004` | STAR-install refs use 5; candidate used 0; plausible root segment | changed to 5 mm | `R005` still produced identical `E004` | `PROVEN_INSUFFICIENT_AS_SOLE_CAUSE` |
 | `H004-3`: missing `Transport Number sets` contributes to `E004` | importer explicitly logged missing field | added `Transport Number sets = 0` | note disappeared, `E004` remained | `DISPROVEN_FOR_E004`; field addition still valid for importer completeness |
 | `H004-4`: JR/can radial mismatch causes `E004` | prior candidate had 19.25-mm JR vs 20.6274-mm can ID | exact-contact candidate uses 20.6274 / 20.6274 | `E004` remained | `DISPROVEN_FOR_E004` |
-| `H004-5`: Detailed Builder `m_dSepFeedLength_mm = 0` and/or `m_dSepTailLength_mm = 0` feeds a mandatory zero extrusion | both remain zero; STAR-install cylindrical refs use nonzero values such as 10/85; exact error is zero extrusion | changed to 10/85 mm in first `<BUILDER>` block (2026-09-10); fix candidate SHA-256 `bf0d6c3e`; R006 package sent to Robert | **RUNTIME_PENDING** | **`CANDIDATE_APPLIED / RUNTIME_PENDING`** |
+| `H004-5`: Detailed Builder `m_dSepFeedLength_mm = 0` and/or `m_dSepTailLength_mm = 0` feeds a mandatory zero extrusion | both remain zero; STAR-install cylindrical refs use nonzero values such as 10/85; exact error is zero extrusion | changed to 10/85 mm in first `<BUILDER>` block (2026-09-10); fix candidate SHA-256 `bf0d6c3e`; R006 package sent to Robert; 30-case ChatGPT suite (2026-09-14) has B01/B02/B03 as direct feed/tail isolation tests | **RUNTIME_PENDING on R006 and 30-case suite** | **`CANDIDATE_APPLIED / RUNTIME_PENDING — re-elevated 2026-09-14`** |
+| `H004-6`: exact-zero `Package m_dintHeight` vs negative-electrode width causes `E004` | package internal height = 65.11 mm = negative electrode width = 65.11 mm → zero axial clearance | ROOT_A (+0.10 mm) and ROOT_B (+0.70 mm) tested — R007 (2026-09-14) | both failed with identical E004 | **`SUBSTANTIALLY_DOWNGRADED`** — package height is not the causal field |
 
-Important: `H004-5` must **not** be described as the confirmed cause until Robert's test of the R006 candidate shows STAR progresses past `E004`.
+Important: `H004-5` must **not** be described as the confirmed cause until Robert's test shows STAR progresses past `E004`.
 
 ---
 
@@ -260,15 +261,19 @@ These facts should be used to prune future diagnoses.
 ACTIVE_FATAL_BLOCKER = E004
 MESSAGE = Electrode Root 1 : Extrusion distance can not be 0.
 FIRST_OBSERVED = 2026-09-04
-LAST_OBSERVED = 2026-09-10
-RUNTIME_OCCURRENCES = multiple packages / multiple variants
+LAST_OBSERVED = 2026-09-14
+RUNTIME_OCCURRENCES = multiple packages / multiple variants including ROOT_A and ROOT_B
 ROOT_CAUSE = UNRESOLVED
-LEADING_HYPOTHESIS = H004-6 (Package m_dintHeight / derived axial construction geometry)
-HYPOTHESIS_STATUS = CANDIDATE_PREPARED / RUNTIME_PENDING (ROOT_A and ROOT_B — see 2026-09-11 addendum)
-H004-5_STATUS = RUNTIME_PENDING on R006 but downgraded — Siemens HE18650 reference uses feed=0 / tail=0 yet imports successfully, undermining the zero-values-alone explanation
-FIX_CANDIDATE_SHA256_H004-6 = ROOT_A c6db74313e675b618f2fb51d371e51231f9e0a2a9f26ca5bdc1f1bde48390343
-FIX_CANDIDATE_SHA256_H004-6 = ROOT_B 59f83aa875415d946b1ccb2b6f880a3a98a036e631e3d78993d14edfbbc9ee36
-PRIOR_FIX_CANDIDATE_SHA256_H004-5 = bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53 (R006 — PENDING)
+LEADING_HYPOTHESIS = H004-5 (SepFeedLength=0 and/or SepTailLength=0) — re-elevated 2026-09-14
+HYPOTHESIS_STATUS = CANDIDATE_APPLIED / RUNTIME_PENDING on R006 and 30-case suite
+H004-5_STATUS = RE-ELEVATED — R007 runtime (ROOT_A/ROOT_B both failed) eliminates H004-6; all confirmed-working
+              references (validationBattery21700, WT_A/WT_B/WT_C) use feed=10/tail=85; all confirmed-failing
+              references use feed=0/tail=0; HE18650/HP18650 counterexample still valid for 18650 geometry but
+              may not apply to 2170 axial proportions
+H004-6_STATUS = SUBSTANTIALLY_DOWNGRADED — ROOT_A (+0.10mm) and ROOT_B (+0.70mm) both failed identically
+NEXT_TEST = 30-case ChatGPT suite in/20260914/hp2170NCA-STAR-E004-30case-highres-diagnostic-20260914.zip
+          — B01 (feed=0), B02 (tail=0), B03 (both=0) are the critical discriminators
+FIX_CANDIDATE_SHA256_H004-5 = bf0d6c3e5c22cd3f07a48a2b57be56b1dae36f174610ed648fc36dcdacb80b53 (R006 — PENDING)
 ```
 
 ## Required evidence standard for closure
@@ -350,7 +355,7 @@ Subsequent Siemens-reference review identified valid cylindrical counterexamples
 
 # `EXPERIMENT_PREPARED` — 2026-09-11 — ROOT_A/ROOT_B axial-clearance discriminators
 
-**Status:** PREPARED — not yet sent to Robert. Runtime results pending.
+**Status:** RESOLVED_NEGATIVE — both candidates failed; H004-6 substantially downgraded (2026-09-14).
 
 **Experiment document:** `tbm_validation/E004_ROOT_CLEARANCE_RUNTIME_EXPERIMENT_20260911.md`
 
@@ -380,7 +385,67 @@ Each file differs from the immutable baseline by exactly one semantic field. All
 
 | Hypothesis | Evidence when proposed | Change/test performed | Runtime result | Current status |
 |---|---|---|---|---|
-| `H004-6`: exact-zero `Package m_dintHeight` vs negative-electrode width causes `E004` | package internal height = 65.11 mm = negative electrode width = 65.11 mm → zero axial clearance | ROOT_A (+0.10 mm) and ROOT_B (+0.70 mm) prepared; not yet tested | PENDING | **`CANDIDATE_PREPARED / RUNTIME_PENDING`** |
+| `H004-6`: exact-zero `Package m_dintHeight` vs negative-electrode width causes `E004` | package internal height = 65.11 mm = negative electrode width = 65.11 mm → zero axial clearance | ROOT_A (+0.10 mm) and ROOT_B (+0.70 mm) tested — R007 (2026-09-14) | **both failed with identical E004** | **`SUBSTANTIALLY_DOWNGRADED`** |
+
+---
+
+---
+
+## `R007` — 2026-09-14 — ROOT_A and ROOT_B axial-clearance discriminators
+
+**Files:** `ROOT_A_AXIAL_CLEARANCE_0p10.tbm` / `ROOT_B_AXIAL_CLEARANCE_HE_0p70.tbm`
+
+**Client location:** `F:\About-Energy\20260911\hp2170NCA-STAR-E004-ROOT-CLEARANCE-diagnostic-20260911\`
+
+**SHA-256:** ROOT_A `c6db7431…` / ROOT_B `59f83aa8…`
+
+**Observed messages (both files identical):**
+
+```text
+Feature execution failed.
+Electrode Root 1 : Extrusion distance can not be 0.
+Command: CreateFromTbm
+   error: Server Error
+```
+
+**Observed error class:** `E004` only — identical to R005/R006 pattern.
+
+**TBM delta from R005 baseline:** ROOT_A changed only `Package m_dintHeight` 65.11 → 65.21; ROOT_B changed only `Package m_dintHeight` 65.11 → 65.81. All other fields byte-identical to baseline.
+
+**Runtime conclusion:** Package m_dintHeight (axial clearance between package interior and negative electrode) is NOT the controlling field for the Electrode Root 1 extrusion distance. A clearance change of up to 0.70 mm (matching HE18650 reference proportions) produced no change in STAR's behaviour. H004-6 is substantially downgraded.
+
+**What this result proves:** Package m_dintHeight alone does not govern the extrusion distance STAR computes internally.
+
+**What this result does NOT prove:** That the package height is irrelevant — it may contribute as a secondary factor. It proves that changing it in isolation is insufficient.
+
+**New/updated hypothesis status:** H004-6 → `SUBSTANTIALLY_DOWNGRADED`. H004-5 re-elevated as leading hypothesis.
+
+---
+
+# `CAMPAIGN_PREPARED` — 2026-09-14 — 30-case ChatGPT high-resolution diagnostic suite
+
+**Status:** PREPARED — not yet sent to Robert.
+
+**Package:** `in/20260914/hp2170NCA-STAR-E004-30case-highres-diagnostic-20260914.zip`
+
+**Strategy:** Start from confirmed-working D00 control (Siemens validationBattery21700) and apply individual/combined deltas toward our project geometry. Opposite direction from our prior campaigns (start broken, apply fixes). 31 files total.
+
+**Static validation result (tools/validate_tbm.py --batch):** 4 FAIL (B01, B02, B03, X02 — all feed/tail=0); 27/31 files 0 FAIL.
+
+**Key discriminators:**
+
+| ID | Delta | Static | H004-5 prediction |
+|---|---|---|---|
+| D00 | None — working control | 0 FAIL | PASS |
+| B01 | Feed: 10→0 only | 1 FAIL | FAIL (E004) |
+| B02 | Tail: 85→0 only | 1 FAIL | FAIL (E004) |
+| B03 | Feed+Tail: 10/85→0/0 | 2 FAIL | FAIL (E004) |
+| B04–B08 | Overlap/mandrel/orientation | 0 FAIL | PASS |
+| A01–A08 | Single PCD changes | 0 FAIL | PASS |
+| I01–I08 | Combined PCD changes | 0 FAIL | PASS |
+| X02 | All BUILDER deltas combined | 2 FAIL | FAIL (E004) |
+
+**Do not update E004 hypothesis ledger from campaign results until Robert returns runtime evidence.**
 
 ---
 

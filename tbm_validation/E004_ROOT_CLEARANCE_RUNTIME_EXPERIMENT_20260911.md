@@ -1,6 +1,6 @@
 # E004 Root Clearance Runtime Experiment — 2026-09-11
 
-**Status:** PENDING — awaiting Robert's runtime result
+**Status:** RESOLVED_NEGATIVE — both candidates failed; H004-6 substantially downgraded
 **Branch:** tbm-rcr-modelmap-fix-exec
 **Author:** Bojan Vidovic / ECM Developer
 
@@ -143,7 +143,13 @@ ROOT_A and ROOT_B are diagnostic instruments. They are not approved production g
 ## Runtime status
 
 ```
-STATUS = PENDING
-SENT_TO_ROBERT = [date TBD]
-RUNTIME_EVENT_ID = [TBD — R007 or later]
+STATUS = RESOLVED_NEGATIVE
+SENT_TO_ROBERT = 2026-09-11
+RUNTIME_EVENT_ID = R007
+RESULT_RECEIVED = 2026-09-14
+ROOT_A_RESULT = FAIL (E004 — Electrode Root 1 : Extrusion distance can not be 0.)
+ROOT_B_RESULT = FAIL (E004 — identical error)
+INTERPRETATION = Third branch: H004-6 substantially downgraded.
+                 Package m_dintHeight is not the causal field.
+                 Next: 30-case ChatGPT suite (in/20260914/).
 ```
