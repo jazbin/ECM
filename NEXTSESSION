@@ -1,153 +1,229 @@
-NEXT SESSION START — 2026-09-10
+NEXT SESSION START — 2026-09-16
 ================================
-Branch: tbm-rcr-modelmap-fix-exec (pushed; last commit bc0118f)
+Branch: tbm-rcr-modelmap-fix-exec
 
-STATE SUMMARY
--------------
-We are in the middle of qualifying the hp2170 NCA RCR distributed TBM for
-Robert's STAR-CCM+ import. Three things are currently pending Robert's response.
+READ FIRST
+----------
+1. tbm_validation/CLIENT_RETURN_ANALYSIS_20260916.md
+2. tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md
+3. tbm_validation/TBM_EXTERNAL_AUDIT_20260914.md  (historical audit; some hypotheses superseded)
+
+RAW CLIENT RETURN
+-----------------
+Branch: client-data/20260916-tbm-root-surrogate-v2
+Package:
+  in/20260916/hp2170NCA-STAR-E004-root-surrogate-client-v2-TBM-only-20260914-PROCESSED.zip
+
+The returned package was analyzed directly on 2026-09-16. It contains the runtime-result workbook, TBMs, successful STEP exports and STEP logs.
 
 GOVERNING MODELLING OBJECTIVE — DO NOT LOSE THIS
 -------------------------------------------------
-For this project, we are NOT trying to reconstruct the physically realistic
-internal clearances of a manufactured 2170 cell. The target is to reproduce
-the already-defined OpenFOAM–ECM reference model in STAR-CCM+.
+The production cell must reproduce the OpenFOAM-ECM reference model in STAR-CCM+ using a reusable TBM-native Battery Design Studio cell.
 
-The OpenFOAM–ECM case is therefore the reference definition for geometry and
-thermal coupling. Where that model has ideal/shared contact, STAR should match
-that condition as closely as its geometry engine permits. Do not introduce
-realistic air gaps, liners, clearances, or contact imperfections unless they
-already exist in the reference model.
+No manual Part-module geometry repair/modification after import is acceptable.
 
-In particular, the radial reference target is JR OD = can ID = 20.6274 mm,
-i.e. zero radial gap / ideal contact. The previous 19.25 mm JR OD is not the
-final equivalence target because it creates a 1.3774 mm diametral gap absent
-from the reference case. The 20.55 mm variant is only a STAR CAD-feasibility
-fallback/probe if exact equality is rejected; it is not the preferred model
-value. If a finite geometric clearance is unavoidable in STAR, thermal
-coupling must still be configured to reproduce the OpenFOAM ideal-contact
-condition. Any interface/contact resistance should be introduced explicitly
-as a controlled model parameter later, not implicitly through an air gap.
+Reference physical radial target remains:
+  Can OD = 21.09 mm
+  Can ID = 20.6274 mm
+  JR OD  = 20.6274 mm
 
-Permanent requirement document:
-  tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md
+This target represents ideal/shared JR-can contact in the reference model. If STAR/BDS requires a tiny CAD clearance to construct the cell, final thermal coupling must still reproduce the ideal-contact reference behavior unless an explicit contact resistance is intentionally introduced later.
 
-PENDING FROM ROBERT (do not send anything further until he replies)
--------------------------------------------------------------------
-1. V3 RCR preflight candidate (MAIN):
-   File: out/hp2170NCA-RCR-STAR-final-preflight-20260910.zip
-         → hp2170NCA-RCR-distributed-final-preflight.tbm
-   SHA:  91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4
-   V3 validator: 0 FAIL | 4 WARN | 14 INFO | 37 PASS
-   Delta vs V2: one field inserted — Transport Number sets = 0 in General
-   Electrolyte SIMMOD (Robert's V1 log confirmed this field was missing).
-   Expected result: import succeeds (S3=5 + Transport Number sets fixes
-   address the two known failure modes from V1 runtime log).
+CLIENT RETURN — EXECUTIVE RESULT
+--------------------------------
+Returned runtime matrix separates two independent failure mechanisms:
 
-2. JR OD test pair:
-   File: out/hp2170NCA-JR-OD-test-20260910.zip
-         → hp2170-jr-safe_20p55.tbm             (20.55 mm JR OD)
-         → hp2170-jr-perfect_contact_20p6274.tbm (20.6274 mm JR OD = can ID)
-   Purpose: determine the correct m_dJellyrollThickness_mm for V4.
-   Evidence: OpenFOAM wedge_2170 mesh has JR OD = can ID = 20.6274 mm
-   (zero gap, shared face). Current TBM has 19.25 mm (1.38 mm gap).
-   Robert should run Create from Tbm on both. For whichever succeeds,
-   export STEP and measure the realised JR OD.
+- 18 successful imports
+- 5 E004 root failures:
+    H09, H10, T02, T03, T09
+    Error: `Electrode Root 1 : Extrusion distance can not be 0.`
+- 9 F-series radial/Can failures:
+    F01-F09
+    Error: `Can Thickness is -ve Check tbm file..`
+    Sometimes preceded by:
+      `Jellyroll outer diameter is greater than Can inner diameter.`
+      `Can inner diameter set to JR outer diameter.`
 
-3. Package_rev3 geometry test (older, status unclear):
-   File: out/tbm_geometry_test_20260909.zip (4 tab/orientation variants)
-   Status: sent 2026-09-09 but may be superseded. If Robert has not replied
-   to this, it can be deprioritised in favour of items 1 and 2 above.
+CRITICAL ROOT FINDING
+---------------------
+The old simple hypothesis "each tab length - electrode width must be > 0" is FALSE.
 
-WHEN ROBERT REPLIES
--------------------
-Case A — V3 import succeeds:
-  - If perfect_contact JR OD also succeeds: update m_dJellyrollThickness_mm
-    to 20.6274 mm in V4 RCR candidate and close WARN 1.
-  - If perfect_contact fails but safe_20p55 succeeds: use the measured
-    realised OD from the STEP export as the V4 value. Close WARN 1 with
-    the measured value, but retain the modelling requirement that the final
-    STAR setup reproduce ideal JR-can thermal contact from the OpenFOAM case.
-  - Update TBM_INVENTORY.md, close WARN 1 in validator (change WARN →
-    PASS or updated WARN with measured value), regenerate V4, validate,
-    send V4 to Robert.
+Define:
+  Delta+    = positive tab length - positive electrode width
+  Delta-    = negative tab length - negative electrode width
+  Delta_avg = (Delta+ + Delta-) / 2
 
-Case B — V3 import fails:
-  - Read the exact STAR error message.
-  - Check STAR_IMPORT_ERROR_HISTORY.md for pattern match.
-  - Add the error to STAR_IMPORT_ERROR_HISTORY.md.
-  - Identify the offending field, implement fix in generator, produce V4.
-  - Do NOT guess — require the verbatim error text before diagnosing.
+Runtime evidence:
+  H01:  0 / +8       -> PASS
+  H05: +9 /  0       -> PASS
+  T01: +0.89 / -0.11 -> PASS
+  H09:  0 / 0        -> E004
+  H10: +0.10/+0.10   -> E004
+  H11: +0.70/+0.70   -> PASS
+  T02:  0/0          -> E004
+  T03: +0.10/+0.10   -> E004
+  T04: +0.70/+0.70   -> PASS
+  T09: -4.11/-5.11   -> E004
 
-OPEN WANS (all 4, non-blocking for import)
-------------------------------------------
-WARN 1: jr_od — m_dJellyrollThickness_mm = 19.25 mm
-  STATUS: REFERENCE_MODEL_TARGET_RESOLVED / STAR_FEASIBILITY_PENDING
-  Source: wedge_2170 mesh JR OD = 20.6274 mm = can ID, representing ideal
-  contact in the OpenFOAM reference model. JR OD test pair sent.
-  Target: 20.6274 mm. If STAR rejects exact equality, 20.55 mm is only a
-  CAD-feasibility surrogate; preserve ideal thermal coupling explicitly.
+Within tested H/T cases:
+  Delta_avg <= 0.10 mm -> E004
+  Delta_avg >= 0.39 mm -> PASS
 
-WARN 2: report_jr_diameter — REPORT block 17.8064 mm vs Builder 19.25 mm
-  STATUS: UNRESOLVED_NONBLOCKING
-  Note: August 2026 characterisation confirmed REPORT JR diameter is NOT
-  consumed by STAR (Detailed Builder wins). Safe to leave stale for now.
-  Will become even more stale once WARN 1 is resolved (17.8064 vs ~20.6).
+This is an EMPIRICAL separator, not a claimed Siemens formula. Root construction is clearly coupled between electrodes / available end geometry rather than two independent direct extrusions.
 
-WARN 3: report_jr_height — REPORT block 52.5 mm vs Package 65.11 mm
-  STATUS: UNRESOLVED_NONBLOCKING (same reasoning as WARN 2)
+STEP evidence shows generated tab/root geometry increases with combined available surplus and then saturates. T06-like +2/+2 mm surplus is already at the same practical generated end geometry as much larger T07/T08 cases. Use T06-like axial/root geometry as the next stable base.
 
-WARN 4: report_capacity — REPORT 1.14762 Ahr vs RCRTable 5.0 Ahr
-  STATUS: UNRESOLVED_NONBLOCKING
-  Note: REPORT capacity is BDS-computed and believed to be recomputed at
-  import. Not documented as consumed by STAR.
+CRITICAL RADIAL FINDING
+-----------------------
+The full F-series does NOT test root/feed/tail behavior. It dies first on radial Can construction.
 
-KEY FILE HASHES
----------------
-V1 RCR candidate (FAILED — do not use):
-  out/rcr_candidate/hp2170-rcr-v1-tabs-on-sameFace.tbm
-  SHA: 7d5850b628389e713e83468d27e45600942b1deb1e23e672f9d18c4f580d6940
-  Failure: +Electrode m_dS3 = 0 → "Electrode Root 1: Extrusion distance = 0"
+Previous field interpretation was wrong:
+  `Package m_dintDiameter` was treated as physical Can ID.
 
-V2 RCR candidate (frozen intermediate — do not overwrite):
-  out/rcr_candidate/hp2170-rcr-v2-S3fix-tabs-on-sameFace.tbm
-  SHA: 372c99026580732866708f0f45906caa74733a826e816fdf2d7de0b416ca0e3b
+Returned successful STEP geometry shows instead approximately:
+  generated Can OD = 20.900 mm
+  generated Can ID = 18.000 mm
+  generated JR OD  = 17.880992 mm
 
-V3 RCR candidate / client copy (current preflight — frozen):
-  out/rcr_candidate/hp2170-rcr-v3-star-preflight-tabs-on-sameFace.tbm
-  out/hp2170NCA-RCR-distributed-final-preflight.tbm
-  SHA: 91cb8f8a2069c308db8dd910a695a2e7bbf55cca509330df004fa8ce82f638d4
+while the corresponding successful TBM has:
+  Package m_dintDiameter     = 20.9
+  m_dRepCanXDim              = 18
+  m_dRepCanYDim              = 18
+  m_dJellyrollThickness_mm   = 17.9
 
-JR OD safe variant:
-  out/jr_od_test/hp2170-jr-safe_20p55.tbm
-  SHA: 62a11705f39890d1fe5d27c7ef98f7ce8155cb8acc4e7b2b746cb95adfea37f6
+Therefore, in this Detailed Builder path, direct CAD evidence strongly indicates:
+  Package m_dintDiameter -> generated Can OUTER diameter
+  m_dRepCanXDim/YDim      -> associated with generated Can INNER diameter
+  m_dJellyrollThickness   -> generated JR diameter
 
-JR OD perfect-contact variant:
-  out/jr_od_test/hp2170-jr-perfect_contact_20p6274.tbm
-  SHA: 2c89d2d9a60e5be6a40ca48fcf29e1075fd67b2764e94436c7c9af1119063ea5
+Do NOT call this a universal proprietary Siemens formula yet; characterize it with a small radial DOE.
 
-KEY DOCUMENTS
--------------
-tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md         — governing modelling objective; STAR must reproduce OpenFOAM–ECM reference geometry/contact rather than realistic internal clearances
-tbm_validation/STAR_MAXIMUM_STATIC_PREFLIGHT_20260910.md — full audit + JR OD addendum
-tbm_validation/RCR_V2_TO_V3_TRANSPORT_NUM_DELTA.md      — V2→V3 delta proof
-tbm_validation/TBM_INVENTORY.md                          — all TBM hashes + JR OD test section
-tbm_validation/STAR_IMPORT_ERROR_HISTORY.md             — runtime error log
-tools/generate_tbm_rcr_candidate.py                     — generates RCR candidate from V4 base
-tools/generate_tbm_v4_candidate.py                      — generates V4 base variants
-tools/generate_tbm_jr_od_test.py                        — generates JR OD test pair from V3
+WHY F01-F09 FAIL
+----------------
+F-series used:
+  Package m_dextDiameter      = 21.09
+  Package m_dintDiameter      = 20.6274
+  m_dJellyrollThickness_mm    = 20.6274
 
-PROTECTED (do not change without explicit authorisation)
----------------------------------------------------------
-PROJECT OBJECTIVE: reproduce OpenFOAM–ECM reference model, not realistic cell clearances
-REFERENCE CONTACT: JR-can and applicable JR-cap/end interfaces ideal/shared contact
-REFERENCE JR TARGET: JR OD = can ID = 20.6274 mm; no artificial air gap
-CONTACT RESISTANCE: zero by default; add explicitly later only if required
-IET = RCRTable 3D, Thermal = Distributed
-m_bOnly1D = 0 (all blocks), m_bLumpedEnergyBalance = 0
-m_dAhCell = 5.0, m_nRCRParameterSets = 3
-OD = 21.09 mm, height = 70.02 mm, can ID = 20.6274 mm
-+Electrode m_dS3 = 5 mm, -Electrode m_dS3 = 50 mm
-Tabs: same-face (both top)
-Transport Number sets = 0
-About-Energy RCR numerical data (three temperature sets)
+Under observed BDS behavior, Can outer radial scale and JR outer radial scale are effectively made almost identical, leading to non-positive Can wall thickness and the STAR Can-thickness failure.
+
+So the problem is more fundamental than "forgot to leave JR-to-Can-ID clearance": the production radial fields were mapped semantically incorrectly.
+
+WORKING CONTROL RADIAL GEOMETRY
+-------------------------------
+Do NOT claim it has 3 mm JR-can clearance from 20.9 - 17.9.
+
+Returned STEP says:
+  Can ID ~= 18.000 mm
+  JR OD  ~= 17.881 mm
+
+Diametral clearance ~= 0.119 mm
+Radial clearance    ~= 0.0595 mm
+
+Can wall in the working reference is very thick:
+  (20.9 - 18.0)/2 = 1.45 mm
+
+The working 21700 is a BDS construction reference, not yet the physical target geometry.
+
+F04 / F09 PACKAGE-VOLUME RESULT
+-------------------------------
+F09 synchronizes package volumes; F04 does not. Both fail on the same radial/Can path.
+
+Conclusion:
+  stale package volume fields are NOT the observed F-series import blocker.
+
+Still clean them later for production consistency.
+
+FEED / TAIL STATUS
+------------------
+F04 has feed/tail 10/85 and already fails on radial Can construction.
+F05 changes feed/tail to 0/0 but also fails upstream.
+
+Therefore F04/F05 does NOT validate or invalidate feed/tail for target full-2170 geometry.
+
+Same caveat applies to:
+  F04/F06 overlap change
+  F04/F07 mandrel width + negative orientation change
+  F08 full project Builder
+
+They are runtime-inconclusive until radial geometry is fixed.
+
+NEXT HIGHEST-VALUE EXPERIMENT
+-----------------------------
+Do NOT run another broad root campaign.
+
+Create a 4-6 case RADIAL CHARACTERIZATION campaign from a proven T06-like axial/root base.
+
+Vary only:
+  Package m_dintDiameter
+  Package m_dextDiameter
+  m_dRepCanXDim
+  m_dRepCanYDim
+  m_dJellyrollThickness_mm
+
+Goal: identify which fields independently control:
+  1. generated Can OD
+  2. generated Can ID
+  3. generated JR OD
+  4. radial clearance/contact behavior
+
+Test hypothesis derived from successful STEP geometry:
+  Package m_dintDiameter        -> 21.09      candidate Can OD control
+  m_dRepCanXDim/YDim            -> 20.6274    candidate Can ID control
+  m_dJellyrollThickness_mm      -> ~20.6274   candidate JR OD control
+
+This is a HYPOTHESIS TO TEST, not yet the final production prescription.
+
+For each successful case request one STEP or otherwise measure:
+  Can OD
+  Can ID
+  JR OD
+
+Then reintroduce project Builder changes on the corrected radial base.
+
+SUCCESSFUL STEP TOPOLOGY
+------------------------
+Successful returned STEP files consistently contain 13 solids:
+  Mandrel
+  Jellyroll
+  Can
+  +Ve Tab Root
+  +Ve Tab Stem
+  -Ve Tab Root
+  -Ve Tab Stem
+  +Ve Washer
+  -Ve Washer
+  +Ve EndPlate
+  -Ve EndPlate
+  +Ve Internal-Post
+  -Ve Internal-Post
+
+Topology remains stable while root/tab dimensions change. This supports the TBM-native surrogate strategy but does NOT prove thermal/material equivalence.
+
+PRODUCTION ITEMS STILL OPEN
+---------------------------
+After geometry is constructible:
+
+1. Identify TBM-native cap/end solid(s) that can represent the OpenFOAM cap role.
+2. Apply cap-equivalent thermal/material properties inside the TBM.
+3. Map shell rho/k/Cp exactly where possible.
+4. Resolve `m_bUseEntropyData` / dU-dT activation without manual STAR edits.
+5. Prove active-area/capacity/resistance/heat scaling vs About-Energy/OpenFOAM.
+6. Reconcile inherited physical winding lengths/masses or prove non-consumption.
+7. Synchronize consumed REPORT/derived fields once field consumption is known.
+8. Verify the cell remains reusable for arbitrary pack layouts and cell counts.
+
+IMPORTANT CORRECTIONS TO OLD NOTES
+----------------------------------
+- Individual positive root surplus is NOT required on each electrode.
+- `Package m_dintDiameter` must NOT currently be interpreted as physical Can ID.
+- Working 20.9 vs 17.9 values do NOT imply a 3-mm JR-can clearance.
+- T09 is not anomalous; it is consistent with the coupled-root failure pattern.
+- F-series results say nothing conclusive about feed/tail because Can construction fails first.
+- Exact-contact physical target remains 20.6274 mm JR/Can ID at the modelling level, but the correct BDS field mapping to generate it is not yet known.
+
+LATEST ANALYSIS COMMIT
+----------------------
+Detailed note:
+  tbm_validation/CLIENT_RETURN_ANALYSIS_20260916.md
+  commit: 101bb8ce876d0a885dd50708dc69bdc2f00a76d8
