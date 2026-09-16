@@ -93,6 +93,40 @@ inspecting the overall bounding box of every returned STEP: Y-extent is
 | `B_CAN_TRANSPARENT_ISO` | 0.08 | 0.92 |
 | `C_INTERNALS_ISO` | 0.0 (hidden) | 1.0 (opaque) |
 | `D_POS_END_ZOOM_FIXED_SCALE` (T-series only) | 0.10 | Jellyroll 0.35, else 0.95 |
+| `E_THREEPART_CAN_TRANSPARENT_ISO` | 0.10 | 0.92 (Jellyroll + Cap only) |
+| `F_THREEPART_INTERNALS_ISO` | 0.0 (hidden) | 1.0 (Jellyroll + Cap only) |
+
+## Three-part reduced view (Can + Jellyroll + Cap only)
+
+Added on request to compare the returned BDS/STAR-CCM+ topology against the
+target ECM-OpenFOAM coupling topology, which represents a cell with only
+three parts. `render_three_part.py` selects **only** the bodies `Can`,
+`Jellyroll`, `+Ve EndPlate`, `-Ve EndPlate` from each already-loaded STEP
+file and renders those alone — every other body (Mandrel, both tab-roots,
+both tab-stems, both washers, both internal-posts) is simply not drawn.
+This is a body-selection filter for rendering purposes only; it does not
+merge, heal, or modify any solid, and the untouched 13-body STEP file is
+unaffected.
+
+**Naming mapping (explicit, not inferred from appearance):** the returned
+STEP files have no body literally named "Cap". The closest structural
+equivalent — the axial end structure that closes off the can — is the
+`EndPlate` body (`+Ve EndPlate` / `-Ve EndPlate`). This script and the
+`STEP_VISUAL_INSPECTION_20260916.md` three-part section treat
+**Cap := EndPlate**. This is a naming/selection choice made for this
+comparison, not a measured or vendor-confirmed fact, and it is stated here
+so it isn't mistaken for one. All 17 cases were confirmed to contain
+exactly these 4 bodies (Can, Jellyroll, +Ve EndPlate, -Ve EndPlate) with no
+`render_three_part.py` warning of a missing/extra body.
+
+Bounding box / camera fit for these views is computed from the 3-part
+subset only (Can+Jellyroll+Cap), not the full 13-body cell, so the
+framing is tighter and centered on just those parts.
+
+Outputs: `<case>_E_THREEPART_CAN_TRANSPARENT_ISO.png`,
+`<case>_F_THREEPART_INTERNALS_ISO.png`,
+`MONTAGE_THREEPART_CAN_TRANSPARENT_ISO.png`,
+`MONTAGE_THREEPART_INTERNALS_ISO.png`.
 
 ## Body-name to color mapping
 

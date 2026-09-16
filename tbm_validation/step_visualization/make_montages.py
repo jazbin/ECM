@@ -91,6 +91,12 @@ def main():
     t_progression_strip(os.path.join(out_dir, "T_PROGRESSION_WHOLECELL_AUTOFIT.png"),
                          suffix="B_CAN_TRANSPARENT_ISO",
                          title_note="whole-cell CAN_TRANSPARENT_ISO, per-case auto-fit -- NOT same scale, context only")
+    montage(all_cases, "E_THREEPART_CAN_TRANSPARENT_ISO",
+            os.path.join(out_dir, "MONTAGE_THREEPART_CAN_TRANSPARENT_ISO.png"),
+            "Three-part (Can+Jellyroll+Cap) only, Can transparent -- all successful cases")
+    montage(all_cases, "F_THREEPART_INTERNALS_ISO",
+            os.path.join(out_dir, "MONTAGE_THREEPART_INTERNALS_ISO.png"),
+            "Three-part (Jellyroll+Cap only, Can hidden) -- all successful cases")
 
 
 if __name__ == "__main__":
