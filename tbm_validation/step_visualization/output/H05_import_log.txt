@@ -1,0 +1,35 @@
+STEP file: /tmp/claude-1000/-workspace/ca9085ae-d199-41ff-bcd5-67b228aa43c3/scratchpad/extract/hp2170NCA-STAR-E004-root-surrogate-client-v2-TBM-only-20260914/H05_NEG_ZERO_SURPLUS.step
+Body count: 13
+Body names:
+  - Mandrel
+  - Jellyroll
+  - Can
+  - +Ve Tab Root
+  - +Ve Tab Stem
+  - -Ve Tab Root
+  - -Ve Tab Stem
+  - +Ve Washer
+  - -Ve Washer
+  - +Ve EndPlate
+  - -Ve EndPlate
+  - +Ve Internal-Post
+  - -Ve Internal-Post
+
+--- pythonocc/OCCT reader stdout (import warnings) ---
+Number of shapes at root : 13
+Name : Cylindrical Cell: Mandrel
+Name : Cylindrical Cell: Jellyroll
+Name : Cylindrical Cell: Can
+Name : Cylindrical Cell: +Ve Tab Root
+Name : Cylindrical Cell: +Ve Tab Stem
+Name : Cylindrical Cell: -Ve Tab Root
+Name : Cylindrical Cell: -Ve Tab Stem
+Name : Cylindrical Cell: +Ve Washer
+Name : Cylindrical Cell: -Ve Washer
+Name : Cylindrical Cell: +Ve EndPlate
+Name : Cylindrical Cell: -Ve EndPlate
+Name : Cylindrical Cell: +Ve Internal-Post
+Name : Cylindrical Cell: -Ve Internal-Post
+
+--- OCCT/OCC native stdout (fd-level capture, bypasses Python redirect) ---
+*** ERR StepReaderData : Unresolved Reference : Fails Count : 1 ***
