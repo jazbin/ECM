@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Pure-thermal qualification case, heat-ON variant: known prescribed constant
+// volumetric heat source, 150000 W/m3 uniform in JellyRoll (same magnitude as
+// cases/wedge_2170_constant_heat_rtherm). Swapped in via timeActivatedFileUpdate
+// in controlDict -- single continuous run, no restart chain.
+constantHeat
+{
+    type            scalarSemiImplicitSource;
+    active          yes;
+    selectionMode   all;
+    scalarSemiImplicitSourceCoeffs
+    {
+        selectionMode   all;
+        volumeMode      specific;
+        fields          (h);
+        injectionRateSuSp
+        {
+            h   (150000 0);
+        }
+    }
+}
+
+limitTemperature
+{
+    type            limitTemperature;
+    active          yes;
+    selectionMode   all;
+    min             250.0;
+    max             500.0;
+}
+
+// ************************************************************************* //

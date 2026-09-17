@@ -1,0 +1,9 @@
+constant/polyMesh/
+constant/*/polyMesh/
+constant/cellToRegion
+0/cellToRegion
+0/*/cellToRegion
+*.unv
+logs/
+postProcessing/
+ecm/

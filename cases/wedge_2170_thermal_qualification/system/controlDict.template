@@ -1,0 +1,255 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// Pure-thermal qualification case (no ECM). Cloned from cases/wedge_2170
+// (near-ideal JR<->Can bottom contact resistance, resolved authoritative --
+// see docs/equivalence/OPENFOAM_REFERENCE_RESOLUTION_20260918.md). Heat
+// source: constant 150000 W/m3 uniform in JellyRoll, ON for the pulse stage,
+// OFF (fvOptions edited to 0) for the rest stage. See Allrun.
+
+application     chtMultiRegionSolidFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         2;
+
+deltaT          0.05;
+
+writeControl    adjustableRunTime;
+
+writeInterval   10;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   8;
+
+runTimeModifiable true;
+
+functions
+{
+    // Switches jellyRoll_rotated/fvOptions from the heat-ON variant to the
+    // heat-OFF (relaxation) variant at t=PULSE_END, within a single
+    // continuous run (runTimeModifiable true). Avoids a two-stage
+    // stop/restart: restarting chtMultiRegionSolidFoam from a non-zero
+    // latestTime directory was found to fail for the jellyRoll_rotated
+    // region (icoPolynomial EOS solid region does not reliably persist a
+    // restart-required field across a stop/start boundary -- see
+    // docs/equivalence/OPENFOAM_REFERENCE_RESOLUTION_20260918.md).
+    heatPulseSwitch
+    {
+        type            timeActivatedFileUpdate;
+        libs            ( utilityFunctionObjects );
+        writeControl    timeStep;
+        writeInterval   1;
+        fileToUpdate    "<system>/jellyRoll_rotated/fvOptions";
+        timeVsFile
+        (
+            (-1          "<system>/jellyRoll_rotated/fvOptions.heat")
+            (__PULSE_END__  "<system>/jellyRoll_rotated/fvOptions.rest")
+        );
+    }
+
+    jellyRollMeanT
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_rotated;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    jellyRollMaxT
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_rotated;
+        operation       max;
+        fields          ( T );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    canMeanT
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell_rotated;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    capMeanT
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap_rotated;
+        operation       volAverage;
+        fields          ( T );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    jrProbes
+    {
+        type            probes;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_rotated;
+        fields          ( T );
+        writeControl    timeStep;
+        writeInterval   1;
+        probeLocations
+        (
+            (0.0        0.0 0.03279)   // JR centerline, mid-height
+            (0.0102     0.0 0.03279)   // JR near-outer-edge, mid-height (radial probe)
+            (0.0        0.0 0.001)     // JR near-bottom (axial probe)
+            (0.0        0.0 0.065)     // JR near-top (axial probe)
+        );
+    }
+    canProbes
+    {
+        type            probes;
+        libs            ( fieldFunctionObjects );
+        region          shell_rotated;
+        fields          ( T );
+        writeControl    timeStep;
+        writeInterval   1;
+        probeLocations
+        (
+            (0.01045    0.0 0.03279)   // Can outer wall, mid-height
+            (0.005      0.0 0.0001)    // Can bottom-end (bottom-end temperature)
+        );
+    }
+    capProbes
+    {
+        type            probes;
+        libs            ( fieldFunctionObjects );
+        region          cap_rotated;
+        fields          ( T );
+        writeControl    timeStep;
+        writeInterval   1;
+        probeLocations
+        (
+            (0.0        0.0 0.06995)   // Cap top-center (top-end temperature)
+        );
+    }
+
+    // Stored-energy accounting: rho is spatially uniform in each region
+    // (icoPolynomial single-term / rhoConst), so total region stored
+    // enthalpy = rho_region * volIntegrate(h). Post-processing multiplies
+    // by rho_region (JR 2660.7, Can 8000, Cap 1447.2 kg/m3, see
+    // constant/<region>/thermophysicalProperties) and sums the three
+    // regions; delta vs. t=0 is the physically meaningful stored-energy
+    // rise.
+    jellyRollHIntegral
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          jellyRoll_rotated;
+        operation       volIntegrate;
+        fields          ( h );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    canHIntegral
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell_rotated;
+        operation       volIntegrate;
+        fields          ( h );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    capHIntegral
+    {
+        type            volFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap_rotated;
+        operation       volIntegrate;
+        fields          ( h );
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+
+    // Total boundary heat loss: wallHeatFlux writes the wall-normal heat
+    // flux field on the two externalWallHeatFluxTemperature (convective)
+    // patches; surfaceFieldValue integrates it to W, sign convention is
+    // OpenFOAM's wallHeatFlux (positive = heat leaving the solid).
+    canWallHeatFlux
+    {
+        type            wallHeatFlux;
+        libs            ( fieldFunctionObjects );
+        region          shell_rotated;
+        patches         ( shell_outerSurface_rotated );
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    capWallHeatFlux
+    {
+        type            wallHeatFlux;
+        libs            ( fieldFunctionObjects );
+        region          cap_rotated;
+        patches         ( capOuterSurface_rotated );
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    canBoundaryHeatLoss
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          shell_rotated;
+        fields          ( wallHeatFlux );
+        operation       areaIntegrate;
+        regionType      patch;
+        name            shell_outerSurface_rotated;
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+    capBoundaryHeatLoss
+    {
+        type            surfaceFieldValue;
+        libs            ( fieldFunctionObjects );
+        region          cap_rotated;
+        fields          ( wallHeatFlux );
+        operation       areaIntegrate;
+        regionType      patch;
+        name            capOuterSurface_rotated;
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+    }
+}
+
+// ************************************************************************* //

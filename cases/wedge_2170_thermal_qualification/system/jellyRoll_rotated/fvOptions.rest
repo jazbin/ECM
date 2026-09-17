@@ -1,0 +1,45 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Pure-thermal qualification case, heat-OFF (relaxation) variant. Swapped in
+// via timeActivatedFileUpdate in controlDict at the end of the pulse.
+constantHeat
+{
+    type            scalarSemiImplicitSource;
+    active          yes;
+    selectionMode   all;
+    scalarSemiImplicitSourceCoeffs
+    {
+        selectionMode   all;
+        volumeMode      specific;
+        fields          (h);
+        injectionRateSuSp
+        {
+            h   (0 0);
+        }
+    }
+}
+
+limitTemperature
+{
+    type            limitTemperature;
+    active          yes;
+    selectionMode   all;
+    min             250.0;
+    max             500.0;
+}
+
+// ************************************************************************* //

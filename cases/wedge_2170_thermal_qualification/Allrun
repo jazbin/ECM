@@ -1,0 +1,36 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+if [ -f /opt/openfoam/etc/bashrc ]; then
+    set +e; set +u
+    source /opt/openfoam/etc/bashrc
+    set -u; set -e
+fi
+
+export LD_LIBRARY_PATH="/workspace/lib:${LD_LIBRARY_PATH:-}"
+export PATH="/workspace/bin:${PATH}"
+
+find . -maxdepth 1 -type d -regextype posix-extended \
+    -regex ".*/[0-9]+(\.[0-9]+)?" ! -name "0" -exec rm -rf {} + 2>/dev/null || true
+rm -rf postProcessing logs
+mkdir -p logs
+
+PULSE_END=${1:-100}
+REST_END=${2:-300}
+
+# Single continuous run: heat pulse 0 -> PULSE_END, then relaxation
+# PULSE_END -> REST_END, switched via timeActivatedFileUpdate (see
+# controlDict). No restart/stop-start boundary. Regenerated fresh from
+# controlDict.template each invocation so PULSE_END/REST_END can be
+# changed on repeat runs.
+cp system/controlDict.template system/controlDict
+sed -i "s/__PULSE_END__/${PULSE_END}/" system/controlDict
+sed -i "s/^endTime.*/endTime         ${REST_END};/" system/controlDict
+
+stamp=$(date -u +%Y%m%d_%H%M%S)
+echo "Continuous run: heat pulse ON 0 -> ${PULSE_END}s, OFF ${PULSE_END} -> ${REST_END}s" \
+    | tee "logs/run_${stamp}.log"
+chtMultiRegionSolidFoam 2>&1 | tee -a "logs/run_${stamp}.log"
+
+echo "Done."

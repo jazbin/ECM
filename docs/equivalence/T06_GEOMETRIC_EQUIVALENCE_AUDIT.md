@@ -5,6 +5,38 @@
 **Method:** exact B-Rep boolean intersection (pythonOCC/OpenCASCADE `BRepAlgoAPI_Common`), `tools/audit_bds_openfoam_overlap.py`. No voxel/triangulated approximation used for the primary result.
 **Raw data:** `artifacts/equivalence/T06_BDS_TO_OPENFOAM_OVERLAP.csv`, `artifacts/equivalence/T06_CONTACT_GRAPH.csv`. Diagnostic figure: `artifacts/equivalence/figures/T06_axial_domain_mapping.png`.
 
+## Finding classification — read this before the rest of the document
+
+T06 (`T06_TARGET_AXIAL_SURPLUS_2p00.step`) was built at the **previous** JR OD
+= 19.25mm radial target, not the final JR OD = Can ID = 20.6274mm target
+confirmed in `NEXTSESSION` (2026-09-10) and
+`tbm_validation/OPENFOAM_ECM_EQUIVALENCE_TARGET.md`. Every finding below falls
+into one of two categories, and they must not be conflated:
+
+**TOPOLOGICAL FINDINGS — independent of final radial dimensions, valid now:**
+- The BDS `Can` solid is a filled envelope spanning the full cell length
+  (Key finding 1), not a thin wall — this is a modelling/export-convention
+  fact about how the body was drawn, not a dimension.
+- OpenFOAM's Cap domain exists only at the top of the cell; BDS mirrors
+  hardware at both ends (Key finding 2) — this is a domain-topology fact.
+- The Can→EndPlate→Internal-Post→Washer→Tab Stem→Tab Root→Jellyroll contact
+  chain (Key finding 3) — this is a touching/not-touching graph, invariant
+  to a uniform radial rescale.
+These will still be true, in the same qualitative form, once T06 is rebuilt
+at the final 20.6274mm radial target.
+
+**DIMENSIONAL/COVERAGE FINDINGS — invalid until final radial geometry exists:**
+- The specific overlap **percentages** in the table below (e.g. Can:
+  83.68%/9.67%/3.49%/3.16%) and any volume-coverage/shortfall numbers derived
+  from them (e.g. the ~44–84% Can/Cap thermal-mass shortfall reported in
+  `BDS_TO_OPENFOAM_THERMAL_MAPPING.md`) are artifacts of comparing a
+  19.25mm-JR-OD body against 20.6274mm-JR-OD reference domains. They are
+  **expected geometry mismatch**, not evidence that the BDS architecture is
+  fundamentally short of thermal mass. Do not use these numbers to drive
+  decisions. Re-run `tools/audit_bds_openfoam_overlap.py` against a
+  final-dimension T06/T-series or H-series export before trusting any
+  coverage percentage.
+
 ## Coordinate registration (stated explicitly, not silent)
 
 The STEP file's solid axis is global **Y**; the OpenFOAM case's is global **Z** (cylindrical `coordinateSystem`, axis (0 0 1)). Registration is fixed by aligning the STEP JellyRoll's bottom face (y=0) to the OpenFOAM JellyRoll region's bottom face (z=0.23132mm): `z_of = y_step + 0.23132mm`. This is justified — not fitted — because the STEP Jellyroll/Mandrel axial extent (65.11mm exactly) matches the OpenFOAM JellyRoll region height to 5 significant figures with zero free parameters. No other registration choice reproduces that match. The residual ambiguity this leaves at the Can/Cap ends is discussed below and does not affect the JR-domain conclusions.

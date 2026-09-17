@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2506                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      createPatchDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+pointSync false;
+
+patches
+(
+    // Radial contact (side): mapped to shell radial patch
+    {
+        name            jellyRoll_rotated_to_shell_rotated_radial;
+        patchInfo
+        {
+            type        mappedWall;
+            sampleMode  nearestPatchFace;
+            sampleRegion shell_rotated;
+            samplePatch  shell_rotated_to_jellyRoll_rotated_radial;
+        }
+        constructFrom   set;
+        set             radialContactFaces;
+    }
+
+    // Bottom flat contact: mapped to shell bottom patch (interface resistance goes here)
+    {
+        name            jellyRoll_rotated_to_shell_rotated_bottom;
+        patchInfo
+        {
+            type        mappedWall;
+            sampleMode  nearestPatchFace;
+            sampleRegion shell_rotated;
+            samplePatch  shell_rotated_to_jellyRoll_rotated_bottom;
+        }
+        constructFrom   set;
+        set             bottomContactFaces;
+    }
+);
+
+// ************************************************************************* //

@@ -1,29 +1,65 @@
 # STAR-CCM+ Client Equivalence Qualification Test Plan
 
-**Date:** 2026-09-17
-**Depends on:** `SOURCE_INVENTORY.md`, `OPENFOAM_THERMAL_OPERATOR_INVENTORY.md`, `CAN_CAP_REDUCTION_DECISION.md`, `T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`, `BDS_TO_OPENFOAM_THERMAL_MAPPING.md`.
+**Date:** 2026-09-17, restructured 2026-09-18.
+**Depends on:** `SOURCE_INVENTORY.md`, `OPENFOAM_THERMAL_OPERATOR_INVENTORY.md`, `CAN_CAP_REDUCTION_DECISION.md`, `T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`, `BDS_TO_OPENFOAM_THERMAL_MAPPING.md`, `OPENFOAM_REFERENCE_RESOLUTION_20260918.md`.
 **Geometry:** known-good T06 (`T06_TARGET_AXIAL_SURPLUS_2p00.step` / `.tbm`), unchanged.
 
-This is requested as **one structured client interaction** (Robert), run in STAR-CCM+ against the T06 import, covering Tests A–D in order — do not proceed to a later test until the prior one passes.
+## Sequencing — read this first
+
+Do **not** open with Test A. Test A presupposes a complicated three-way Can
+material split and a bottom-resistance surrogate — both of which may turn out
+to be unnecessary, or may not even be things STAR can do, depending on how
+STAR's `Create from Tbm` actually treats the 13 overlapping BDS bodies when it
+builds Parts and Regions. We proved (via exact B-Rep boolean intersection,
+`T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`) that the STEP solids themselves overlap;
+we have **not** established that STAR's own Parts→Regions construction
+preserves that overlap, resolves it automatically, or exposes it to the user
+at all. **Do not assume the returned STEP decomposition is automatically
+identical to STAR's final thermal computational decomposition.**
+
+So the first client interaction is **Step 0 below only** — five direct
+capability questions, no case setup required. Their answers determine
+whether Test A's piecewise-mapping machinery is even necessary, and in what
+form. Tests A–D remain specified below for when they're needed, but are
+explicitly gated behind Step 0.
+
+## Step 0 — STAR capability questions (ask this first, nothing else)
+
+1. How does STAR actually treat the overlapping BDS "Can" when `Create from Tbm` creates the battery model?
+2. Which of the 13 Parts become actual thermally meshed solid volumes/Regions?
+3. Are overlaps boolean-resolved automatically?
+4. Can Core/+Tab/−Tab electrical assignments remain intact while thermal material/continuum assignments are changed?
+5. Can auxiliary electrical parts be excluded from Energy, or otherwise prevented from creating conductive thermal paths?
+
+No case run is required to answer these — they are about what `Create from
+Tbm` does and what the resulting Region/continuum tree looks like, inspectable
+directly in STAR's part/region browser. **Only after these are answered** do
+we know whether Test A's Can 3-way split and Option D bottom-interface
+surrogate are actually needed, or whether STAR's own Region construction
+already does something equivalent (or something that makes the whole
+piecewise-mapping question moot).
 
 ## Phase 6 note — pure-thermal OpenFOAM reference experiment
 
-A candidate case already exists in-repo: `cases/wedge_2170_constant_heat_rtherm` — same 3-region geometry/materials as the production reference, constant volumetric heat source (150000 W/m³, uniform in JellyRoll, via `scalarSemiImplicitSource`, no ECM coupling) — structurally exactly what Phase 6 asks for. However:
-
-- Its base-contact resistance (`thicknessLayers=1.804785e-3 m`) differs from the current production case's near-ideal value (`6.015e-7 m`), so it is not a same-topology drop-in; it represents an intentionally-resistive bottom contact, useful as a secondary sensitivity case but not the primary "ideal contact" reference.
-- The existing `postProcessing/jellyRoll_rotated/jellyRollMeanT` result files for this case and for the production `wedge_2170` case are byte-identical despite the different configurations — indicating stale/copied data. **Neither is used here as validated transient evidence.**
-
-**Recommended action (not executed this run — flagged as the exact next step, not fabricated):** re-run `cases/wedge_2170_constant_heat_rtherm` (or a clone with `thicknessLayers` restored to the production value `6.015e-7m` for topology parity) fresh, confirm `postProcessing` is regenerated (not stale), and use its `T_JR_mean(t)`, `T_JR_max(t)` histories plus the same probes in STAR as the Test A comparison baseline. Exact commands:
-
-```bash
-cd cases/wedge_2170_constant_heat_rtherm
-rm -rf postProcessing 100 200 300 400 500 processor*   # keep 0/, constant/, system/, ecm/
-./Allrun   # or the OpenFOAM run command already used in this case (see run.log for the prior invocation)
-```
+A clean, non-stale pure-thermal reference case now exists at
+`cases/wedge_2170_thermal_qualification` (cloned from the authoritative
+production case, `docs/equivalence/OPENFOAM_REFERENCE_RESOLUTION_20260918.md`):
+same 3-region geometry/materials, same near-ideal bottom contact
+(R≈1.8mΩ·K/W), 100% Q→JellyRoll heat source (150000 W/m³, uniform, via
+`scalarSemiImplicitSource`, no ECM coupling), single continuous run (no
+restart chain) with the heat pulse switched off via `timeActivatedFileUpdate`
+at t=100s, total duration 300s. This supersedes the earlier
+`cases/wedge_2170_constant_heat_rtherm` candidate (that case's
+`thicknessLayers=1.804785e-3m` bottom contact was found to be a stale,
+abandoned calibration variant, not the production reference — see the
+resolution doc). Use its exported CSVs (JR mean/max T, radial/axial probes,
+Can/top-end/bottom-end T, total stored energy, total boundary heat loss) as
+the Test A/D comparison baseline once Step 0's answers make clear which test
+is actually needed.
 
 Common probe definitions (physical coordinates, JR-aligned OpenFOAM z frame, mm): JR centerline z=32.79 (mid-height) r=0; JR outer edge z=32.79 r=10.31; Can outer wall z=32.79 r=10.545; Cap top-center z=70.02 r=0. Use identical (r,z) probe locations in STAR.
 
-## Test A — thermal operator only
+## Test A — thermal operator only (gated behind Step 0 — do not run first)
 
 Using the T06 geometry, unmodified:
 
