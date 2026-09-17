@@ -17,27 +17,68 @@ preserves that overlap, resolves it automatically, or exposes it to the user
 at all. **Do not assume the returned STEP decomposition is automatically
 identical to STAR's final thermal computational decomposition.**
 
-So the first client interaction is **Step 0 below only** — five direct
-capability questions, no case setup required. Their answers determine
-whether Test A's piecewise-mapping machinery is even necessary, and in what
-form. Tests A–D remain specified below for when they're needed, but are
-explicitly gated behind Step 0.
+So the first client interaction is the **STAR Capability Gate — S0**, below.
+Its answers determine whether Test A's piecewise-mapping machinery is even
+necessary, and in what form. Tests A–D remain specified below for when
+they're needed, but are explicitly gated behind S0 passing/informing the
+approach.
 
-## Step 0 — STAR capability questions (ask this first, nothing else)
+**Workflow constraint (confirmed 2026-09-18): only Robert has STAR-CCM+
+access.** Bojan does not have a local STAR install. All S0 evidence must
+therefore be gathered from a single self-contained package sent to Robert
+and the package/`.sim`/screenshots he returns — see
+`artifacts/equivalence/robert_s0/`. No assumption should be made that Bojan
+can perform additional STAR-side inspection locally, now or as a followup;
+any further STAR-side question must go through another Robert round-trip
+package, not local access.
 
-1. How does STAR actually treat the overlapping BDS "Can" when `Create from Tbm` creates the battery model?
-2. Which of the 13 Parts become actual thermally meshed solid volumes/Regions?
-3. Are overlaps boolean-resolved automatically?
-4. Can Core/+Tab/−Tab electrical assignments remain intact while thermal material/continuum assignments are changed?
-5. Can auxiliary electrical parts be excluded from Energy, or otherwise prevented from creating conductive thermal paths?
+## S0 — STAR Capability Gate
 
-No case run is required to answer these — they are about what `Create from
-Tbm` does and what the resulting Region/continuum tree looks like, inspectable
-directly in STAR's part/region browser. **Only after these are answered** do
-we know whether Test A's Can 3-way split and Option D bottom-interface
-surrogate are actually needed, or whether STAR's own Region construction
-already does something equivalent (or something that makes the whole
-piecewise-mapping question moot).
+Confirmed already (do not re-ask Robert): STAR's `Create from Tbm` creates a
+separate Part and Region for each of the 13 imported BDS bodies.
+
+Four tests, all performed by Robert in one session against the known-good
+T06 geometry, unmodified:
+
+- **S0-A — Region geometry / overlap resolution.** Does STAR's computational
+  Region geometry retain the overlapping solids present in the exported BDS
+  STEP, or does it clip/boolean-resolve them? Evidence: per-Region and (if
+  exposed) per-Geometry-Part volumes for at least Can/Jellyroll/Mandrel/
+  EndPlates/Internal-Posts, plus one centerline axial section view.
+- **S0-B — Region interfaces / contact topology.** What interfaces/contacts
+  did STAR actually build between neighbouring Regions along the confirmed
+  Can→EndPlate→Post→Washer→TabStem→TabRoot→Jellyroll contact chain
+  (`T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`)? Inspected directly in STAR's
+  Interfaces tree, not inferred from geometry.
+- **S0-C — Electrical role vs. thermal material independence.** Can a Region
+  (test case: `+Ve Tab Stem`) keep its electrical role (Core/+Tab Parts,
+  valid Battery Cell/Unit Cell Model) while its thermal material is changed
+  independently to an extreme test value?
+- **S0-D — Electrical role vs. thermal path suppression.** Building on S0-C:
+  can a Region's thermal *path* be suppressed (low-k, Energy-model exclusion,
+  uncoupled interface, or explicit interface contact resistance) while its
+  electrical role remains intact? Four mechanisms (D1–D4), each checked
+  independently.
+
+Full instructions, exact return template, and screenshot checklist are in
+`artifacts/equivalence/robert_s0/README_FOR_ROBERT.md`,
+`ROBERT_RETURN_TEMPLATE.md`, and `SCREENSHOT_CHECKLIST.md`. The packaged ZIP
+for sending to Robert is `out/ROBERT_STAR_S0_QUALIFICATION_20260917.zip`
+(contains the README, template, checklist, and the exact known-good T06 TBM
+— see `artifacts/equivalence/robert_s0/T06_INPUT_PROVENANCE.md` for its
+provenance/SHA256).
+
+Robert is asked only to perform actions, take measurements, make one small
+material change (S0-C) and one small thermal-path capability test (S0-D),
+and return evidence — not to interpret results, compare against OpenFOAM, or
+do any of Test A–D's setup. Interpretation of the returned S0 evidence, and
+the decision of which of Test A–D (and in what form) is actually needed,
+happens on this side after Robert's package comes back.
+
+**Only after S0's answers come back** do we know whether Test A's Can 3-way
+split and Option D bottom-interface surrogate are actually needed, or
+whether STAR's own Region construction already does something equivalent
+(or something that makes the whole piecewise-mapping question moot).
 
 ## Phase 6 note — pure-thermal OpenFOAM reference experiment
 
