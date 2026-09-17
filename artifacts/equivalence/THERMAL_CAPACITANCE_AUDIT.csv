@@ -1,0 +1,5 @@
+reference_domain,OF_volume_mm3,OF_rhoCp_J_per_m3K,OF_integrated_C_J_per_K,mapped_BDS_overlap_volume_mm3,mapped_integrated_C_J_per_K,absolute_diff_C_J_per_K,relative_diff_pct,note
+JellyRoll,21758.289,2607486.0,56.7344,21539.926,56.1651,-0.5693,-1.00,"1.0% shortfall -- small unmapped void (e.g. mandrel/jellyroll or jellyroll/can radial clearance), not resolved"
+Can,1067.764,4000000.0,4.2711,599.486,2.3979,-1.8732,-43.86,"43.9% shortfall -- most missing volume is NOT accounted by any BDS solid at all (not merely misclassified): real unmodeled void/clearance in BDS Can-domain space"
+Cap,1634.437,723600.0,1.1827,260.284,0.1883,-0.9944,-84.07,"84.1% shortfall -- largest gap; most of OF Cap-domain volume has no corresponding BDS solid material present"
+Total,24460.490,,62.1882,22399.696,58.7513,-3.4369,-5.53,"Total mapped capacitance (JR+Can+Cap overlap only, excludes 239.754 mm3 of BDS material that fell entirely outside all 3 OF domains, which has no OF material assignment defined)"

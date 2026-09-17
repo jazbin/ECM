@@ -1,0 +1,39 @@
+body_a,body_b,min_distance_mm,touching
+Mandrel,Jellyroll,0.0,YES
+Mandrel,+Ve Tab Root,0.02397,NO
+Mandrel,+Ve Tab Stem,0.06823,NO
+Mandrel,+Ve Washer,1.163,NO
+Mandrel,-Ve Washer,1.163,NO
+Mandrel,+Ve Internal-Post,1.2225,NO
+Mandrel,-Ve Internal-Post,1.2225,NO
+Jellyroll,Can,0.0595,NO
+Jellyroll,+Ve Tab Root,0.0,YES
+Jellyroll,+Ve Tab Stem,0.05815,NO
+Jellyroll,-Ve Tab Root,0.0,YES
+Jellyroll,-Ve Tab Stem,0.05815,NO
+Jellyroll,+Ve Washer,1.163,NO
+Jellyroll,-Ve Washer,1.163,NO
+Jellyroll,+Ve Internal-Post,1.93507,NO
+Jellyroll,-Ve Internal-Post,1.93507,NO
+Can,-Ve Tab Root,0.17989,NO
+Can,-Ve Tab Stem,0.19115,NO
+Can,+Ve Washer,0.0595,NO
+Can,-Ve Washer,0.0595,NO
+Can,+Ve EndPlate,0.0,YES
+Can,-Ve EndPlate,0.0,YES
++Ve Tab Root,+Ve Tab Stem,0.0,YES
++Ve Tab Root,+Ve Washer,1.10485,NO
++Ve Tab Root,+Ve Internal-Post,1.92618,NO
++Ve Tab Stem,+Ve Washer,0.0,YES
++Ve Tab Stem,+Ve EndPlate,1.2225,NO
++Ve Tab Stem,+Ve Internal-Post,1.53685,NO
+-Ve Tab Root,-Ve Tab Stem,0.0,YES
+-Ve Tab Root,-Ve Washer,1.10485,NO
+-Ve Tab Stem,-Ve Washer,0.0,YES
+-Ve Tab Stem,-Ve EndPlate,1.2225,NO
++Ve Washer,+Ve EndPlate,1.163,NO
++Ve Washer,+Ve Internal-Post,0.0,YES
+-Ve Washer,-Ve EndPlate,1.163,NO
+-Ve Washer,-Ve Internal-Post,0.0,YES
++Ve EndPlate,+Ve Internal-Post,0.0,YES
+-Ve EndPlate,-Ve Internal-Post,0.0,YES

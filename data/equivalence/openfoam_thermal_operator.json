@@ -1,0 +1,119 @@
+{
+  "source_case": "cases/wedge_2170",
+  "source_case_note": "Current production OpenFOAM-ECM reference case (chtMultiRegionSolidFoam, 2506). A second case, cases/wedge_2170_constant_heat_rtherm, shares identical geometry/materials but uses a finite base-contact resistance and a fixed volumetric heat source instead of ECM coupling; treated as a secondary/legacy sensitivity variant, NOT the primary reference (see unknowns).",
+  "coordinate_system": "cylindrical, axis = global Z, origin (0,0,0), z=0 at can bottom outer face",
+  "domains": {
+    "JellyRoll": {
+      "openfoam_region": "jellyRoll_rotated",
+      "geometry_source": "cases/wedge_2170/constant/jellyRoll_rotated/polyMesh/points (exact ASCII mesh bounding box)",
+      "radius_m": 0.01031368,
+      "z_range_m": [0.00023132, 0.0653413],
+      "height_m": 0.06511,
+      "volume_m3": 2.175828894e-05,
+      "rho_kg_m3": 2660.7,
+      "cp_model": "hTabulated (piecewise-linear vs T), consistent with rho_ref/Cp_ref/Cp_grad in docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md: Cp(T)=980+3*(T_degC-25) J/kgK",
+      "cp_table_J_per_kgK": [[250, 835.55], [500, 1585.55]],
+      "conductivity_tensor_W_per_mK": {"kr": 1.4, "ktheta": 1.4, "kz": 29.0, "form": "cylindrical (r,theta,z), transport=tabulatedAnIso, constant with T in this case (single triplet)"},
+      "thermo_model": "heSolidThermo/pureMixture/tabulatedAnIso/hTabulated/icoPolynomial(rho const 2660.7)"
+    },
+    "Can": {
+      "openfoam_region": "shell_rotated",
+      "geometry_source": "cases/wedge_2170/constant/shell_rotated/polyMesh/points",
+      "outer_radius_m": 0.010545,
+      "z_range_m": [0.0, 0.0653413],
+      "shape": "hollow cylinder (radial wall, r 0.01031368-0.010545) union solid bottom disc (r 0-0.010545, z 0-0.00023132); i.e. Can wraps the JellyRoll radially AND forms a thin bottom wall under it. No top wall (top is bounded by Cap domain).",
+      "wall_thickness_m": 0.00023132,
+      "volume_m3": 1.067764e-06,
+      "rho_kg_m3": 8000.0,
+      "cp_J_per_kgK": 500.0,
+      "conductivity_W_per_mK": 16.0,
+      "conductivity_form": "constIso (scalar, isotropic)",
+      "thermo_model": "heSolidThermo/pureMixture/constIso/hConst/rhoConst"
+    },
+    "Cap": {
+      "openfoam_region": "cap_rotated",
+      "geometry_source": "cases/wedge_2170/constant/cap_rotated/polyMesh/points",
+      "outer_radius_m": 0.010545,
+      "z_range_m": [0.0653413, 0.07002],
+      "shape": "solid disc, full radius, no bottom-side equivalent domain exists in this reference model",
+      "height_m": 0.0046787,
+      "volume_m3": 1.634437e-06,
+      "rho_kg_m3": 1447.2,
+      "cp_J_per_kgK": 500.0,
+      "conductivity_tensor_W_per_mK": {"kr": 0.01, "ktheta": 0.01, "kz": 0.1, "form": "cylindrical (r,theta,z), transport=constAnIso"},
+      "thermo_model": "heSolidThermo/pureMixture/constAnIso/hConst/rhoConst"
+    }
+  },
+  "interfaces": [
+    {
+      "pair": "JellyRoll <-> Can (radial, JR_OD == Can_ID)",
+      "patch_names": ["jellyRoll_rotated_to_shell_rotated_radial", "shell_rotated_to_jellyRoll_rotated_radial"],
+      "type": "compressible::turbulentTemperatureRadCoupledMixed",
+      "contact_resistance": "none specified (no thicknessLayers/kappaLayers block) -> ideal/zero-resistance coupled contact",
+      "radiation": "qr none on both sides"
+    },
+    {
+      "pair": "JellyRoll <-> Can (bottom, under JR)",
+      "patch_names": ["jellyRoll_rotated_to_shell_rotated_bottom", "shell_rotated_to_jellyRoll_rotated_bottom"],
+      "type": "compressible::turbulentTemperatureRadCoupledMixed",
+      "contact_resistance": "explicit thin-layer resistance: thicknessLayers=6.01519461276695e-07 m, kappaLayers=1 (dimensionless-scaled). This is nonzero but numerically small; NOT the same value as the 5.40067678 K/W 'Rtherm_jroll_base' documented in docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md -- see unknowns.",
+      "radiation": "qr none on both sides"
+    },
+    {
+      "pair": "JellyRoll <-> Cap",
+      "patch_names": ["jellyRoll_rotated_to_cap_rotated", "cap_rotated_to_jellyRoll_rotated"],
+      "type": "compressible::turbulentTemperatureRadCoupledMixed",
+      "contact_resistance": "none specified -> ideal/zero-resistance coupled contact",
+      "radiation": "qr none on both sides"
+    },
+    {
+      "pair": "Can <-> Cap",
+      "patch_names": ["shell_rotated_to_cap_rotated", "cap_rotated_to_shell_rotated"],
+      "type": "compressible::turbulentTemperatureRadCoupledMixed",
+      "contact_resistance": "none specified -> ideal/zero-resistance coupled contact",
+      "radiation": "qr none on both sides"
+    }
+  ],
+  "external_boundaries": [
+    {
+      "patch": "shell_outerSurface_rotated",
+      "region": "shell_rotated (Can)",
+      "type": "externalWallHeatFluxTemperature",
+      "mode": "coefficient",
+      "h_W_per_m2K": 160,
+      "Ta_K": 298.15,
+      "nFaces_in_wedge_mesh": 3024
+    },
+    {
+      "patch": "capOuterSurface_rotated",
+      "region": "cap_rotated (Cap)",
+      "type": "externalWallHeatFluxTemperature",
+      "mode": "coefficient",
+      "h_W_per_m2K": 160,
+      "Ta_K": 298.15,
+      "nFaces_in_wedge_mesh": 612
+    }
+  ],
+  "heat_source": {
+    "mechanism": "fvOptions ecmHeatSource (libecmFvOptions.so), region jellyRoll_rotated ONLY",
+    "selectionMode": "all (uniform application across every cell in jellyRoll_rotated)",
+    "field": "h (enthalpy equation source), volumetric field name ecmQdot",
+    "coupling": "functions/ecmCoupling (type ecmCoupler), region jellyRoll_rotated, zone jellyRoll_rotated, couplingMode lumped, lumpedOutput totalPower, totalVolumeScale 1 (full 360 deg cylinder, mesh is a wedge slice)",
+    "external_process": "python3 python/ecm_coupling_wrapper.py --backend ecm-step, driven by constant/electrical_inputs_from_validation.csv (time, current_A), persistent-pipe JSON IPC (ecm/ecm_in.json, ecm/ecm_out.json)",
+    "zoning": "single lumped zone = entire jellyRoll_rotated region; NOT split into axial or radial sub-zones",
+    "can_heated_directly": false,
+    "cap_heated_directly": false,
+    "reversible_entropic_heat_included": "unknown -- not visible from OpenFOAM-side files; internal to ecm_coupling_wrapper.py / ecm-step backend, not audited in this run (out of scope: Python ECM backend internals)",
+    "documented_vs_implemented_conflict": "docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md documents f_jroll=0.966, f_cap=0.034, f_can=0 (a three-way heat split). The actual committed OpenFOAM case (fvOptions only exists under jellyRoll_rotated; no fvOptions file exists under shell_rotated or cap_rotated) deposits 100% of ECM heat into jellyRoll_rotated and 0% into Can or Cap. This is an unresolved discrepancy between documentation and the executable reference model -- flagged, not resolved, per instructions not to invent values."
+  },
+  "initial_conditions": {
+    "T_K": 298.15,
+    "uniform_across_all_three_regions": true
+  },
+  "unknowns": [
+    "f_cap/f_jroll/f_can heat-split fractions documented in docs/WEDGE_2170_BATTERY_CELL_THERMAL_PROPERTIES_REFERENCE.md do not match the actual fvOptions wiring in cases/wedge_2170 (100% into JellyRoll only). Not resolved here.",
+    "Rtherm_jroll_base = 5.40067678 K/W documented value does not reconcile with the thicknessLayers/kappaLayers (6.015e-7 m / 1) value on the jellyRoll<->shell 'bottom' patch in the current production case cases/wedge_2170 under a simple R=thickness/(kappa*area) full-360 check (~1.8e-3 K/W obtained, not 5.4 K/W). A separate variant case cases/wedge_2170_constant_heat_rtherm uses thicknessLayers=1.804785e-3 m on the same patch (implying R~1.8 K/W by the same check), closer in order of magnitude but still not an exact match. Reconciliation requires the original derivation of the 5.4 K/W figure, not available in-repo.",
+    "Whether reversible/entropic heat is included in the ECM heat deposited via ecmQdot is internal to the Python ecm-step backend and was not audited (out of scope of the OpenFOAM-side file inventory).",
+    "Existing postProcessing/jellyRoll_rotated/jellyRollMeanT time-history data found under both cases/wedge_2170 and cases/wedge_2170_constant_heat_rtherm are byte-identical despite the two cases having different fvOptions/contact-resistance configurations. This indicates at least one of the two result sets is stale/copied rather than freshly generated from its own case configuration. Neither is treated as validated transient evidence in this report; see docs/equivalence/STAR_CLIENT_EQUIVALENCE_TEST_PLAN.md Phase 6 note."
+  ]
+}
