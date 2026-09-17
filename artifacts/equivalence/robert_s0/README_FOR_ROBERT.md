@@ -129,10 +129,36 @@ changed independently? We're using `+Ve Tab Stem` as the test Region.
 - Confirm `+Ve Tab Stem` is currently listed as part of the positive
   electrical path (Core/+Tab Parts).
 
+**Important — check continuum sharing before changing anything:**
+
+In STAR-CCM+, thermal material/model properties are often controlled by the
+Region's assigned **Physics Continuum**, not stored uniquely per-Region. If
+several battery Regions share one continuum, changing a property on that
+continuum would silently change it for all of them — not just
+`+Ve Tab Stem`. Before making any change, please:
+
+1. Identify which Physics Continuum is currently assigned to
+   `+Ve Tab Stem`.
+2. Check whether that same continuum is assigned to any other Region.
+3. **If it is shared with other Regions, do not modify it directly.**
+   Instead, duplicate it (or create a new continuum with the same
+   models/settings) to get a temporary test continuum, assign only
+   `+Ve Tab Stem` to that temporary continuum, and make the test change
+   there. Leave every other Region's continuum assignment untouched.
+4. If `+Ve Tab Stem` already has a continuum that is not shared with any
+   other Region, you can change the property on it directly — no duplicate
+   needed.
+
+We're not prescribing exact menu steps here since that depends on your STAR
+version's UI — use whatever mechanism duplicates a continuum in your
+version. Please record what you did in the return template.
+
 **The one change to make:** change *only* the thermal material/property of
-the `+Ve Tab Stem` Region to a deliberately extreme test value — e.g. thermal
-conductivity k = 0.01 W/m·K. This is a throwaway test value, not a
-production value. Please do **not** change any electrical property.
+the `+Ve Tab Stem` Region (via the isolated continuum, per above, if
+needed) to a deliberately extreme test value — e.g. thermal conductivity
+k = 0.01 W/m·K. This is a throwaway test value, not a production value.
+Please do **not** change any electrical property, and please confirm no
+other Region's thermal behaviour changed as a side effect.
 
 **After the change**, record:
 - Is `+Ve Tab Stem` still listed in +Tab Parts?
@@ -159,17 +185,30 @@ still carries its electrical role?
 if that's more natural in STAR's UI). Do not modify the other two `.sim`
 files.
 
+**Same continuum-sharing caution as S0-C applies here.** Before D1–D4,
+re-check whether `+Ve Tab Stem`'s Physics Continuum is shared with other
+Regions. If it is, use an isolated/duplicated temporary continuum (as in
+S0-C) for any continuum-level change, so other Regions are not affected.
+For D3/D4, which act on the *interface* between `+Ve Tab Stem` and its
+neighbour rather than on the continuum, this may not apply — just confirm
+the interface change doesn't affect any other interface.
+
 Try each of these four, in order, and for each one record: was it possible?,
 did the electrical assignment remain intact?, did the Battery Cell / Unit
-Cell Model remain valid?
+Cell Model remain valid?, and did every other Region's thermal setup remain
+unchanged?
 
 1. **D1** — Set a very low thermal conductivity on the Region (similar to
    S0-C) while explicitly confirming the electrical assignment is preserved.
 2. **D2** — Check whether the Energy (thermal) model can be disabled or the
-   Region/continuum excluded from Energy, while the Part remains
-   electrically referenced. If STAR clearly prevents this (e.g. it's greyed
-   out or gives an immediate error), don't force it — just note that it's
-   not available and how you know.
+   Region excluded from Energy, while the Part remains electrically
+   referenced. **Do not disable Energy at the continuum level if that
+   continuum is shared with other Regions** — that would turn off Energy
+   for all of them, not just the test Region. If Region-level exclusion
+   isn't possible without an isolated/duplicated continuum, use one (as in
+   S0-C). If STAR clearly prevents this (e.g. it's greyed out or gives an
+   immediate error), don't force it — just note that it's not available and
+   how you know.
 3. **D3** — Check whether the *interface* between this Region and its
    thermal neighbour can be made non-conducting (uncoupled/adiabatic/or
    otherwise), while the Region's electrical identity is unaffected.

@@ -46,6 +46,7 @@ critical, just keep them identifiable).
 - `40_before_core_tab_parts.png`
 - `41_before_battery_cell_valid.png`
 - `42_before_electrical_mesh_status.png`
+- `42b_continuum_assignment_check.png` — shows which Physics Continuum `+Ve Tab Stem` uses and whether other Regions share it (and the temporary duplicated continuum, if one was created)
 - `43_material_change_dialog.png`
 - `44_after_tab_parts_check.png`
 - `45_after_battery_cell_status.png`

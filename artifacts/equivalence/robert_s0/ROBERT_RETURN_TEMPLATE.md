@@ -39,6 +39,12 @@ Before change:
 - Electrical mesh status:
 - +Ve Tab Stem confirmed in positive electrical path (Y/N):
 
+Continuum isolation check:
+- Original Physics Continuum:
+- Was original continuum shared by other Regions: YES / NO
+- Temporary dedicated continuum created: YES / NO / NOT NEEDED
+- Other Regions left unchanged: YES / NO
+
 Change made: +Ve Tab Stem thermal conductivity set to k = ______ W/m·K
 
 After change:
@@ -55,24 +61,28 @@ D1 — low thermal conductivity while preserving electrical assignment:
 - Possible (Y/N):
 - Electrical assignment retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
+- Isolated to selected Region only (other Regions' continuum/thermal setup unchanged) (Y/N):
 - Notes:
 
 D2 — Energy model disabled/excluded for Region while electrically referenced:
 - Possible (Y/N):
 - Electrical assignment retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
+- Isolated to selected Region only (other Regions' continuum/thermal setup unchanged) (Y/N):
 - Notes:
 
 D3 — interface to neighbour made non-conducting while electrical identity intact:
 - Possible (Y/N):
 - Electrical assignment retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
+- Isolated to selected interface only (other interfaces unaffected) (Y/N):
 - Notes:
 
 D4 — explicit thermal contact resistance applied to interface while electrical path intact:
 - Possible (Y/N):
 - Electrical assignment retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
+- Isolated to selected interface only (other interfaces unaffected) (Y/N):
 - Notes:
 
 ## General
