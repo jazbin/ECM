@@ -1,0 +1,40 @@
+event_id,date,package_or_file,tbm_group,tbm_id,variant_notes,import_result,error_class,error_text,masked,notes
+R001,2026-09-03,tbm_geometry_test_20260903,direct,4_variants,all tab/orientation variants,FAIL,E003,Mandrel thickness must be positive,NO,First runtime event; all four variants; E003 blocks downstream
+R002,2026-09-04,tbm_geometry_test_20260904,direct,4_variants,all tab/orientation variants,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,E003 resolved; E004 appears immediately downstream
+R003,2026-09-07,tbm_geometry_test_20260907,direct,4_variants,all tab/orientation variants,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,No change from R002; client confirms E004 for all four cases
+R004,2026-09-09,hp2170-rcr-v1-tabs-on-sameFace.tbm,direct,1_variant,m_bOnly1D cleared; same-face tabs,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,YES–partial,m_bOnly1D cleared; E004 unchanged; H003 and tab-flag hypotheses masked by E004
+R005,2026-09-10,hp2170NCA-RCR-distributed-exact-contact-final.tbm,direct,1_variant,transport-num cleared; S3+→5; JR OD=Can ID,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,YES–partial,S3=5 and exact JR contact do not clear E004; H004-1 and H004-3 masked by E004
+R006,2026-09-10,hp2170NCA-RCR-distributed-exact-contact-final (SepFeed=10/Tail=85 fix),direct,1_variant,H004-5 candidate; sep_feed 0→10; sep_tail 0→85,PENDING,N/A,N/A,YES–BLOCKED,Result never received from Robert; H004-5 not yet tested in production TBM; blocked by no return
+R007,2026-09-14,ROOT_A_AXIAL_CLEARANCE_0p10+ROOT_B_AXIAL_CLEARANCE_HE_0p70,root_clearance,2_candidates,pkg_m_dintHeight: 65.11→65.21 (A) and →65.81 (B),FAIL-BOTH,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,H004-6 REFUTED; package m_dintHeight is not the causal field
+R008-D00,2026-09-16,client_v2,D,D00,Working 21700 control (validationBattery21700),PASS,—,—,NO,Environment/import control; STAR environment confirmed working
+R008-H01,2026-09-16,client_v2,H,H01,pos_surplus=0.00mm (tab=elec width); neg_surplus=+8mm,PASS,—,—,NO,Positive root zero surplus alone does not trigger E004
+R008-H02,2026-09-16,client_v2,H,H02,pos_surplus=+0.10mm; neg_surplus=+8mm,PASS,—,—,NO,
+R008-H03,2026-09-16,client_v2,H,H03,pos_surplus=+0.70mm; neg_surplus=+8mm,PASS,—,—,NO,
+R008-H04,2026-09-16,client_v2,H,H04,pos_surplus=+2.00mm; neg_surplus=+8mm,PASS,—,—,NO,
+R008-H05,2026-09-16,client_v2,H,H05,pos_surplus=+9mm; neg_surplus=0.00mm (tab=elec width),PASS,—,—,NO,Negative root zero surplus alone does not trigger E004
+R008-H06,2026-09-16,client_v2,H,H06,pos_surplus=+9mm; neg_surplus=+0.10mm,PASS,—,—,NO,
+R008-H07,2026-09-16,client_v2,H,H07,pos_surplus=+9mm; neg_surplus=+0.70mm,PASS,—,—,NO,
+R008-H08,2026-09-16,client_v2,H,H08,pos_surplus=+9mm; neg_surplus=+2.00mm,PASS,—,—,NO,
+R008-H09,2026-09-16,client_v2,H,H09,pos_surplus=0.00; neg_surplus=0.00 (both),FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,Both-zero triggers E004; single-zero does not
+R008-H10,2026-09-16,client_v2,H,H10,pos_surplus=+0.10; neg_surplus=+0.10 (both),FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,Both-0.10mm still fails; combined threshold >0.10mm
+R008-H11,2026-09-16,client_v2,H,H11,pos_surplus=+0.70; neg_surplus=+0.70 (both),PASS,—,—,NO,Both-0.70mm passes; combined threshold <0.70mm per polarity
+R008-H12,2026-09-16,client_v2,H,H12,pos_surplus=+2.00; neg_surplus=+2.00 (both),PASS,—,—,NO,
+R008-H13,2026-09-16,client_v2,H,H13,abs_tab_length=60mm; pos_surplus=+4mm; neg_surplus=+3mm,PASS,—,—,NO,Absolute tab length 60mm not the issue; surpluses +4/+3mm both positive and large
+R008-T01,2026-09-16,client_v2,T,T01,target axial; tabs=65mm; pos_surplus=+0.89; neg_surplus=-0.11,PASS,—,—,NO,Negative surplus slightly negative (-0.11mm) still passes when pos=+0.89mm
+R008-T02,2026-09-16,client_v2,T,T02,target axial; both_surplus=0.00,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,Confirms H09 finding in target stack geometry
+R008-T03,2026-09-16,client_v2,T,T03,target axial; both_surplus=+0.10mm,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,Confirms H10 finding in target stack geometry
+R008-T04,2026-09-16,client_v2,T,T04,target axial; both_surplus=+0.70mm,PASS,—,—,NO,Minimum passing both-surplus confirmed ≤0.70mm in target stack
+R008-T05,2026-09-16,client_v2,T,T05,target axial; both_surplus=+1.00mm,PASS,—,—,NO,
+R008-T06,2026-09-16,client_v2,T,T06,target axial; both_surplus=+2.00mm,PASS,—,—,NO,STEP: Tab Stem top-Y saturates here; T07/T08 identical geometry
+R008-T07,2026-09-16,client_v2,T,T07,target axial; both_surplus=+5.00mm,PASS,—,—,NO,STEP: Tab Stem top-Y identical to T06 (saturation confirmed)
+R008-T08,2026-09-16,client_v2,T,T08,target axial; both_surplus=+9/+8mm (derived heights from D00),PASS,—,—,NO,STEP: Tab Stem top-Y identical to T06 (saturation confirmed)
+R008-T09,2026-09-16,client_v2,T,T09,target axial; tabs=60mm; pos_surplus=-4.11; neg_surplus=-5.11,FAIL,E004,Electrode Root 1 : Extrusion distance can not be 0.,NO,ANOMALY: large negative surpluses (-4.11/-5.11) fail; reproduces R005 tab-length condition in target axial stack
+R008-F01,2026-09-16,client_v2,F,F01,full 2170 radial+axial; both_surplus=+0.10mm,FAIL,RADIAL,Can Thickness is -ve (preceded by JR-OD>Can-ID warning),YES–BLOCKED,F-series blocked by separate JR/Can radial conflict; cannot test E004 or root-surplus hypothesis
+R008-F02,2026-09-16,client_v2,F,F02,full 2170; both_surplus=+0.70mm,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,Same radial blocker
+R008-F03,2026-09-16,client_v2,F,F03,full 2170; both_surplus=+2.00mm,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,Same radial blocker
+R008-F04,2026-09-16,client_v2,F,F04,full 2170; +9/+8mm derived heights,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,Has SepFeed=10/Tail=85 yet still blocked by radial; H004-5 not testable here
+R008-F05,2026-09-16,client_v2,F,F05,F04 + project SepFeed/Tail=0/0,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,
+R008-F06,2026-09-16,client_v2,F,F06,F04 + project overlaps 8/20,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,
+R008-F07,2026-09-16,client_v2,F,F07,F04 + project mandrel-width=6 and neg-tab-orientation=0,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,
+R008-F08,2026-09-16,client_v2,F,F08,full project Builder; positive root-height relation preserved,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,All F-series fail; F08 cannot close the production import question
+R008-F09,2026-09-16,client_v2,F,F09,F04 + synchronized Package m_dextVolume/m_dintVolume,FAIL,RADIAL,Can Thickness is -ve,YES–BLOCKED,
