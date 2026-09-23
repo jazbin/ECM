@@ -50,15 +50,8 @@ T06 geometry, unmodified:
   Can→EndPlate→Post→Washer→TabStem→TabRoot→Jellyroll contact chain
   (`T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`)? Inspected directly in STAR's
   Interfaces tree, not inferred from geometry.
-- **S0-C — Electrical role vs. thermal material independence.** Can a Region
-  (test case: `+Ve Tab Stem`) keep its electrical role (Core/+Tab Parts,
-  valid Battery Cell/Unit Cell Model) while its thermal material is changed
-  independently to an extreme test value?
-- **S0-D — Electrical role vs. thermal path suppression.** Building on S0-C:
-  can a Region's thermal *path* be suppressed (low-k, Energy-model exclusion,
-  uncoupled interface, or explicit interface contact resistance) while its
-  electrical role remains intact? Four mechanisms (D1–D4), each checked
-  independently.
+- **S0-C — Two-part thermal capability check.** C.1: Can STAR assign an anisotropic thermal conductivity tensor (independent kr, kθ, kz) in a cylindrical coordinate frame to a solid Region inside a battery model? Required for Jellyroll (MAT-006: kr=1.4, kθ=1.4, kz=29 W/m·K) and Cap-equivalent region (MAT-012: kr=0.01, kθ=0.01, kz=0.1 W/m·K). Checked by inspecting the material model options for the Jellyroll Region — no material change required. C.2 (unchanged): Can a Region (test case: `+Ve Tab Stem`) keep its electrical role (Core/+Tab Parts, valid Battery Cell/Unit Cell Model) while its thermal material is changed independently to an extreme test value?
+- **S0-D — Electrical role vs. thermal path suppression.** Building on S0-C: can a Region's thermal *path* be suppressed (low-k, Energy-model exclusion, uncoupled interface, or explicit interface contact resistance) while its electrical role remains intact? Four mechanisms (D1–D4), each checked independently. **Test Region is `−Ve Tab Stem`** (the negative/bottom electrical path) — not `+Ve Tab Stem`. D4 records the exact STAR model name, input units, and quantity type (area-specific resistance, total resistance, conductance per area, or thickness/conductivity pair) for the explicit contact resistance mechanism.
 
 Full instructions, exact return template, and screenshot checklist are in
 `artifacts/equivalence/robert_s0/README_FOR_ROBERT.md`,
