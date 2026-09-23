@@ -14,16 +14,26 @@ This document records the gate evaluation per `docs/equivalence/ECM_CAMPAIGN_REA
 
 **PASS.**
 
-| S0 deliverable | Requirement IDs addressed |
-|---|---|
-| R0 (import + baseline) | RUN-004 (STAR version), STAR-001 (13-Region confirmation) |
-| S0-A (Region volumes + Can topology) | STAR-008 (Can/JR overlap), STAR-009 (Can/EndPlate overlap), STAR-012 (Can computational topology), GEO-022/023/024 (Region volumes) |
-| S0-B (interface topology + area) | STAR-003 (Mandrel↔JR), STAR-007 (Can↔JR across radial gap), STAR-010 (+Root↔JR area), STAR-011 (−Root↔JR area), TOP-001..015, IFC-001..006 |
-| S0-C.1 (anisotropic k capability) | MAT-006 (JR anisotropic cylindrical k), MAT-012 (Cap-equivalent anisotropic k), STAR-014 (Core Part + non-default k coexist) |
-| S0-C.2 (electrical/thermal independence) | STAR-005 (electrical role retained under thermal remapping) |
-| S0-D (thermal path suppression + D4 resistance) | STAR-006 (−Tab suppression while −Tab role preserved), STAR-013 (generic interface resistance capability) |
+Only requirements for which this package produces directly discriminating evidence are listed. A requirement is listed here only if the package's explicit Robert output (measurement, screenshot, capability check) can confirm, refute, or bound it. Requirements that merely retain a future resolution path are NOT listed — they belong in Gate 9.
 
-All deliverable IDs match entries in the master matrix. No deliverable is justified only by narrative.
+| S0 deliverable | Requirement IDs directly addressed |
+|---|---|
+| R0 (import + baseline) | RUN-004 (STAR version recorded), STAR-001 (13-Region import confirmed) |
+| S0-A (Region volumes) | STAR-008 (Can/JR overlap resolution), STAR-009 (Can/EndPlate overlap), GEO-022/023/024 (Region volumes) |
+| S0-A (Can topology) | STAR-012 (Can computational topology: monolithic vs subdivided; clipped vs overlap-preserved) |
+| S0-B (interface table + areas) | STAR-003 (Mandrel↔JR existence), STAR-007 (Can↔JR interface across radial gap), STAR-010 (+Root↔JR area), STAR-011 (−Root↔JR area), TOP-001 (JR↔Can radial interface existence), TOP-002 (radial interface area), TOP-003 (JR↔Can bottom interface existence), TOP-005 (JR↔Cap top existence), TOP-006 (JR↔Cap top area), TOP-009 (gap check), TOP-011 (Mandrel↔JR existence), TOP-013 (+Root↔JR contact area), TOP-014 (−Root↔JR contact area), IFC-001 (JR↔Can radial gap-bridging), IFC-003 (JR↔Cap top ideal contact), IFC-006 (areas match targets) |
+| S0-C.1 (anisotropy capability) | MAT-006 (JR anisotropic cylindrical k), MAT-012 (Cap-equivalent anisotropic k) |
+| S0-C.2 (electrical/thermal independence, +Tab) | STAR-005 (+Tab electrical role preserved while thermal material changed) |
+| S0-C.3 (Core Part + non-default k) | STAR-014 (Core Part assignment valid while non-default thermal k assigned) |
+| S0-D.1..D.3 (thermal suppression mechanisms) | STAR-006 (−Tab thermal suppression while −Tab electrical role preserved) — three independent mechanism checks |
+| S0-D.4 (generic interface resistance) | STAR-013 (STAR can assign thermal contact resistance: model name, units, formulation confirmed) |
+
+Requirements NOT claimed for S0 (retain future resolution paths):
+- TOP-004/007/008/010/012/015: addressed by GEO-AX or Test A
+- IFC-002 (production resistance value): S0-D confirms generic capability (STAR-013); IFC-002 itself requires S0-B topology + correct production path (future)
+- IFC-004/005: Test A
+- STAR-015: conditional on STAR-012 result; future step if triggered
+- STAR-016: conditional on S0-B + S0-D; future step
 
 ---
 
@@ -31,20 +41,20 @@ All deliverable IDs match entries in the master matrix. No deliverable is justif
 
 **PASS.**
 
-All 13 requirement families retain ≥ 1 future resolution path:
-- GEO: S0-A addresses GEO-022/023/024; RAD campaign covers GEO-001..007; GEO-AX campaign covers GEO-009..021.
-- TOP: S0-B covers TOP-001..015 (interface existence + type).
-- MAT: S0-C.1 covers MAT-006/012 (anisotropy). MAT-001..005/007..011/013..015 addressed by subsequent Test A/B/C/D.
-- IFC: S0-B covers IFC-001..006. IFC-007..012 remain in Test A/B/C/D scope.
-- BC: Not in S0 scope; Test A covers BC family.
-- SRC: SRC-008 SATISFIED. SRC-001..007/009 in Test A/D scope.
+All 13 requirement families retain ≥ 1 future resolution path after S0's scope:
+- GEO: S0-A addresses GEO-022/023/024; RAD covers GEO-001..007; GEO-AX covers GEO-009..021.
+- TOP: S0-B covers TOP-001/002/003/005/006/009/011/013/014. TOP-004/007/008/010/012/015 addressed by GEO-AX or Test A.
+- MAT: S0-C.1 covers MAT-006/012. MAT-001..005/007..011/013..015 in Test A/B/C/D scope.
+- IFC: S0-B covers IFC-001/003/006. IFC-002/004/005 in Test A or future S0-D follow-on scope.
+- BC: Test A scope.
+- SRC: SRC-008 SATISFIED. Remainder in Test A/D scope.
 - IC: Test B/C scope.
-- LUMP: Test D-LUMP scope. LUMP-001 already SATISFIED.
-- ELEC: S0-C.2 and S0-D cover STAR-005/006/013/014. ELEC-001..012 bulk addressed by Test B/C/D (DIST track).
-- DIST: Test B/C scope. DIST-001/002 SATISFIED.
-- STAR: S0 addresses STAR-001/003/005..014. STAR-015 conditional (activated only if S0-A shows monolithic Can). STAR-016 conditional (gated on S0-B + S0-D).
+- LUMP: Test D-LUMP scope. LUMP-001 SATISFIED.
+- ELEC: S0-C.2, S0-C.3, S0-D cover STAR-005/006/013/014. ELEC-001..012 bulk in Test B/C/D.
+- DIST: DIST-001/002 SATISFIED. DIST-003..005 in Test B/C.
+- STAR: S0 covers STAR-001/003/005..014. STAR-015 conditional on STAR-012. STAR-016 conditional on S0-B + S0-D.
 - VAL: Test A/B/C/D scope.
-- RUN: RUN-004 in R0. RUN-001..003/005..011 in Test A/B/C/D scope.
+- RUN: RUN-004 in R0. Remainder in Test A/B/C/D.
 
 No family drops to zero coverage as a result of S0's scope.
 
@@ -56,11 +66,11 @@ No family drops to zero coverage as a result of S0's scope.
 
 | Contradiction | Check | Status |
 |---|---|---|
-| C01 f_cap | S0 contains no heat-source instruction. Not triggered. | N/A |
-| C02 Rtherm | D4 instructs Robert to record property name/units but does NOT specify a production resistance value. No Rtherm value is given. | PASS |
-| C04 F-series | No instruction in this package states zero-clearance is impossible. No instruction constrains radial dimensions. | PASS |
-| C06 S0-B area | S0-B now explicitly requires interface_area_mm2 for the 6 mandatory pairs. | PASS |
-| C10 two-mode | S0 is framed as a capability gate for the DIST-configured T06 baseline. LUMP track is not the subject of S0. | PASS |
+| C01 f_cap | No heat-source instruction in S0. | N/A |
+| C02 Rtherm | D4 records property name/units/formulation; does NOT specify a production resistance value. No Rtherm value given. | PASS |
+| C04 F-series | No instruction states zero-clearance is impossible. No radial dimensions constrained. | PASS |
+| C06 S0-B area | S0-B requires `interface_area_mm2` for 6 mandatory pairs. | PASS |
+| C10 two-mode | S0 framed as capability gate for DIST-configured T06 baseline. LUMP track not the subject. | PASS |
 
 ---
 
@@ -74,13 +84,13 @@ No family drops to zero coverage as a result of S0's scope.
 
 **PASS.**
 
-**5a — Geometry:** S0 does not send a TBM for geometry modification. The T06 input TBM is used read-only (import only). No dimensional sweep. No radial combination is being tested. SHA of input TBM verified against T06_INPUT_PROVENANCE.md: `433a8162b6f02bbc0a5781bc7f789345adaecf8bd2b9d5ac7bd6199ed8fb6f71`.
+**5a — Geometry:** S0 does not send a TBM for modification. T06 used read-only. SHA verified: `433a8162b6f02bbc0a5781bc7f789345adaecf8bd2b9d5ac7bd6199ed8fb6f71`.
 
-**5b — Common mode-independent params:** S0 does not set any TBM parameters. Not applicable to this package.
+**5b — Common mode-independent params:** S0 does not set TBM parameters. N/A.
 
-**5c — Distributed-track-only config:** The T06 TBM is distributed-track configured (IET=RCRTable 3D, Thermal=Distributed, m_bOnly1D=0, m_bLumpedEnergyBalance=0). S0 does not ask Robert to modify these. Baseline is preserved as imported.
+**5c — Distributed-track-only config:** T06 TBM is distributed-track configured. S0 does not ask Robert to modify these. Baseline preserved as imported.
 
-**5d — Lumped-track:** S0 does not address the lumped track. Not applicable.
+**5d — Lumped-track:** S0 does not address the lumped track. N/A.
 
 ---
 
@@ -88,33 +98,34 @@ No family drops to zero coverage as a result of S0's scope.
 
 **PASS.**
 
-Each requirement ID mapped in Gate 1 has an explicit measurement request in the README:
+Every requirement ID from Gate 1 maps to an explicit measurement or observation request in the README:
 
-| Requirement | Measurement requested |
+| Requirement | Explicit Robert output requested |
 |---|---|
-| RUN-004 | STAR version string from R0 |
-| STAR-001 | Full tree screenshot after import |
+| RUN-004 | STAR version string (R0 step 1) |
+| STAR-001 | Full tree screenshot after import (R0) |
 | STAR-008/009 | Region volume table (S0-A) |
 | GEO-022/023/024 | Region volume table (S0-A) |
-| STAR-012 | Can topology classification + screenshot (S0-A) |
-| STAR-003 | Mandrel↔JR row in interface table (S0-B) |
-| STAR-007 | Can↔JR row + area in interface table (S0-B) |
-| STAR-010/011 | ±Root↔JR rows + area (required) in interface table (S0-B) |
-| TOP-001..015 | All 14 interface pair rows in interface table (S0-B) |
-| IFC-001..006 | Interface type + gap treatment columns (S0-B) |
+| STAR-012 | Can topology: two independent questions (computational subdivision + overlap resolution) with screenshot (S0-A) |
+| STAR-003 | Mandrel↔JR row in interface table with type (S0-B) |
+| STAR-007 | Can↔JR row in interface table (S0-B) |
+| STAR-010/011 | ±Root↔JR rows with required area (S0-B mandatory pairs) |
+| TOP-001/003/005/009/011 | Interface exists Y/N for relevant pairs (S0-B) |
+| TOP-002/006 | `interface_area_mm2` for Can↔JR and ±Root↔JR pairs (S0-B) |
+| TOP-013/014 | `interface_area_mm2` for +Root↔JR and −Root↔JR (S0-B mandatory) |
+| IFC-001/003 | Interface type + gap treatment columns (S0-B) |
+| IFC-006 | `interface_area_mm2` columns for all pairs (S0-B) |
 | MAT-006/012 | Anisotropy capability check: anisotropic Y/N, cylindrical Y/N, kr/kθ/kz independent Y/N (S0-C.1) |
-| STAR-014 | Same — capability check on JR continuum (S0-C.1) |
-| STAR-005 | Material independence test on +Ve Tab Stem (S0-C.2) |
-| STAR-006 | Thermal suppression test on −Ve Tab Stem (S0-D D1/D2/D3) |
-| STAR-013 | D4 resistance capability: model name, units, quantity type (S0-D D4) |
+| STAR-005 | Before/after +Tab Parts assignment + Battery Cell validity on +Ve Tab Stem test (S0-C.2) |
+| STAR-014 | Before/after Core Parts assignment + Battery Cell validity on Core Part test (S0-C.3) |
+| STAR-006 | Three independent mechanism checks (D1/D2/D3), each starting from clean baseline, each recording −Tab Parts retention (S0-D) |
+| STAR-013 | D4: exact model name, input units, quantity type, test value, property panel screenshot (S0-D.4) |
 
 ---
 
 ## Gate 7 — Dependency ordering
 
-**PASS.**
-
-S0 has no upstream dependencies in the master matrix. It is the first STAR run. RAD-A/B/C/D, GEO-AX, and Test A/B/C/D all depend on S0 output — those are downstream, not upstream of S0.
+**PASS.** S0 has no upstream dependencies in the master matrix. All downstream work (RAD, GEO-AX, Test A/B/C/D) depends on S0 output.
 
 ---
 
@@ -122,11 +133,11 @@ S0 has no upstream dependencies in the master matrix. It is the first STAR run. 
 
 **PASS.**
 
-- NEXTSESSION file: this package does not use NEXTSESSION as a design input. Instructions derive from frozen audit (HEAD de20698).
-- Coverage percentages from BDS_TO_OPENFOAM_THERMAL_MAPPING.md: not cited anywhere in S0 instructions.
-- TBM_HYPOTHESIS_LEDGER.md: no rejected/superseded hypothesis is used as a design input.
-- F-series failure: no instruction states zero-clearance is impossible.
-- Internal OF reference areas are included as internal comment in README_FOR_ROBERT.md and are NOT presented to Robert as pass/fail criteria.
+- NEXTSESSION: not used as design input.
+- Coverage percentages from BDS_TO_OPENFOAM_THERMAL_MAPPING.md: not cited.
+- No rejected/superseded hypothesis used as design input.
+- No instruction states zero-clearance is impossible.
+- Internal OF reference areas are in a comment block in the README, not presented to Robert as criteria.
 
 ---
 
@@ -136,20 +147,16 @@ S0 has no upstream dependencies in the master matrix. It is the first STAR run. 
 
 This package's scope decisions do not remove any OPEN/NOT TESTED requirement's last resolution path. Specifically:
 
-- STAR-015 (conditional 3-way Can material split): conditional on S0-A result. If S0-A shows monolithic Can, STAR-015 becomes active and is addressed in a subsequent step. Not dropped.
-- STAR-016 (production resistance applicability): conditional on S0-B + S0-D. If both confirm prerequisites, STAR-016 is addressed in production test planning. Not dropped.
-- H004-3 (JR OD = Can ID constructibility): in RAD-D2 scope. Not affected by S0.
-- All other OPEN/PARTIAL requirements retain named future resolution paths in ECM_EXPERIMENT_COVERAGE_MATRIX.md.
+- Requirements not directly addressed by S0 (TOP-004/007/008/010/012/015; IFC-002/004/005; STAR-015; STAR-016) all retain named future resolution paths in ECM_EXPERIMENT_COVERAGE_MATRIX.md or are gated on S0 results.
+- STAR-015 activated only if STAR-012 shows monolithic Can → addressed in a subsequent step if triggered.
+- STAR-016 activated only if S0-B + S0-D confirm prerequisites → subsequent production path test.
+- H004-3 (JR OD = Can ID constructibility): RAD-D2 scope. Not affected by S0.
 
 ---
 
 ## Gate 10a — Two-track coverage
 
-**PASS.**
-
-S0 is a capability gate, not an electrical-equivalence experiment. It uses the DIST-configured T06 TBM to establish STAR's capability against the distributed track requirements. The LUMP track (OF `couplingMode lumped` ↔ STAR 0D RCR) is not addressed by S0; it is covered by Test D-LUMP (future package). The README explicitly states: "DIST-configured T06 baseline. S0 is a capability gate, not an electrical-equivalence comparison."
-
-`wedge_2170` is not cited as a reference anywhere in this package.
+**PASS.** S0 uses DIST-configured T06 baseline. LUMP track not addressed by S0; covered by Test D-LUMP (future). `wedge_2170` not cited as distributed reference anywhere in this package.
 
 ---
 
@@ -157,21 +164,27 @@ S0 is a capability gate, not an electrical-equivalence experiment. It uses the D
 
 **PASS.**
 
-Pre-dispatch expected outcomes for hypotheses affected by S0 return:
+Pre-dispatch expected outcomes for hypotheses directly tested by S0:
 
 | Hypothesis | Expected outcome | Revision trigger |
 |---|---|---|
-| RMAP-3 (Can Region is addressable separately from JR) | S0-A shows Can as distinct Region; volume expected ~6202 mm³ solid or ~1068 mm³ shell depending on STAR's overlap resolution | Revise if STAR merges Can+JR into single Region |
-| STAR-012 (Can topology) | Most likely: monolithic Can Region with no automatic sub-region splitting. If monolithic → STAR-015 activates | Revise if STAR auto-creates sub-regions |
-| STAR-007 (Can↔JR interface across radial gap) | If T06's JR OD (17.88 mm) << Can ID (~20.6 mm), no direct contact interface is expected; STAR may report no interface or a synthetic virtual face | Revise if STAR creates an interface despite the gap |
-| STAR-010/011 (Root↔JR area) | Area likely small (Root tabs are offset from JR in T06 axial placement); near-zero area expected from T06 geometry | Revise if STAR reports substantial area (>100 mm²) |
-| MAT-006/012 (anisotropic k) | Unknown STAR capability. Either Y or N is actionable: Y → MAT-006/012 move to PARTIAL; N → TBM/mapping workaround required | Update master matrix on return |
-| STAR-006/013 (−Tab suppression, generic resistance) | Expected: D1 possible; D3/D4 possible; D2 uncertain (may be continuum-level only) | Update based on exact STAR error/success messages |
+| STAR-012 (Can Region topology) | Most likely MONOLITHIC / OVERLAP PRESERVED — BDS STEP typically produces full overlapping bodies; STAR may or may not auto-clip. Two-question format captures both dimensions independently. | STAR-015 activated if MONOLITHIC; material-assignment approach changes if SUBDIVIDED |
+| STAR-007 (Can↔JR interface across T06's radial gap) | No direct contact interface expected in T06: JR OD (17.88 mm) << Can ID (~20.6 mm); STAR likely reports no interface. Area would be zero or NOT AVAILABLE. | Revise if STAR creates a virtual/synthetic interface despite the gap |
+| STAR-010/011 (Root↔JR area) | Small area expected from T06 geometry; Root tabs are offset from full-disc JR face in T06 axial placement. | Revise if STAR reports area ≥ 100 mm² (would approach full-disc target of 3.325×10⁴ mm²) |
+| MAT-006/012 (anisotropic k) | Unknown STAR capability. Either answer is actionable. Y → MAT-006/012 move to PARTIAL; N → workaround required. | Update master matrix immediately on return |
+| STAR-005 (electrical role vs. thermal change) | Expected: +Tab Parts retained after k change if continuum properly isolated. | Update if STAR invalidates electrical model on any thermal material change |
+| STAR-014 (Core Part vs. thermal change) | Expected: Core Parts retained after k change on isolated continuum. | Update if STAR couples Core Part assignment to specific material type |
+| STAR-006 (−Tab suppression) | D1 (low-k): likely possible. D2 (Energy exclusion): uncertain. D3 (adiabatic interface): likely possible. Overall: at least one mechanism expected viable. | Update per each D1/D2/D3 result independently |
+| STAR-013 (generic resistance) | Expected: mechanism exists (STAR has interface resistance models). D4 confirms model name + units. | Update if no resistance model available at all |
+
+Note: RMAP-3 (`m_dintDiameter → Can ID?`) is a RAD-A hypothesis, not an S0 hypothesis. It is not listed here.
 
 ---
 
 ## Summary
 
-All 10 gate points: **PASS** (or N/A where not applicable to a capability-only package).
+All 10 gate points: **PASS** (or N/A where not applicable).
+
+Exact requirement IDs claimed by S0: RUN-004, STAR-001, STAR-003, STAR-005, STAR-006, STAR-007, STAR-008, STAR-009, STAR-010, STAR-011, STAR-012, STAR-013, STAR-014, GEO-022, GEO-023, GEO-024, MAT-006, MAT-012, TOP-001, TOP-002, TOP-003, TOP-005, TOP-006, TOP-009, TOP-011, TOP-013, TOP-014, IFC-001, IFC-003, IFC-006 (30 requirements across 8 families).
 
 **Package is ready for dispatch when this sentence is removed and replaced with: "Dispatched: [date]."**

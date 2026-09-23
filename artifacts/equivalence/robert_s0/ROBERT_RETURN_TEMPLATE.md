@@ -18,10 +18,21 @@ Volume table (object_name, object_type, volume_mm3):
 
 Axial section screenshot filename:
 
-Can computational topology:
-- Can Region appears as: [ ] (A) one monolithic Region / [ ] (B) multiple sub-regions/cell-zones / [ ] (C) visually clipped/resolved
-- Details/notes on what you see in the tree below Can Region:
-- Can topology screenshot filename (or "NOT AVAILABLE"):
+Can computational topology — two independent observations:
+
+**Computational subdivision (choose one):**
+- [ ] MONOLITHIC — one addressable Can Region, nothing further in the tree
+- [ ] SUBDIVIDED — multiple sub-regions/cell-zones/components visible under Can
+- [ ] NOT AVAILABLE — cannot determine from STAR UI
+Details/notes on tree contents below Can Region:
+
+**Overlap resolution (choose one):**
+- [ ] CLIPPED — Can geometry visually appears resolved/clipped against Jellyroll or neighbour
+- [ ] OVERLAP PRESERVED — Can volume appears to retain the overlapping region
+- [ ] CANNOT DETERMINE — not possible to tell from UI/evidence
+Details/notes:
+
+Can topology screenshot filename (or "NOT AVAILABLE"):
 
 Notes:
 
@@ -53,7 +64,7 @@ Coordinate frame options available in STAR (describe what you see):
 Screenshot filename(s) for anisotropy property panels:
 Notes:
 
-### C.2 — Electrical role vs. thermal material independence (on material_test.sim)
+### C.2 — +Tab electrical role vs. thermal material independence (on T06_S0_material_test.sim)
 
 Before change:
 - Core Parts:
@@ -61,7 +72,7 @@ Before change:
 - −Tab Parts:
 - Battery Cell / Unit Cell Model valid (Y/N):
 - Electrical mesh status:
-- +Ve Tab Stem confirmed in positive electrical path (Y/N):
+- +Ve Tab Stem confirmed in +Tab Parts (Y/N):
 
 Continuum isolation check:
 - Original Physics Continuum assigned to +Ve Tab Stem:
@@ -79,48 +90,86 @@ After change:
 - Short solve starts without error (Y/N):
 - Exact error/warning message (if any):
 
+### C.3 — Core Part assignment preserved while non-default k applied (on T06_S0_core_test.sim)
+
+Before change:
+- Full Core Parts list as shown by STAR:
+- Test Region chosen (Jellyroll, or other — specify which):
+- Battery Cell / Unit Cell Model valid (Y/N):
+- Electrical mesh status:
+
+Continuum isolation check:
+- Original Physics Continuum assigned to test Region:
+- Was original continuum shared by other Regions: YES / NO
+- Temporary dedicated continuum created: YES / NO / NOT NEEDED
+- Other Regions left unchanged: YES / NO
+
+Change made: test Region thermal conductivity set to k = ______ W/m·K
+
+After change:
+- Test Region still in Core Parts (Y/N):
+- Battery Cell / Unit Cell Model still valid (Y/N):
+- Electrical mesh still valid (Y/N):
+- Battery model initializes/regenerates without error (Y/N):
+- Short solve starts without error (Y/N):
+- Any other Region's thermal material affected (Y/N):
+- Exact error/warning message (if any):
+
 ## S0-D — Electrical role vs. thermal path suppression
 
 Test Region used: [ ] −Ve Tab Stem  [ ] Other (specify: _________)
 −Ve Tab Stem (or substitute) confirmed in −Tab Parts before starting (Y/N / NOT LISTED):
 
-Continuum isolation check (same as S0-C):
-- Original Physics Continuum assigned to test Region:
-- Was original continuum shared by other Regions: YES / NO
+NOTE: each D test was run in an independent .sim file starting from the clean baseline (confirm below):
+- D1 .sim file: T06_S0_D1.sim  [ ] fresh baseline / [ ] reverted baseline
+- D2 .sim file: T06_S0_D2.sim  [ ] fresh baseline / [ ] reverted baseline
+- D3 .sim file: T06_S0_D3.sim  [ ] fresh baseline / [ ] reverted baseline
+- D4 .sim file: T06_S0_D4.sim  [ ] fresh baseline / [ ] reverted baseline
+
+### D1 — Low thermal conductivity (in T06_S0_D1.sim)
+
+Continuum isolation check:
+- Original Physics Continuum shared with other Regions: YES / NO
 - Temporary dedicated continuum created: YES / NO / NOT NEEDED
+- Other Regions' thermal setup unchanged: YES / NO
 
-D1 — low thermal conductivity while preserving negative electrical assignment:
-- Possible (Y/N):
+- D1 mechanism available/settable (Y/N):
 - Electrical assignment (−Tab Parts) retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
-- Isolated to test Region only (other Regions' thermal setup unchanged) (Y/N):
-- Notes:
+- Notes/errors:
 
-D2 — Energy model disabled/excluded for test Region while electrically referenced:
-- Possible (Y/N):
+### D2 — Energy model exclusion (in T06_S0_D2.sim)
+
+Continuum isolation check:
+- Original Physics Continuum shared with other Regions: YES / NO
+- Temporary dedicated continuum created: YES / NO / NOT NEEDED
+- Other Regions' thermal setup unchanged: YES / NO
+
+- D2 mechanism available/settable (Y/N):
 - Electrical assignment (−Tab Parts) retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
-- Isolated to test Region only (other Regions' thermal setup unchanged) (Y/N):
-- Notes:
+- Notes/errors:
 
-D3 — interface to thermal neighbour made non-conducting while electrical identity intact:
-- Possible (Y/N):
+### D3 — Interface made non-conducting/adiabatic (in T06_S0_D3.sim)
+
+- D3 mechanism available/settable (Y/N):
 - Electrical assignment (−Tab Parts) retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
-- Isolated to selected interface only (other interfaces unaffected) (Y/N):
-- Notes:
+- Interface change isolated to selected interface only (other interfaces unaffected) (Y/N):
+- Notes/errors:
 
-D4 — explicit thermal contact resistance applied to interface while electrical path intact:
-- Possible (Y/N):
+### D4 — Explicit thermal contact resistance applied (in T06_S0_D4.sim)
+
+- D4 mechanism available/settable (Y/N):
 - Electrical assignment (−Tab Parts) retained (Y/N):
 - Battery Cell / Unit Cell Model valid (Y/N):
-- Isolated to selected interface only (other interfaces unaffected) (Y/N):
+- Interface change isolated to selected interface only (Y/N):
 - STAR property/model name used (exact string as shown in UI):
 - Input units as shown in STAR field (e.g. m²·K/W, K/W, W/m²·K):
 - Quantity type: [ ] area-specific resistance (m²·K/W) [ ] total resistance (K/W) [ ] conductance (W/K) [ ] conductance-per-area (W/m²·K) [ ] thickness+conductivity pair [ ] other (describe):
 - Test value entered and units:
 - D4 property panel screenshot filename:
-- Notes:
+- Notes/errors:
 
 ## General
 

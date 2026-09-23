@@ -26,13 +26,21 @@ S0-A       → STAR-008 (Can/JR overlap resolution), STAR-009 (Can/EndPlate over
              STAR-012 (Can computational topology), GEO-022/023/024 (Region volumes)
 S0-B       → STAR-003 (Mandrel↔JR interface), STAR-007 (Can↔JR across radial gap),
              STAR-010 (+Root↔JR area), STAR-011 (−Root↔JR area),
-             TOP-001..015, IFC-001..006
-S0-C       → STAR-005 (electrical role retained under thermal remapping),
-             STAR-014 (Core Part + non-default k coexist),
-             MAT-006 (JR anisotropic cylindrical k capability),
+             TOP-001 (JR↔Can radial interface existence), TOP-002 (radial area),
+             TOP-003 (JR↔Can bottom interface existence), TOP-005 (JR↔Cap top existence),
+             TOP-006 (JR↔Cap top area), TOP-009 (gap/zero-gap check),
+             TOP-011 (Mandrel↔JR interface), TOP-013 (+Root↔JR full-disc check),
+             TOP-014 (−Root↔JR full-disc check),
+             IFC-001 (JR↔Can radial gap-bridging), IFC-003 (JR↔Cap top ideal contact),
+             IFC-006 (interface areas match targets)
+S0-C.1     → MAT-006 (JR anisotropic cylindrical k capability),
              MAT-012 (Cap-equivalent anisotropic k capability)
-S0-D       → STAR-006 (−Tab thermal suppression while −Tab role preserved),
-             STAR-013 (generic interface resistance capability)
+S0-C.2     → STAR-005 (+Tab electrical role retained while thermal material changed)
+S0-C.3     → STAR-014 (Core Part assignment valid while non-default k assigned)
+S0-D.1     → STAR-006 evidence contribution: low-k suppression while −Tab role preserved
+S0-D.2     → STAR-006 evidence contribution: Energy exclusion while −Tab role preserved
+S0-D.3     → STAR-006 evidence contribution: adiabatic interface while −Tab role preserved
+S0-D.4     → STAR-013 (generic interface resistance capability: model name/units/formulation)
 Electrical context: current DIST-configured T06 baseline.
 S0 is a capability gate, not an electrical-equivalence comparison.
 -->
@@ -67,9 +75,9 @@ answer is correct — just report what STAR actually built.
 **Actions (on `T06_S0_baseline.sim`):**
 
 1. If practical, create a **Volume report** for each of the following
-   Regions (all 13 if your STAR exposes all of them; at minimum these six):
-   Can, Jellyroll, Mandrel, +Ve EndPlate, −Ve EndPlate, +Ve Internal-Post,
-   −Ve Internal-Post.
+   Regions (all 13 if your STAR exposes all of them; at minimum the following
+   seven): Can, Jellyroll, Mandrel, +Ve EndPlate, −Ve EndPlate,
+   +Ve Internal-Post, −Ve Internal-Post.
 2. If STAR also lets you report volume on the original **Geometry Parts**
    (pre-Region, i.e. the imported CAD bodies) separately from the Region
    volumes, please report those too — same list.
@@ -80,15 +88,21 @@ answer is correct — just report what STAR actually built.
 
 **Can computational topology — additional question:**
 
-After collecting the volume numbers, please record what STAR exposes for the `Can` Region's internal computational structure:
+After collecting the volume numbers, please record what STAR exposes for the `Can` Region's internal computational structure. Answer the following two questions **independently** — both answers may apply at the same time:
 
-- Does `Can` appear as **one monolithic Region** with no further subdivision (A)?
-- Does STAR expose **multiple separately addressable sub-regions, cell zones, or components** under `Can` (B)?
-- Does STAR appear to have **automatically clipped or resolved** the Can volume against a neighbouring body (e.g., can you see a Can sub-volume that visually corresponds to the Jellyroll-occupied zone) (C)?
+**Question 1 — Computational subdivision:**
+Does STAR show anything below the Can Region level? Choose one:
+- `MONOLITHIC` — Can appears as one addressable Region/volume with no further sub-regions, cell zones, or components visible in the tree
+- `SUBDIVIDED` — STAR exposes multiple separately addressable sub-regions, cell zones, or named components under Can
+- `NOT AVAILABLE` — cannot determine from the STAR UI
 
-If you can see a Region tree or component hierarchy under `Can` in STAR's tree view, please take a screenshot of it and note what you observe. If STAR shows nothing below the `Can` Region, please record: `Can computational topology below Region level: NOT AVAILABLE`.
+**Question 2 — Overlap resolution:**
+Does the Can geometry appear to have been automatically clipped or resolved against a neighbouring body (e.g. a Can sub-volume that visually corresponds to the Jellyroll-occupied zone is absent, or the Can shape looks truncated where Jellyroll overlaps it)? Choose one:
+- `CLIPPED` — Can geometry visually appears resolved/clipped against a neighbour
+- `OVERLAP PRESERVED` — Can geometry visually appears to still overlap Jellyroll (full solid volume present despite geometric overlap)
+- `CANNOT DETERMINE` — not possible to tell from the STAR UI/evidence
 
-We are **not** asking you to split anything or assign materials — just record what STAR's UI exposes.
+If you can see a Region tree or component hierarchy under `Can` in STAR's tree view, please take a screenshot. We are **not** asking you to split anything or assign materials — just record what STAR's UI exposes.
 
 **What to return:** a simple table (CSV or text is fine) with columns
 `object_name, object_type, volume_mm3`, where `object_type` is either
@@ -243,30 +257,66 @@ that detail matters more to us than a simple pass/fail.
 
 ---
 
+**C.3 — Core Part assignment preserved while non-default thermal conductivity is applied:**
+
+**What we need to know:** can a Region that is listed as a Core Part (the active heat-generating cell material) retain its Core Part assignment while its thermal conductivity is changed to a non-default value? This is distinct from C.2 (which tested +Tab Parts). We are not assuming which Region is a Core Part — please check STAR's actual assignment first.
+
+**Setup:** make a fresh copy of the baseline — `Save As` → `T06_S0_core_test.sim`. Do not modify the other `.sim` files.
+
+**Before making any change**, record the full Core Parts list as STAR shows it. Identify which Region STAR lists as a Core Part. If Jellyroll is listed, use Jellyroll as the test Region. If Jellyroll is not listed, use whichever Region STAR shows as the first Core Part and record which one you used.
+
+**Same continuum-sharing caution as C.2 applies.** Before changing anything: identify which Physics Continuum is assigned to the chosen Core Part Region; if that continuum is shared with other Regions, duplicate/create an isolated temporary continuum and assign only the test Region to it before making any change. Do not modify any other Region's continuum.
+
+**The one change to make:** change *only* the thermal conductivity of the chosen Core Part Region (via the isolated continuum if needed) to an extreme test value — e.g. k = 500 W/m·K. This is a throwaway value, not a production value. Do **not** change any electrical property.
+
+**After the change**, record:
+- Is the test Region still listed in Core Parts?
+- Is the Battery Cell / Unit Cell Model still valid?
+- Is the electrical mesh still valid?
+- Can the battery model initialize/regenerate without error?
+- Can a very short solve begin without error?
+- Did any other Region's thermal material change as a side effect?
+
+Capture the exact error/warning message if any.
+
+---
+
 ## S0-D — Can the thermal path be suppressed while electrical role remains?
 
 **Only do this after S0-C.** Same idea, going one step further: can we make a Region thermally "quiet" (not conducting heat into/out of it) while it still carries its electrical role?
 
-**Test Region for S0-D: `−Ve Tab Stem`** (the negative/bottom electrical path, not the positive/top). If `−Ve Tab Stem` is not accessible in the Parts tree or is not listed as a distinct Region, use the closest available Region in the negative/bottom Tab stack (e.g., `−Ve Tab Root`, `−Ve Washer`, or `−Ve Internal-Post`) and note which one you used.
+**Test Region for all D tests: `−Ve Tab Stem`** (the negative/bottom electrical path). If `−Ve Tab Stem` is not accessible in the Parts tree or is not listed as a distinct Region, use the closest available Region in the negative/bottom Tab stack (e.g., `−Ve Tab Root`, `−Ve Washer`, or `−Ve Internal-Post`) and note which one you used.
 
-**Pre-check before starting D1–D4:** confirm that the test Region (`−Ve Tab Stem` or substitute) is currently assigned to `−Tab Parts` in the Battery Cell / Unit Cell Model. Record its current −Tab Parts assignment. If the Region is NOT listed in −Tab Parts (i.e., it has no electrical role at all), please note this and proceed anyway — but flag it.
+**Pre-check:** before starting any D test, open `T06_S0_baseline.sim` and confirm that the test Region (`−Ve Tab Stem` or substitute) is currently assigned to `−Tab Parts`. Record its assignment. If the Region is NOT listed in −Tab Parts, please flag it.
 
-**Setup:** make a fresh copy of the baseline — `Save As` → `T06_S0_thermal_path_test.sim`. Do not modify the other two `.sim` files.
+**CRITICAL: each D test must start from an untouched copy of the baseline.**
 
-**Same continuum-sharing caution as S0-C applies here.** Before D1–D4, re-check whether `−Ve Tab Stem`'s Physics Continuum is shared with other Regions. If it is, use an isolated/duplicated temporary continuum (as in S0-C) for any continuum-level change. For D3/D4, which act on the *interface* between `−Ve Tab Stem` and its neighbour rather than on the continuum, this may not apply — just confirm the interface change doesn't affect any other interface.
+Do NOT run D1 through D4 sequentially in the same file. Each mechanism must be tested in isolation so its result is unambiguous. Please create a separate fresh copy of `T06_S0_baseline.sim` for each test:
 
-Try each of these four, in order, and for each one record: was it possible?, did the electrical assignment remain intact?, did the Battery Cell / Unit Cell Model remain valid?, and did every other Region's thermal setup remain unchanged?
+- `T06_S0_D1.sim` — fresh baseline copy, test D1 only
+- `T06_S0_D2.sim` — fresh baseline copy, test D2 only
+- `T06_S0_D3.sim` — fresh baseline copy, test D3 only
+- `T06_S0_D4.sim` — fresh baseline copy, test D4 only
 
-1. **D1** — Set a very low thermal conductivity on the Region (similar to S0-C) while explicitly confirming the negative electrical assignment is preserved.
-2. **D2** — Check whether the Energy (thermal) model can be disabled or the Region excluded from Energy, while the Part remains electrically referenced. **Do not disable Energy at the continuum level if that continuum is shared with other Regions.** If Region-level exclusion isn't possible without an isolated/duplicated continuum, use one (as in S0-C). If STAR clearly prevents this (e.g. it's greyed out or gives an immediate error), don't force it — just note that it's not available and how you know.
-3. **D3** — Check whether the *interface* between this Region and its thermal neighbour can be made non-conducting (uncoupled/adiabatic/or otherwise), while the Region's electrical identity is unaffected.
-4. **D4** — Check whether an explicit thermal contact resistance value can be applied to that interface, while the electrical path remains intact. No need to use a production-realistic number. Please record the following specifically:
-   - What is the **exact property/model name** STAR uses for this (e.g. "Thermal Resistance", "Contact Resistance", "Interface Resistance", "Gap Conductance")?
-   - What are the **input units** as shown in the STAR field (e.g. m²·K/W, K/W, W/m²·K)?
-   - Is the quantity entered as **area-specific resistance** (m²·K/W), **total resistance** (K/W), **conductance** (W/K), **conductance per unit area** (W/m²·K), or a **thickness/conductivity** pair (m and W/m·K)?
-   - What test value did you enter, and what were the units?
-   - Please take a screenshot of the D4 property panel showing the model type and the value/unit field.
+If retaining four files is impractical, you may instead do each test in a single file but explicitly revert the file to the clean baseline state before each test (e.g. reload from the saved baseline `.sim`). The important requirement is: each test result reflects `baseline → exactly one tested mechanism`, not `baseline → D1 → D2 → D3 → D4`.
 
-   This is a generic capability check (can STAR assign an explicit interface resistance at all?). We are not asking you to confirm that the specific value is correct for production use — that determination is made on our side later.
+**Continuum-sharing caution for D1 and D2:** before any continuum-level change, re-check whether `−Ve Tab Stem`'s Physics Continuum is shared with other Regions. If it is, use an isolated/duplicated temporary continuum (as in S0-C) so other Regions are not affected. For D3 and D4, which act on the *interface* between `−Ve Tab Stem` and its thermal neighbour rather than on the continuum, this may not apply — just confirm the interface change does not affect any other interface.
 
-That's it — please send back the filled-in template, the screenshots, and the three `.sim` files (baseline, material_test, thermal_path_test) if practical.
+For each test, record: was the mechanism available and settable?, did the negative electrical assignment (−Tab Parts) remain intact?, did the Battery Cell / Unit Cell Model remain valid?, did every other Region's thermal setup remain unchanged?
+
+**D1 (in `T06_S0_D1.sim`):** Set a very low thermal conductivity on `−Ve Tab Stem` (e.g. k = 0.01 W/m·K) while explicitly confirming the negative electrical assignment is preserved. Use an isolated continuum if shared (same method as S0-C.2).
+
+**D2 (in `T06_S0_D2.sim`):** Check whether the Energy (thermal) model can be disabled or the Region excluded from Energy, while the Part remains electrically referenced. **Do not disable Energy at the continuum level if that continuum is shared with other Regions** — that would affect all of them. If Region-level exclusion requires an isolated/duplicated continuum, use one. If STAR clearly prevents this (greyed out or immediate error), just note that it is not available.
+
+**D3 (in `T06_S0_D3.sim`):** Check whether the *interface* between `−Ve Tab Stem` and its thermal neighbour can be made non-conducting (uncoupled, adiabatic, or otherwise thermally isolated), while the Region's electrical identity is unaffected.
+
+**D4 (in `T06_S0_D4.sim`):** Check whether an explicit thermal contact resistance value can be applied to the interface between `−Ve Tab Stem` and its neighbour, while the electrical path remains intact. No need to use a production value — just confirm the mechanism exists and is settable. Please record specifically:
+- The **exact property/model name** STAR uses (e.g. "Thermal Resistance", "Contact Resistance", "Interface Resistance", "Gap Conductance")
+- The **input units** as shown in the STAR field (e.g. m²·K/W, K/W, W/m²·K)
+- Whether the quantity is entered as: area-specific resistance (m²·K/W) / total resistance (K/W) / conductance (W/K) / conductance per unit area (W/m²·K) / thickness+conductivity pair / other
+- The test value you entered and its units
+- A screenshot of the D4 property panel showing model type, value field, and units
+
+This is a generic capability check (STAR-013: can STAR assign interface resistance at all?). We are not asking you to confirm the value is correct for production use — that is determined on our side after S0 returns.
+
+Please send back the filled-in template, the screenshots, and, if practical, the `.sim` files: baseline + S0-C.2 material_test + S0-C.3 core_test + D1 + D2 + D3 + D4.
