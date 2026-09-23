@@ -144,15 +144,21 @@ Format: `ID | Claim A (source) | Claim B (source) | Stronger evidence | Canonica
 
 ---
 
-## C10 — Distributed RCR semantics: OF "lumped per-timestep" vs STAR "truly spatial"
+## C10 — Two-mode architecture: CORRECTED (prior framing "OF is lumped" was wrong)
 
-**Claim A:** The OF-ECM coupling is described as "distributed" — each JellyRoll cell gets its own ECM call per timestep.
+**Prior incorrect framing (removed):** Earlier drafts characterized OpenFOAM as lumped-only and STAR distributed 3D RCR as an additional capability layered on top. This was wrong.
 
-**Claim B:** The STAR RCRTable 3D with Distributed thermal mode provides genuinely spatial thermal-electrical coupling where local SOC, V, and heat generation respond to local temperature. This is a materially different implementation than the OF per-cell ECM Python runtime, even if both are called "distributed."
+**Confirmed two-mode architecture from repository evidence:**
 
-**Stronger evidence:** Claim B is a correct description of the difference. The comparison is not a failure — it is an expected semantic gap between the two implementations. The campaign (Test C) explicitly tests whether STAR's distributed mode produces the required spatial behavior.
+OpenFOAM has two distinct ECM coupling modes, both present in the repository:
 
-**Canonical resolution:** Do not describe these as equivalent implementations. Document the semantic difference in Test C design: OF uses per-cell ECM callbacks at each timestep; STAR uses its internal RCRTable 3D interpolation with Distributed thermal. The PASS criterion (DIST-001..005) tests whether STAR's output behaves equivalently, not whether the code path is identical.
+**OF Lumped mode:** `couplingMode lumped` (`lumpedOutput totalPower`) — present in `cases/wedge_2170/system/controlDict` and `cases/validation_lumped_paramset_21p09x70p02/system/controlDict`. Single scalar ECM state (`state.q_ah`, `state.v_rc`, `state.hysteresis`). External Python wrapper `ecm_coupling_wrapper.py --backend ecm-step`. Uniform heat deposition across all JR cells. No spatial sub-partitioning.
 
-**Files to update:** Test C design document should explicitly state this distinction.
+**OF Distributed mode:** `couplingMode elementWise` — present in `cases/validation_distributed_paramset_21p09x70p02/system/controlDict`. 18 spatial ECM partitions (axial6 × radial3 from `mapping_table_axial6_radial3_2170mesh.csv`), each with independent `q_ah`, `v_rc`, `hysteresis` state. Heat generation varies ~10× between partitions (`prev_qvol_by_ecmid`: central ~957 kW/m³, outer-edge ~16 MW/m³). `ECM_DISTRIBUTED_ELECTRICAL_MODE=parallel2rc`. Spatial state field `stField ecmST`.
+
+**STAR requirement — unchanged:** The final STAR workflow must support BOTH native 0D/lumped whole-cell RCR (LUMP track) AND native distributed 3D RCR (ELEC/DIST track). Neither is subordinate to the other.
+
+**Canonical resolution:** The master matrix now has an explicit LUMP family (7 requirements) for the lumped track and separate ELEC/DIST families (17 requirements) for the distributed track. Test A-LUMP / Test D-LUMP cover lumped equivalence. Tests B/C/D cover distributed equivalence. When citing an "OF reference," always specify which case and which coupling mode.
+
+**Files updated:** `ECM_EQUIVALENCE_MASTER_MATRIX.md` (LUMP section added; DIST section updated with confirmed elementWise evidence; SRC-004/005 corrected to specify per-track); `ECM_EXPERIMENT_COVERAGE_MATRIX.md` (OF reference cases table added; Test A-LUMP / Test D-LUMP added).
 

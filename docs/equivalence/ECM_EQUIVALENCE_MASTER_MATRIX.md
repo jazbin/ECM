@@ -132,8 +132,8 @@ Columns: `ID | Requirement | Auth source | OF/reference target | Current TBM/STA
 | SRC-001 | 100% of ECM heat deposited in JellyRoll only | `fvOptions/jellyRoll_rotated`; json | 100% JR | STAR battery model deposits heat in Core Parts; Core Parts = JR + Mandrel in T06 | OF confirmed; STAR not run | OPEN | Heat in Mandrel rather than full-JR volume if Mandrel separate from Core Parts | Map Mandrel to Core Parts or suppress separately | S0-C; Test A | GEO-005, GEO-015 |
 | SRC-002 | Zero direct heat in Can | OF case (no Can fvOptions) | 0 W | No Can fvOptions in OF | OF confirmed | NOT TESTED | Direct Can heating would add spurious energy source | Verify STAR assigns no direct heat to Can Region | Test A | — |
 | SRC-003 | Zero direct heat in Cap | OF case (no Cap fvOptions) | 0 W | No Cap fvOptions in OF | OF confirmed | NOT TESTED | Direct Cap heating spurious | Verify STAR assigns no direct heat to Cap-mapped Regions | Test A | — |
-| SRC-004 | Spatially uniform heat deposition across all JR cells | `selectionMode all`; json | Uniform q(x)=Q_total/V_JR | STAR RCRTable 3D should give spatially varying q(x,t) coupled to local T | OF confirmed; distributed mode expected to vary | PARTIAL | OF uses lumped uniform deposition; STAR distributed mode varies spatially — intrinsic difference between lumped OF ECM and distributed STAR | Test A uses no-ECM fixed heat source for thermal baseline; Test D compares full coupled behavior | Test A (uniform source), Test D (coupled) | — |
-| SRC-005 | No axial or radial sub-zoning of heat source within JR | `selectionMode all` | Single zone = all JR | STAR distributed mode inherently zones heat by local SOC/T | OF confirmed; STAR expected to differ | PARTIAL | Spatial heat distribution differs between OF lumped and STAR distributed — acceptable difference for Test D but must be documented | Document in Test D comparison | Test D | — |
+| SRC-004 | **LUMPED track:** Spatially uniform heat deposition q = Q_total/V_JR; **DISTRIBUTED track:** spatially varying q(x,t) per partition as confirmed in OF distributed reference | LUMPED: `wedge_2170` `selectionMode all`, `lumpedOutput totalPower`; DIST: `validation_distributed_paramset_21p09x70p02` ecm_state `prev_qvol_by_ecmid` varies ~10× | LUMPED: uniform q; DIST: per-partition q, ~10× variation confirmed | LUMPED STAR: uniform deposition expected from 0D mode; DIST STAR: spatially varying q expected from RCRTable 3D | OF both modes confirmed; STAR not run | PARTIAL | Misidentifying the track conflates two distinct behaviors; STAR Test A-LUMP uses uniform source; Test C/D-DIST verifies spatial variation | LUMPED track: Test A-LUMP; DIST track: Test C/D | Test A-LUMP; Test C | — |
+| SRC-005 | **LUMPED track:** Single heat-source zone = all JR cells; **DISTRIBUTED track:** per-partition ECM IDs (axial6_radial3 = 18 partitions) via `elementMappingFile` | LUMPED: `selectionMode all` single zone; DIST: `mapping_table_axial6_radial3_2170mesh.csv`, 18 ecmCellIds | LUMPED: one zone; DIST: 18 spatial partitions confirmed | Not tested in STAR for either track | OF both confirmed | PARTIAL | Sub-zoning semantics differ between tracks; must not conflate them when designing STAR tests | LUMPED: Test A-LUMP; DIST: Test C confirms 18-partition-equivalent behavior | Test A-LUMP; Test C | — |
 | SRC-006 | Heat source drives enthalpy field h (not T directly) | OF `fvOptions ecmHeatSource` on `h` | Enthalpy source | STAR uses its own thermal energy solver | OF confirmed | NOT TESTED | Formulation difference should be equivalent; verify energy balance | Energy balance check in Test A | Test A | — |
 | SRC-007 | V_JR for volumetric source = 2.17583×10⁻⁵ m³ (full 360° cylinder, totalVolumeScale=1) | OF `ecmCoupling`; json | 2.17583×10⁻⁵ m³ | Wrong until GEO-001/005 met | json confirmed; TBM OD wrong | OPEN | Wrong volumetric heat density if V_JR wrong | Resolves with GEO-001, GEO-005 | RAD-D1/D2 | GEO-001, GEO-005 |
 | SRC-008 | f_cap = 0 in executable OF case (NOT f_cap = 0.034 per documentation) | `fvOptions` files (no Cap source); json `documented_vs_implemented_conflict` | 0% Cap heat | OF executable: 0% Cap. Some docs say 0.034 — CONTRADICTED | json unknown flag; `SOURCE_INVENTORY.md` discrepancy #1 | **CONTRADICTED** | STAR Test A must match the executable OF, not the documented fraction; using f_cap=0.034 in STAR would give wrong comparison | Resolve conflict by checking OF source code; use executable-confirmed 0% | Test A design (use 0% Cap heat) | — |
@@ -148,7 +148,25 @@ Columns: `ID | Requirement | Auth source | OF/reference target | Current TBM/STA
 
 ---
 
-## ELEC — ECM / RCR Electrical Behaviour
+## LUMP — Lumped Equivalence Track (OF lumped ↔ STAR 0D whole-cell RCR)
+
+**OF lumped reference:** `cases/wedge_2170` (`couplingMode lumped`, `lumpedOutput totalPower`) and `cases/validation_lumped_paramset_21p09x70p02` (`couplingMode lumped`). Both use a single scalar ECM state (one q_ah, one v_rc vector, one hysteresis value — no spatial partitioning). Heat deposition is uniform across all JR cells.
+
+**STAR target:** native 0D/lumped whole-cell RCR mode.
+
+| ID | Requirement | Auth source | OF target | Current TBM/STAR state | Evidence | Status | Op consequence | Resolution | Required test | Dep |
+|---|---|---|---|---|---|---|---|---|---|---|
+| LUMP-001 | OF lumped couplingMode confirmed: single scalar ECM state, uniform deposition | `cases/wedge_2170/system/controlDict`; `cases/validation_lumped_paramset_21p09x70p02/system/controlDict` | `couplingMode lumped`; single `state.q_ah`, `state.v_rc`, `state.hysteresis` | Confirmed from both cases | controlDict + ecm_state.json | **SATISFIED** | Reference confirmed; lumped track defined | — | — | — |
+| LUMP-002 | STAR native 0D/lumped whole-cell RCR mode available and selectable | NEXTSESSION final requirement | Native STAR 0D RCR; IET selectable | Not yet tested in STAR; TBM design supports it via IET field | NEXTSESSION | PARTIAL | Lumped track cannot be validated if STAR lacks native 0D RCR mode | Verify during Test B (lumped variant) | Test B-LUMP | — |
+| LUMP-003 | V(t) match: STAR lumped vs OF lumped for same AE characterization + current profile + SOC₀ + T₀ | `cases/wedge_2170` V(t) output; `cases/validation_lumped_paramset_21p09x70p02` postProcessing | V(t) time series from wedge_2170 (lumped run) | Not yet compared | OF lumped reference run available | NOT TESTED | Primary electrical validation for lumped track | Test D-LUMP | Test D-LUMP | LUMP-002, LUMP-006, LUMP-007 |
+| LUMP-004 | SOC(t) match: STAR lumped vs OF lumped | Same cases | SOC(t) time series | Not yet compared | OF lumped reference available | NOT TESTED | SOC tracking equivalence | Test D-LUMP | Test D-LUMP | LUMP-002 |
+| LUMP-005 | Total Qdot(t) match: STAR lumped vs OF lumped | Same cases | Qdot(t) total heat (lumpedOutput totalPower) | Not yet compared | OF lumped output available | NOT TESTED | Energy balance equivalence; total heat determines thermal response | Test A-LUMP / Test D-LUMP | Test A-LUMP | LUMP-002 |
+| LUMP-006 | T_JR_mean(t) match: STAR lumped vs OF lumped | Same cases | T_JR_mean(t) transient | Not yet compared | OF lumped reference available | NOT TESTED | Thermal response equivalence under lumped load | Test A-LUMP | Test A-LUMP | LUMP-002, LUMP-005 |
+| LUMP-007 | Same About-Energy characterization data used in both OF lumped and STAR lumped runs | NEXTSESSION; `cases/wedge_2170/constant/electrical_inputs_from_validation.csv` | AE RCR tables; same SOC₀, T₀, current profile | In TBM design; wedge_2170 uses electrical_inputs_from_validation.csv | NEXTSESSION; wedge_2170 | PARTIAL | Different characterization data would make comparison meaningless | Confirm STAR uses same AE tables before Test D-LUMP | Pre-Test-D-LUMP | — |
+
+---
+
+## ELEC — ECM / RCR Electrical Behaviour (DISTRIBUTED track: OF elementWise ↔ STAR distributed 3D RCR)
 
 | ID | Requirement | Auth source | OF target | Current TBM/STAR state | Evidence | Status | Op consequence | Resolution | Required test | Dep |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -167,15 +185,19 @@ Columns: `ID | Requirement | Auth source | OF/reference target | Current TBM/STA
 
 ---
 
-## DIST — Distributed Electrical Semantics
+## DIST — Distributed Electrical Semantics (OF elementWise ↔ STAR distributed 3D RCR)
+
+**OF distributed reference:** `cases/validation_distributed_paramset_21p09x70p02` (`couplingMode elementWise`, `ECM_DISTRIBUTED_ELECTRICAL_MODE=parallel2rc`). ECM state file confirms 18 spatial partitions, each with independent q_ah, v_rc (2 RC elements), hysteresis. Heat `prev_qvol_by_ecmid` and `dqdt_by_ecmid` vary by approximately 10× between central partitions (~957 kW/m³) and outer-edge partitions (~16 MW/m³). Uses `elementMappingFile mapping_table_axial6_radial3_2170mesh.csv` (6 axial × 3 radial = 18 partitions). Spatial state field `stField ecmST`.
+
+**STAR target:** native distributed 3D RCR mode (IET=RCRTable 3D, Thermal=Distributed).
 
 | ID | Requirement | Auth source | OF target | Current TBM/STAR state | Evidence | Status | Op consequence | Resolution | Required test | Dep |
 |---|---|---|---|---|---|---|---|---|---|---|
-| DIST-001 | Local electrical state (SOC, polarization) must vary spatially within JR when temperature gradient exists | Test plan (Test C PASS criterion) | SOC(x,t) ≠ constant when T(x,t) spatially varying | Not yet demonstrated in STAR | Test plan | NOT TESTED | Lumped behavior would defeat the purpose of distributed RCR mode | Test C PASS criterion | Test C | ELEC-001, ELEC-002 |
-| DIST-002 | Local heat deposition q(x,t) must differ at spatially separated JR points when T(x,t) differs | Test plan (Test C) | q(x_A,t) ≠ q(x_B,t) when T(x_A) ≠ T(x_B) | Not tested | Test plan | NOT TESTED | Spatially uniform heat regardless of T gradient → lumped behavior | Test C | Test C | DIST-001 |
-| DIST-003 | Local current density responds to local RCR state | Test plan | Local J(x,t) governed by local SOC, polarization | Not tested | Test plan | NOT TESTED | Global current density ignores local state → wrong spatial heat pattern | Test C | Test C | DIST-001 |
-| DIST-004 | RCR response at a spatial point governed by local T (not global mean T) | Test plan | RCR(x,t) = f(T_local(x,t)) | Not tested | Test plan | NOT TESTED | Global-T interpolation would give same RCR everywhere | Test C | Test C | DIST-001, ELEC-006 |
-| DIST-005 | Simultaneous T_A ≠ T_B at two probes implies electrical_state_A(t) ≠ electrical_state_B(t) | Test plan (Test C formal PASS criterion) | Demonstrated at ≥ 2 probes with ~20 K gradient | Not tested | Test plan | NOT TESTED | Required to prove distributed semantics are operative | Test C | Test C | DIST-001..004 |
+| DIST-001 | OF distributed mode confirmed: local electrical state (SOC, polarization) varies spatially across 18 partitions | `cases/validation_distributed_paramset_21p09x70p02/ecm/ecm_state.json`; `controlDict couplingMode elementWise` | 18 independent ECM partition states with distinct q_ah, v_rc, hysteresis | Confirmed from ecm_state.json | ecm_state.json; controlDict | **SATISFIED** | OF distributed reference is confirmed and characterised | — | — | — |
+| DIST-002 | Local heat deposition q(x,t) spatially varies across JR partitions in OF distributed mode | `cases/validation_distributed_paramset_21p09x70p02/ecm/ecm_state.json` `prev_qvol_by_ecmid` / `dqdt_by_ecmid` | q varies ~10× between central (partition 2: ~957 kW/m³) and outer-edge (partition 9: ~16 MW/m³) partitions | Confirmed from ecm_state.json | ecm_state.json | **SATISFIED** | OF distributed reference spatial variation confirmed | — | — | — |
+| DIST-003 | STAR distributed 3D RCR must produce spatially varying local electrical state under non-uniform T | Test plan (Test C PASS criterion) | Per-partition SOC/heat varying spatially when T spatially varying — as confirmed in OF distributed reference (DIST-001/002) | Not yet demonstrated in STAR | Test plan; DIST-001/002 confirmed | NOT TESTED | Uniform electrical state → lumped behavior → distributed mode inoperative | Test C PASS criterion | Test C | ELEC-001, ELEC-002 |
+| DIST-004 | Local current density / heat at a spatial point governed by local T (not global mean T) in STAR | Test plan | RCR(x,t) = f(T_local(x,t)); analogous to OF elementWise partition-local T interpolation | Not tested in STAR | Test plan | NOT TESTED | Global-T interpolation → same RCR everywhere → lumped behavior in STAR | Test C | Test C | DIST-003, ELEC-006 |
+| DIST-005 | Simultaneous T_A ≠ T_B at two representative JR probes → electrical_state_A(t) ≠ electrical_state_B(t) in STAR | Test plan (Test C formal PASS criterion); analogous behavior confirmed in OF distributed reference | ≥ 2 probe locations with ~20 K gradient showing independent electrical state evolution | Not yet demonstrated in STAR | DIST-001/002 confirm OF reference; STAR not run | NOT TESTED | Required formal proof that STAR distributed semantics are operative | Test C | Test C | DIST-003, DIST-004 |
 
 ---
 
@@ -251,9 +273,12 @@ Columns: `ID | Requirement | Auth source | OF/reference target | Current TBM/STA
 | BC | 5 | 0 | 0 | 0 | 0 | 5 | 0 |
 | SRC | 8 | 0 | 2 | 1 | 1 | 4 | 0 |
 | IC | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
+| LUMP | 7 | 1 | 2 | 0 | 0 | 4 | 0 |
 | ELEC | 12 | 4 | 4 | 0 | 0 | 4 | 0 |
-| DIST | 5 | 0 | 0 | 0 | 0 | 5 | 0 |
+| DIST | 5 | 2 | 0 | 0 | 0 | 3 | 0 |
 | STAR | 14 | 1 | 0 | 0 | 0 | 13 | 0 |
 | VAL | 17 | 0 | 1 | 1 | 0 | 15 | 0 |
 | RUN | 9 | 5 | 3 | 0 | 0 | 1 | 0 |
-| **Total** | **130** | **11** | **18** | **38** | **1** | **62** | **0** |
+| **Total** | **137** | **14** | **20** | **38** | **1** | **64** | **0** |
+
+**Note on two-track architecture:** LUMP (7 reqs) covers the lumped/0D equivalence track (OF `wedge_2170` / `validation_lumped_paramset_21p09x70p02` ↔ STAR 0D RCR). ELEC/DIST (17 reqs) cover the distributed equivalence track (OF `validation_distributed_paramset_21p09x70p02` ↔ STAR RCRTable 3D). Both tracks are required. DIST-001/002 are now SATISFIED from confirmed OF distributed reference evidence.

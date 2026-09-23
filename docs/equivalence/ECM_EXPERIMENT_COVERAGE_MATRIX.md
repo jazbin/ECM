@@ -8,6 +8,17 @@ Columns: `Experiment | Type | Status | Req IDs addressed | Req IDs it CANNOT add
 
 ---
 
+## OpenFOAM reference cases (authoritative sources — confirmed from repository)
+
+| Reference | Type | Mode | Req IDs established | Key configuration evidence | Usable as comparison baseline |
+|---|---|---|---|---|---|
+| **`cases/wedge_2170`** | OF ECM run | **LUMPED** (`couplingMode lumped`) | LUMP-001 (confirmed); LUMP-007 (partial — uses `electrical_inputs_from_validation.csv`); SRC-004/005 lumped track; ELEC params; VAL probes (wedge geometry) | `system/controlDict`: `couplingMode lumped`, `lumpedOutput totalPower`; `ecm/ecm_state.json`: single scalar state; `--backend ecm-step` | YES for lumped-track Tests A-LUMP/D-LUMP; NOT for distributed track |
+| **`cases/validation_lumped_paramset_21p09x70p02`** | OF ECM run | **LUMPED** (`couplingMode lumped`) | LUMP-001 (confirmed); LUMP-003/004/005/006 (comparison baseline); LUMP-007 (inline electricalInputs block) | `controlDict`: `couplingMode lumped`; ecm_state.json: single scalar state; inline `electricalInputs {current_A 79; SOC 0.5;}` | YES for lumped track; geometry uses non-rotated regions (`jellyRoll`, `shell`, `cap`) |
+| **`cases/validation_distributed_paramset_21p09x70p02`** | OF ECM run | **DISTRIBUTED** (`couplingMode elementWise`) | DIST-001 (SATISFIED); DIST-002 (SATISFIED); DIST-003..005 (OF reference confirmed); ELEC-001/002 distributed track | `controlDict`: `couplingMode elementWise`, `ECM_DISTRIBUTED_ELECTRICAL_MODE=parallel2rc`; `ecm_state.json`: 18 spatial partitions (axial6 × radial3); `stField ecmST`; `elementMappingFile mapping_table_axial6_radial3_2170mesh.csv`; prev_qvol_by_ecmid varies ~10× across partitions | YES for distributed track Tests C/D-DIST; geometry uses non-rotated regions |
+| **`cases/wedge_2170_thermal_qualification`** | OF thermal-only run | Thermal (no ECM) | VAL-017 (reference CSV for thermal baseline); BC-001/002 verification; MAT verification | `controlDict`: fixed heat source via `heatPulseSwitch` fvOptions; no ECM couplingMode block; uses `jellyRoll_rotated` regions (wedge geometry) | YES for Test A thermal baseline comparison |
+
+---
+
 ## Historical experiments (completed — Robert-returned evidence)
 
 | Experiment | Type | Status | Req IDs addressed | Req IDs it CANNOT address (notable) | Output evidence | Dependencies | Still needed? |
@@ -47,7 +58,14 @@ Columns: `Experiment | Type | Status | Req IDs addressed | Req IDs it CANNOT add
 
 ---
 
-## Tests A/B/C/D — Operator Equivalence Tests (planned, not yet run; require S0 pass + geometry corrections)
+## Tests A-LUMP / D-LUMP — Lumped Track Equivalence Tests (planned, not yet run)
+
+| Experiment | Type | Status | Req IDs addressed | Notable gaps | Output evidence needed | Dependencies | Still needed? |
+|---|---|---|---|---|---|---|---|
+| **Test A-LUMP — Thermal baseline (uniform heat source, lumped track geometry)** | STAR thermal run | NOT RUN | LUMP-005/006; MAT-001..012; BC-001..005; SRC-004 (lumped track); IC-001; IFC-001..006; VAL-004..015 | ELEC/DIST/LUMP-003/004 (no ECM yet) | T_JR_mean(t), Qdot(t), thermal probes; compare to `wedge_2170_thermal_qualification` baseline | S0 pass; geometry corrections; lumped-mode material mapping | YES |
+| **Test D-LUMP — Full coupled lumped comparison with OF reference** | STAR lumped ECM + thermal | NOT RUN | LUMP-003/004/005/006/007; ELEC-001 (lumped variant); VAL-001/002/003/004; RUN-001/002 | SRC-008 must be resolved; LUMP-007 (same AE data confirmed) | V(t) vs `wedge_2170` or `validation_lumped_paramset_21p09x70p02`; SOC(t); Qdot(t); T_JR_mean(t) | Test A-LUMP pass; LUMP-007 confirmed | YES |
+
+## Tests A/B/C/D — Distributed Track Equivalence Tests (planned, not yet run; require S0 pass + geometry corrections)
 
 | Experiment | Type | Status | Req IDs addressed | Notable gaps | Output evidence needed | Dependencies | Still needed? |
 |---|---|---|---|---|---|---|---|
@@ -100,8 +118,9 @@ Every historical and planned experiment maps to at least one requirement. No exp
 | BC | 5 | 3 | 2 (BC-003 no fixed-T; BC-004 no radiation) | Need addition to Test A setup checklist |
 | SRC | 8 | 6 | 1 (SRC-008 f_cap conflict unresolved — no test yet) | Must resolve before Test D |
 | IC | 1 | 1 | 0 | Test A sets IC |
-| ELEC | 12 | 9 | 3 (ELEC-007/008/009 set during Test B/C/D but not in S0 scope) | Acceptable; gated correctly |
-| DIST | 5 | 5 | 0 | Test C covers all |
+| LUMP | 7 | 5 | 2 (LUMP-003/004 comparison itself requires Test D-LUMP which depends on full geometry fix) | Two-track lumped tests added; LUMP-001 SATISFIED from OF case evidence |
+| ELEC | 12 | 9 | 3 (ELEC-007/008/009 set during Test B/C/D but not in S0 scope) | Acceptable; gated correctly; ELEC = distributed track |
+| DIST | 5 | 5 | 0 | DIST-001/002 now SATISFIED from OF reference; Test C covers DIST-003..005 |
 | STAR | 14 | 12 | 2 (STAR-012 3-way Can split; STAR-013 resistance on face) | Add to S0-A and S0-D |
 | VAL | 17 | 15 | 2 (VAL-013 asymmetry observable; IFC-005/BC checks in Test A) | Fold into Test A acceptance |
 | RUN | 9 | 8 | 1 (RUN-003 time step matching) | Add to Test A/D setup |

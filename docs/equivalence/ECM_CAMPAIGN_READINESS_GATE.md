@@ -111,6 +111,20 @@
 
 ---
 
+## Gate 10a — Two-track coverage (lumped + distributed)
+
+**Check:** Any package that addresses electrical equivalence must explicitly specify which track it covers: LUMP (OF `couplingMode lumped` ↔ STAR 0D RCR) or DIST (OF `couplingMode elementWise` ↔ STAR RCRTable 3D). No package may be described as covering "ECM equivalence" without stating the track.
+
+**How to verify:**
+- If this package's scope touches ELEC/LUMP/DIST/VAL requirements, confirm it names the relevant track(s).
+- If addressing only one track, confirm the other track has a named future step.
+- Do not cite `wedge_2170` as the distributed reference — it is `couplingMode lumped`. The distributed reference is `validation_distributed_paramset_21p09x70p02` (`couplingMode elementWise`, 18 partitions).
+- Do not describe STAR distributed RCR as an enhancement over a lumped OF baseline. Both tracks are independent requirements.
+
+**Dispatch blocker if:** Package claims to validate "ECM equivalence" without specifying which track, or misidentifies wedge_2170 as the distributed reference.
+
+---
+
 ## Gate 10 — Hypothesis ledger consistency
 
 **Check:** Any hypothesis in `TBM_HYPOTHESIS_LEDGER.md` that this package's results will affect has a clear expected-outcome statement written down before dispatch. After Robert returns, the update to the ledger is planned (not retroactive rationalization).
@@ -135,6 +149,7 @@ ECM Campaign Readiness Gate — package: <NAME> — date: <DATE>
 [ ] Gate 7: All upstream dependencies satisfied or parallel
 [ ] Gate 8: No stale/superseded claim used as design input
 [ ] Gate 9: No test plan step weakened without replacement
+[ ] Gate 10a: If electrical reqs in scope — track specified (LUMP / DIST / both); wedge_2170 not cited as distributed reference
 [ ] Gate 10: Pre-dispatch expected outcomes recorded for affected hypotheses
 
 Blockers: <none / list>
