@@ -71,11 +71,8 @@ Primary question: which generated radial quantity (Can ID, Can OD, or neither) i
   controlled by Package m_dintDiameter?
   — Do NOT pre-assume the answer is Can ID; current evidence is ambiguous.
 Falsifier: no radial change in STEP → m_dintDiameter not a direct geometry driver
-Required STAR output: import result (PASS/FAIL)
-Required STEP measurement (if PASS):
-  - Can OD from B-Rep bounding box on Can solid (outer radius × 2)
-  - Can ID from B-Rep bounding box on Can solid (inner cavity, mm)
-  - JR OD from B-Rep bounding box on Jellyroll solid
+Required BDS result: BDS generation PASS/FAIL; return STEP file if PASS
+Post-return automated analysis (our side): Can OD, Can ID, JR OD from exact B-Rep
 ```
 
 **Interpretation matrix:**
@@ -103,11 +100,8 @@ Predicted observable (if RMAP-2 true): Can OD ≈ 19mm in STEP; JR OD unchanged 
 Predicted observable (if REPORT regenerated at import): no change in Can OD
   — STAR overwrites REPORT block; another field (m_dextDiameter or m_dintDiameter) drives Can OD
 Falsifier: Can OD unchanged → m_dRepCanXDim/YDim are not the operative Can OD control
-Required STAR output: import result
-Required STEP measurement (if PASS):
-  - Can OD
-  - JR OD (confirm unchanged)
-  - Can ID
+Required BDS result: BDS generation PASS/FAIL; return STEP file if PASS
+Post-return automated analysis (our side): Can OD, Can ID, JR OD from exact B-Rep
 ```
 
 **Note:** A null result (no geometry change) from RAD-B is itself highly informative — it would require revisiting RMAP-2 and promoting m_dextDiameter or m_dintDiameter as the Can OD candidate.
@@ -123,15 +117,13 @@ Frozen baseline: T06
 Changed field: m_dJellyrollThickness_mm (Detailed Builder block)
   Old value: 17.9mm
   New value: 17.5mm
-  (decrease — safely below current Can OD ≈ 18mm; avoids radial blocker)
+  (decrease — safely below current generated Can ID = 18.000 mm; avoids radial blocker)
 All other radial fields unchanged
 Predicted observable: JR OD ≈ 17.5mm in STEP; Can OD and Can ID unchanged
 Falsifier: JR OD unchanged → m_dJellyrollThickness_mm does not directly control
   JR OD on this geometry class (would require re-examining August finding)
-Required STAR output: import result
-Required STEP measurement (if PASS):
-  - JR OD
-  - Can OD (confirm unchanged)
+Required BDS result: BDS generation PASS/FAIL; return STEP file if PASS
+Post-return automated analysis (our side): JR OD, Can OD, Can ID from exact B-Rep
 ```
 
 ---
