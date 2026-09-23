@@ -12,48 +12,36 @@
 
 **PASS.**
 
-All deliverables in this package map to requirement IDs. Each case addresses one or more GEO requirements. This is a geometry-characterisation round that establishes operative TBM field controls; no deliverable is justified only by narrative.
+All deliverables map to requirement IDs. This is a geometry-characterisation round that establishes operative TBM field controls; each case advances OPEN GEO requirements toward resolution.
 
-| Campaign case | Requirement IDs directly addressed (field identification advances these toward OPEN → PARTIAL or OPEN → PARTIAL OPEN) |
+| Campaign case | GEO requirement IDs advanced |
 |---|---|
-| RAD-A (Can ID field probe) | GEO-002 (Can ID = 20.6274 mm), GEO-004 (Can wall thickness — derived from GEO-002 + GEO-003), GEO-007 (JR↔Can gap = 0) |
-| RAD-B (Can OD field probe) | GEO-003 (Can OD = 21.09 mm), GEO-004 (Can wall thickness) |
-| RAD-C (JR OD field probe) | GEO-001 (JR OD = 20.6274 mm), GEO-022 (JR thermal volume) |
-| AX-A (Can height probe) | GEO-010 (Can axial range), GEO-013 (Can top flush with JR top), GEO-014 (Can bottom position), GEO-023 (Can thermal volume) |
-| AX-B (Separator tail zero) | GEO-009 (JR axial z-range), GEO-016 (no bottom Cap domain), GEO-021 (no symmetric end-stack) |
-| AX-C (Separator feed zero) | GEO-009, GEO-013, GEO-017 (no free void layer) |
-| AX-D (Electrode end-overlap probe) | GEO-009, GEO-017 |
-| CEN-A (Mandrel zero probe) | GEO-005 (full solid JR to axis), GEO-015 (no Mandrel domain in thermal model) |
+| RAD-A (m_dintDiameter probe) | GEO-002 (Can ID), GEO-003 (Can OD), GEO-004 (wall thickness — derived) |
+| RAD-B (m_dRepCanX/Y probe) | GEO-003 (Can OD), GEO-004 |
+| RAD-C (m_dJellyrollThickness_mm probe) | GEO-001 (JR OD), GEO-022 (JR thermal volume) |
+| AX-A (m_dextHeight probe) | GEO-010 (Can axial range), GEO-013 (Can top flush), GEO-014 (Can bottom position) |
+| AX-B (SepTail zero) | GEO-009 (JR axial z-range), GEO-016 (no bottom Cap), GEO-021 (no symmetric end-stack) |
+| AX-C (SepFeed zero) | GEO-009, GEO-013, GEO-017 (no free void) |
+| AX-D (EndOverlap probe) | GEO-009, GEO-017 |
+| CEN-A (Mandrel 0.5mm probe) | GEO-005 (full solid JR), GEO-015 (no Mandrel domain) |
 
 ---
 
 ## Gate 2 — Orphan-requirement scan
 
-**PASS.**
-
-No requirement family is orphaned by this package. All families retain ≥ 1 future resolution path. Specifically:
-- GEO-001..024: the geometry campaign directly advances GEO-001/002/003/005/009/010/013/014/015/016/017/021; remaining GEO requirements (GEO-006/007/008/011/012/018/019/020/022/023/024) retain resolution paths through RAD/GEO-AX or S0/Test A.
-- GEO-008 is SATISFIED (JR height = 65.11mm confirmed).
-- S0 is parked, not cancelled; all STAR family requirements retain S0 as their resolution path.
-- All non-GEO families (TOP, MAT, IFC, BC, SRC, IC, LUMP, ELEC, DIST, STAR, VAL, RUN) are untouched by this geometry-only package.
+**PASS.** No requirement family orphaned. All non-GEO families (TOP, MAT, IFC, BC, SRC, IC, LUMP, ELEC, DIST, STAR, VAL, RUN) are untouched. S0 is parked, not cancelled; all STAR family requirements retain S0 as their resolution path.
 
 ---
 
 ## Gate 3 — Contradiction audit
 
-**PASS.**
-
-No contradiction in C01–C10 affects geometry-only TBM-to-STEP instructions:
-- C01 (f_cap): no heat-source instruction in this package.
-- C02 (Rtherm): no resistance instruction in this package.
-- C04 (F-series): no instruction states zero-clearance is impossible. RAD-A and RAD-C independently probe the two field controls needed for zero-clearance construction; an exact-contact test (JR OD = Can ID) is deferred until RAD-A confirms operative Can-ID control.
-- C06 (S0-B area): not an S0 package.
+**PASS.** No contradiction in C01–C10 affects geometry-only TBM-to-STEP instructions. No heat-source, resistance, or electrical instructions. C04 (F-series): no instruction states zero-clearance is impossible; RAD-C uses a downward perturbation safely below current T06 generated Can ID.
 
 ---
 
 ## Gate 4 — S0 prerequisite check
 
-**PASS (not needed).** This package does not depend on S0-A, S0-B, S0-C, or S0-D output. TBM-to-STEP geometry measurements do not require prior STAR import evidence. S0 is parked independently.
+**PASS (not needed).** TBM-to-STEP geometry export does not depend on any STAR capability evidence. S0 is parked independently.
 
 ---
 
@@ -61,11 +49,20 @@ No contradiction in C01–C10 affects geometry-only TBM-to-STEP instructions:
 
 **PASS.**
 
-**5a — Geometry:** All sweep values are explicitly labelled. Every case changes exactly one or two fields, with the delta stated in the README and CASE_MATRIX. No proven-impossible radial combination is present (all changes are single-field probes at intermediate values, not combinations already shown to fail). JR OD = Can ID (exact contact) is NOT included in this package — contingent on RAD-A confirming operative Can-ID control.
+**5a — Geometry:** All sweep values explicitly labelled in CASE_MATRIX and README. No proven-impossible radial combination present.
 
-**5b — Common mode-independent params:** No TBM in this package changes m_dAhCell, m_nRCRParameterSets, transport number, S3 values, or AE data source. Electrochemical fields are unchanged from T06 baseline.
+Safety assessment (from T06 STEP-confirmed dimensions + perturbation direction — NOT from field-value inequalities):
+- RAD-A: m_dJellyrollThickness_mm stays at 17.9; changing m_dintDiameter to 19.0 is safe whether it controls OD (~19mm > current Can ID 18mm) or ID (~19mm > current JR OD 17.881mm).
+- RAD-B: JR field unchanged at 17.9; changing m_dRepCanX/Y to 19 does not affect the JR/Can radial relationship.
+- RAD-C: m_dJellyrollThickness_mm decreases from 17.9 to 17.5 — moves JR OD downward, away from current Can ID 18.0mm. Safe direction.
+- AX-A/B/C/D: no radial field change; current T06 radial geometry preserved.
+- CEN-A: Mandrel field reduced; no radial impact. H001 (zero Mandrel non-constructible) is respected: value set to 0.5mm, not zero.
 
-**5c / 5d — Mode config:** Not applicable — no STAR run; TBM-to-STEP only.
+JR OD = Can ID (exact contact) is NOT in this package. Deferred until RAD-A and RAD-C confirm operative field controls.
+
+**5b:** No TBM changes m_dAhCell, m_nRCRParameterSets, transport number, S3 values, or AE data source.
+
+**5c/5d:** Not applicable — no STAR run.
 
 ---
 
@@ -73,46 +70,43 @@ No contradiction in C01–C10 affects geometry-only TBM-to-STEP instructions:
 
 **PASS.**
 
-For each of the 8 cases, ROBERT_RETURN_TEMPLATE.md requests:
-- BDS generation status (error/no-error)
-- Complete STEP body list (names + count)
-- 8 key dimension measurements from STEP (JR OD, Mandrel OD, Can ID, Can OD, Can height, JR height, JR-to-Can-top, JR-to-Can-bottom)
-- CEN-A additionally: Mandrel presence classification and JR-axis-filling status
+Robert's only deliverable per case: the exported STEP file (or BDS error text if generation fails). No dimension measurement requested from Robert. Automated post-return B-Rep analysis computes all required geometry quantities.
 
-Every requirement ID from Gate 1 maps to explicit measurements in the return template:
-- GEO-001/002/003: JR OD, Can ID, Can OD columns in dimension table
-- GEO-005/015: STEP body list + Mandrel presence classification (CEN-A)
-- GEO-010/013/014: Can height, JR-to-Can-top, JR-to-Can-bottom columns
-- GEO-009/016/017/021: body list + JR height + JR-to-Can-end distances
+Quantities we compute automatically after return:
+- body names and count
+- JR OD, JR inner radius, JR axial range
+- Mandrel OD (if present)
+- Can inner diameter, Can outer diameter, Can wall thickness, Can axial range
+- JR-to-Can top and bottom overhang
+- Root/Stem/Washer/Post/EndPlate extents
+- pairwise minimum distances (touch graph)
+- Boolean overlap volumes
+
+Every GEO requirement ID from Gate 1 is resolved by this automated analysis comparing each returned STEP against the T06 baseline STEP.
 
 ---
 
 ## Gate 7 — Dependency ordering
 
-**PASS.** No upstream dependencies for TBM-to-STEP geometry measurement. This package is the upstream dependency for subsequent RAD and GEO-AX packages; it is not downstream of anything in the current campaign.
+**PASS.** No upstream dependencies for TBM-to-STEP export. This package is upstream of all subsequent RAD, GEO-AX, and S0-follow-on packages.
 
 ---
 
 ## Gate 8 — No stale evidence as a basis
 
-**PASS.**
-
-- T06 STEP-confirmed baseline values (JR OD 17.881mm, Can ID 18.000mm, Can OD 20.90mm) are from the committed geometric audit at HEAD 479ef02 — not from NEXTSESSION or superseded sources.
-- No coverage percentages from BDS_TO_OPENFOAM_THERMAL_MAPPING.md used as design input.
-- No rejected/superseded hypothesis used as basis. RMAP-3 (m_dintDiameter → Can ID) is classified HYPOTHESIS/OPEN in TBM_GEOMETRY_DOF_MATRIX.md — it is the subject of RAD-A, not a pre-assumed truth.
-- AXIAL-001/002 (symmetric construction, invariant Can height within family) are CONFIRMED from returned STEP data — used correctly as baseline context.
+**PASS.** T06 STEP-confirmed dimensions used as baseline (committed audit HEAD 479ef02). TBM_NEXT_EXPERIMENTS.md updated to reflect these measured values (no longer "not yet measured"). No rejected/superseded hypothesis used as design input. H001 (Mandrel-zero constraint) is CONFIRMED/HIGH and respected — zero Mandrel not retested. RMAP-3 treated as an open hypothesis, not a confirmed mapping.
 
 ---
 
 ## Gate 9 — Requirement coverage continuity
 
-**PASS.** No OPEN or NOT TESTED requirement loses its last resolution path as a result of this package's scope decisions. The package adds characterization evidence to GEO requirements; it does not close or remove any planned step. S0 is parked — its 29 requirement IDs retain S0 as their named resolution step.
+**PASS.** No OPEN or NOT TESTED requirement loses its last resolution path. S0 parked, not cancelled.
 
 ---
 
 ## Gate 10a — Two-track coverage
 
-**PASS.** No electrical/LUMP/DIST/VAL requirements are in scope. Geometry-only package.
+**PASS.** No electrical requirements in scope. Geometry-only package.
 
 ---
 
@@ -120,23 +114,24 @@ Every requirement ID from Gate 1 maps to explicit measurements in the return tem
 
 **PASS.**
 
-Pre-dispatch expected outcomes for hypotheses directly tested by this campaign:
+Pre-dispatch expected outcomes:
 
-| Hypothesis | Status | Expected outcome | Revision trigger |
-|---|---|---|---|
-| RMAP-1: m_dJellyrollThickness_mm → JR OD (RAD-C) | CONFIRMED August class; T06 transfer OPEN | JR OD shifts from 17.881mm toward 19.0mm proportionally. Expected scale factor ≈ 1 (direct correspondence observed in August class). | Update GEO-001 status; record T06 scale factor |
-| RMAP-2: m_dextDiameter → Can OD (RAD-B) | SUPPORTED/medium | Can OD shifts from 20.90mm toward 22.0mm. A small systematic offset (~0.1mm) may persist based on T06 baseline. | Update GEO-003 status |
-| RMAP-3: m_dintDiameter → Can ID (RAD-A) | OPEN/HYPOTHESIS | Most likely: Can ID unchanged at ~18mm (inoperative — Can ID tracks JR OD, not m_dintDiameter). Siemens corpus shows operative Can-ID control requires m_dintDiameter = m_dJellyrollThickness_mm. | If inoperative: update DOF matrix — Can ID is JR-OD-driven; plan combined-field test for next package. If operative: Can ID shifts; plan exact-contact test. |
-| AXIAL-001: symmetric construction (AX-A/B/C) | CONFIRMED for T/H families | Can overhang symmetric if Can height changes. | Update if any AX case shows asymmetric placement |
-| AXIAL-009: T06 saturation (AX-B/C/D) | SUPPORTED/medium | AX-B/C/D show no change in end-stack geometry, confirming envelope-limited saturation. | Update competing explanations based on actual results |
-| Mandrel-suppress: m_dMandrelThickness_mm = 0 → Mandrel absent (CEN-A) | OPEN | Mandrel body absent from STEP; JR fills to axis. BDS builder logic likely suppresses the body when thickness = 0. | Update GEO-005/015 status; if Mandrel present, record minimum achievable OD |
+| Hypothesis | Expected outcome | Revision trigger |
+|---|---|---|
+| RMAP-3: m_dintDiameter → radial geometry (RAD-A) | Most likely: Can ID unchanged (inoperative; Can ID tracks JR OD). Also possible: Can ID or Can OD shifts. Both outcomes actionable. | Update DOF matrix and RMAP-3 on return |
+| RMAP-2: m_dRepCanX/Y → Can OD (RAD-B) | Can OD shifts toward 19mm per August evidence. Null result also informative. | Update GEO-003 and RMAP-2 on return |
+| RMAP-1: m_dJellyrollThickness_mm → JR OD, T06 class (RAD-C) | JR OD shifts proportionally from 17.881 toward ~17.5mm. | Update GEO-001 on return |
+| AX package / AXIAL-001/009 | T06 saturation insensitive to separator fields (AX-B/C/D); Can height responsive to m_dextHeight (AX-A). | Refine AXIAL-009 explanation on return |
+| Mandrel operativity / H001 (CEN-A) | Mandrel OD reduces proportionally (field operative). Zero non-constructible per H001 — not retested. | Update GEO-005/015 and Mandrel DOF on return |
 
 ---
 
 ## Summary
 
-All 10 gate points: **PASS** (or N/A where not applicable).
+All 10 gate points: **PASS**.
 
-GEO requirement IDs addressed by this campaign: GEO-001, GEO-002, GEO-003, GEO-004, GEO-005, GEO-009, GEO-010, GEO-013, GEO-014, GEO-015, GEO-016, GEO-017, GEO-021, GEO-022, GEO-023 (15 requirements across 1 family — characterization-level evidence; final satisfaction pending production-dimension confirmation).
+GEO IDs addressed: GEO-001, GEO-002, GEO-003, GEO-004, GEO-005, GEO-009, GEO-010, GEO-013, GEO-014, GEO-015, GEO-016, GEO-017, GEO-021, GEO-022 (14 requirements — characterisation-level evidence; production satisfaction pending confirmed field controls).
+
+Robert manual measurements requested: **NONE**. All geometry analysis is automated post-return.
 
 **Package is ready for dispatch when this sentence is removed and replaced with: "Dispatched: [date]."**

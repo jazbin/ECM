@@ -2,40 +2,58 @@
 
 **Date:** 2026-09-23
 **Purpose:** Identify the best achievable TBM geometry relative to the OpenFOAM thermal operator target before any STAR physics work begins.
-**Method:** TBM-to-STEP conversion only. Robert opens each TBM in BDS, exports STEP, measures key dimensions, and reports the table. No STAR import, no physics.
+**Method:** TBM-to-STEP export only. Robert opens each TBM in BDS and exports a STEP file (or reports failure). No STAR import. No manual dimension measurement. Post-return B-Rep analysis is automated on our side.
 **Baseline:** T06_TARGET_AXIAL_SURPLUS_2p00.tbm. SHA-256: 433a8162b6f02bbc0a5781bc7f789345adaecf8bd2b9d5ac7bd6199ed8fb6f71
 
 ---
 
-## Baseline dimensions (T06 STEP-confirmed)
+## T06 baseline — known STEP-confirmed dimensions
 
-| Quantity | T06 value | OF target | Gap |
+| Quantity | T06 value (STEP-confirmed) | OF target | Gap |
 |---|---|---|---|
-| JR OD | 17.881 mm | 20.6274 mm | −2.746 mm |
-| Can ID | 18.000 mm | 20.6274 mm | −2.627 mm |
-| Can OD | 20.90 mm | 21.09 mm | −0.19 mm |
-| JR↔Can radial gap | 0.0595 mm | 0 mm | +0.0595 mm |
-| Mandrel OD | ~6 mm | 0 (none) | +6 mm |
-| Can height | ~70 mm | 65.34 mm | +4.66 mm |
+| JR OD | 17.880992 mm | 20.6274 mm | −2.746 mm |
+| Can ID | 18.000000 mm | 20.6274 mm | −2.627 mm |
+| Can OD | ~20.90 mm | 21.09 mm | ~−0.19 mm |
+| JR↔Can radial gap | 0.059504 mm | 0 mm | +0.059504 mm |
+| Mandrel OD | ~6 mm | 0 (none) | +~6 mm |
+| Can axial height | ~70 mm | 65.34 mm | +~4.7 mm |
 | JR height | 65.11 mm | 65.11 mm | 0 (SATISFIED) |
-| JR-to-Can-top | 2.445 mm | 0 mm | +2.445 mm |
-| JR-to-Can-bottom | 2.445 mm | 0.231 mm | +2.214 mm |
+| JR-to-Can-top | ~2.445 mm | 0 mm | +~2.445 mm |
+| JR-to-Can-bottom | ~2.445 mm | 0.231 mm | +~2.214 mm |
+
+Source: `docs/equivalence/T06_GEOMETRIC_EQUIVALENCE_AUDIT.md`; `tbm_validation/TBM_GEOMETRY_DOF_MATRIX.md`.
 
 ---
 
-## Controlling TBM fields (BUILDER + Package sections of T06)
+## Controlling TBM fields — evidence status at dispatch
 
-| Field | T06 value | Candidate controls | Evidence |
+| Field | T06 value | Candidate geometry role | Status |
 |---|---|---|---|
-| `m_dJellyrollThickness_mm` | 17.9 | JR OD | CONFIRMED August class; T06-class transfer OPEN |
-| `Package m_dintDiameter` | 20.9 | Can ID | OPEN (HYPOTHESIS — candidate field identified from Siemens corpus) |
-| `Package m_dextDiameter` | 21.0 | Can OD | SUPPORTED (August data, RMAP-2) |
-| `m_dMandrelThickness_mm` | 6.0 | Mandrel OD | OPEN |
-| `Package m_dextHeight` | 70.0 | Can height | OPEN |
-| `Package m_dintHeight` | 65.11 | Internal cavity height | OPEN |
-| `m_dSepFeedLength_mm` | 10 | End-stack spacing | OPEN (plausible per Siemens corpus) |
-| `m_dSepTailLength_mm` | 85 | End-stack spacing | OPEN (plausible per Siemens corpus) |
+| `m_dJellyrollThickness_mm` | 17.9 | JR OD | CONFIRMED August class; T06 transfer OPEN |
+| `Package m_dintDiameter` | 20.9 | Unknown — either Can ID or Can OD or neither | OPEN/ambiguous |
+| `m_dRepCanXDim` / `m_dRepCanYDim` | 18 / 18 | Possibly Can OD | SUPPORTED/high (August); T06 class OPEN |
+| `m_dMandrelThickness_mm` | 6.0 | Mandrel OD | OPEN; zero confirmed non-constructible (H001) |
+| `Package m_dextHeight` | 70.0 | Can axial envelope | OPEN |
+| `m_dSepTailLength_mm` | 85 | Axial end-stack | OPEN |
+| `m_dSepFeedLength_mm` | 10 | Axial end-stack | OPEN |
 | `m_dElectrodeOverlapAtEnd_mm` | 40 | End-stack extent | OPEN |
+
+---
+
+## Post-return analysis (automated — NOT from Robert)
+
+For all successful STEP files returned, we compute via exact B-Rep tools (`tools/audit_bds_openfoam_overlap.py` and equivalent):
+
+- body names and count
+- JR OD, JR ID (inner void radius if any), JR axial min/max
+- Mandrel OD (if body present), Mandrel axial extents
+- Can inner diameter, Can outer diameter, Can wall thickness, Can axial min/max
+- top/bottom overhang (Can max − JR max; JR min − Can min)
+- Root/Stem/Washer/Post/EndPlate axial extents and radial bounds
+- pairwise min distances (touch graph)
+- Boolean overlap volumes for Can↔EndPlate
+
+Robert does not measure any dimension.
 
 ---
 
@@ -43,56 +61,67 @@
 
 ### RADIAL family — 3 TBMs
 
-| Case | TBM filename | Field changed | From | To | GEO req. | Hypothesis under test | Discriminating result |
-|---|---|---|---|---|---|---|---|
-| RAD-A | GC_RAD_A_can_id_probe.tbm | `Package m_dintDiameter` | 20.9 | 19.0 | GEO-002 | RMAP-3: m_dintDiameter controls Can ID | Can ID shifts from 18mm toward 19mm (operative) OR stays at 18mm (inoperative / JR-driven) |
-| RAD-B | GC_RAD_B_can_od_probe.tbm | `Package m_dextDiameter` | 21.0 | 22.0 | GEO-003 | RMAP-2: m_dextDiameter controls Can OD | Can OD shifts from 20.9mm toward 22mm (operative) |
-| RAD-C | GC_RAD_C_jr_od_probe.tbm | `m_dJellyrollThickness_mm` | 17.9 | 19.0 | GEO-001 | RMAP-1: m_dJellyrollThickness_mm controls JR OD; T06-class transfer | JR OD shifts from 17.881mm toward 19mm |
+| Case | TBM filename | Field(s) changed | From | To | GEO req. | Question under test |
+|---|---|---|---|---|---|---|
+| RAD-A | GC_RAD_A_can_id_probe.tbm | `Package m_dintDiameter` | 20.9 | 19.0 | GEO-002, GEO-003 | Which generated radial quantity (Can ID, Can OD, or neither) responds to m_dintDiameter? |
+| RAD-B | GC_RAD_B_can_rep_xy_probe.tbm | `m_dRepCanXDim`, `m_dRepCanYDim` | 18 / 18 | 19 / 19 | GEO-003 | Which generated radial quantity (Can OD, Can ID, or neither) responds to m_dRepCanX/Y? |
+| RAD-C | GC_RAD_C_jr_od_probe.tbm | `m_dJellyrollThickness_mm` | 17.9 | 17.5 | GEO-001 | Does JR OD respond proportionally to m_dJellyrollThickness_mm on the T06 geometry class? |
 
-**Necessity:** All three are single-variable, non-redundant. RAD-A and RAD-C both probe the JR-to-Can radial relationship but via different fields; together they resolve whether Can ID tracks JR OD or is independently controlled. RAD-B is independent of both.
+**RAD-A safety:** m_dJellyrollThickness_mm stays at 17.9; current T06 generated Can ID = 18.000mm. Changing m_dintDiameter to 19.0 is safe in either direction of mapping: if it controls OD (20.9→19mm), OD remains above current Can ID; if it controls ID (20.9→19mm), ID still exceeds current JR OD 17.881mm.
+
+**RAD-B safety:** m_dJellyrollThickness_mm stays at 17.9; changing m_dRepCanXDim/YDim 18→19 is safe in both possible outcomes (OD or ID change).
+
+**RAD-C safety:** Decreasing m_dJellyrollThickness_mm from 17.9 to 17.5 moves JR OD downward, away from Can ID. No geometry conflict possible.
+
+Note: safety assessed from T06 generated STEP dimensions and direction of perturbation — NOT from field-value inequalities.
 
 ### AXIAL/END family — 4 TBMs
 
-| Case | TBM filename | Field(s) changed | From | To | GEO req. | Hypothesis under test | Discriminating result |
-|---|---|---|---|---|---|---|---|
-| AX-A | GC_AX_A_can_height_probe.tbm | `Package m_dextHeight`, `Package m_dintHeight` | 70, 65.11 | 75, 70 | GEO-010, GEO-013, GEO-014 | Package height fields control Can axial envelope | Can height changes from ~70mm; JR-to-Can-end distances change |
-| AX-B | GC_AX_B_sep_tail_zero.tbm | `m_dSepTailLength_mm` | 85 | 0 | GEO-009, GEO-016, GEO-021 | Separator tail drives bottom-end-stack height; setting to 0 reduces bottom stack | JR-to-Can-bottom distance changes OR T06 saturation confirmed insensitive to tail |
-| AX-C | GC_AX_C_sep_feed_zero.tbm | `m_dSepFeedLength_mm` | 10 | 0 | GEO-009, GEO-013, GEO-021 | Separator feed drives top-end-stack height; isolates feed from tail | JR-to-Can-top distance changes OR confirmed insensitive to feed (vs tail in AX-B) |
-| AX-D | GC_AX_D_end_overlap_probe.tbm | `m_dElectrodeOverlapAtEnd_mm` | 40 | 80 | GEO-009, GEO-017 | Electrode overlap at end drives Root/Stem axial extent; can extend to reduce end void | End-stack extent increases OR T06 saturation confirmed insensitive (envelope-limited) |
+| Case | TBM filename | Field changed | From | To | GEO req. | Question under test |
+|---|---|---|---|---|---|---|
+| AX-A | GC_AX_A_ext_height_probe.tbm | `Package m_dextHeight` | 70 | 75 | GEO-010, GEO-013, GEO-014 | What generated axial/end geometry changes when package external height is increased? Does Can envelope change? Does JR placement shift? |
+| AX-B | GC_AX_B_sep_tail_zero.tbm | `m_dSepTailLength_mm` | 85 | 0 | GEO-009, GEO-016, GEO-021 | What generated axial/end geometry changes when separator tail length is set to zero? |
+| AX-C | GC_AX_C_sep_feed_zero.tbm | `m_dSepFeedLength_mm` | 10 | 0 | GEO-009, GEO-013, GEO-021 | What generated axial/end geometry changes when separator feed length is set to zero? (Isolated from AX-B.) |
+| AX-D | GC_AX_D_end_overlap_probe.tbm | `m_dElectrodeOverlapAtEnd_mm` | 40 | 80 | GEO-009, GEO-017 | What generated axial/end geometry changes when electrode end-overlap is increased to 80 mm? |
 
-**Necessity:** AX-A is the only direct test of Can height controllability. AX-B and AX-C are both needed: they isolate the two separator length fields independently (a combined 0/0 test cannot attribute any effect). AX-D is needed to confirm whether saturation is envelope-limited or end-overlap-limited; the result distinguishes the two competing AXIAL-009 explanations.
+**AX-A isolation:** Only m_dextHeight changes; m_dintHeight remains at 65.11mm. This isolates the external height field from the internal height field. Automated post-return comparison directly answers whether the Can envelope responds to m_dextHeight alone.
+
+**AX-B and AX-C:** Different fields isolated independently. Do not assume tail controls one end and feed the other — automated B-Rep comparison determines which body/end responds.
+
+**AX-D:** Do not assume that larger overlap extends the stack; T06 saturation evidence (AXIAL-009) makes this possible but not certain. Automated comparison determines actual change.
 
 ### CENTRAL family — 1 TBM
 
-| Case | TBM filename | Field changed | From | To | GEO req. | Hypothesis under test | Discriminating result |
-|---|---|---|---|---|---|---|---|
-| CEN-A | GC_CEN_A_mandrel_zero.tbm | `m_dMandrelThickness_mm` | 6.0 | 0.0 | GEO-005, GEO-015 | Setting Mandrel thickness to zero suppresses the Mandrel body, producing a solid JR to axis | STEP has no Mandrel body (suppressed) OR Mandrel present but smaller OR Mandrel unchanged (field inoperative) |
+| Case | TBM filename | Field changed | From | To | GEO req. | Question under test |
+|---|---|---|---|---|---|---|
+| CEN-A | GC_CEN_A_mandrel_probe.tbm | `m_dMandrelThickness_mm` | 6.0 | 0.5 | GEO-005, GEO-015 | Does m_dMandrelThickness_mm control generated Mandrel OD on the T06 class? Does the JR inner void radius respond proportionally? |
 
-**Necessity:** Single test covers the full range of possible outcomes. If zero is not achievable, the result still confirms whether the field is operative and identifies the minimum achievable Mandrel OD.
+**CEN-A constraint:** Zero Mandrel is NOT retested. H001 is CONFIRMED/HIGH: STAR/CreateFromTbm rejects zero or negative Mandrel thickness with "Mandrel thickness must be positive." Zero Mandrel is non-constructible under this constraint. The campaign tests whether the smallest practical positive value (0.5mm) is achievable and whether the field is operative at all.
+
+Zero-Mandrel record: non-constructible under H001. Not retested in this campaign.
 
 ---
 
 ## Redundancy evaluation
 
-No cases are redundant:
-- RAD-A and RAD-C probe the same quantity (Can ID) from different field angles; only by testing both can we determine whether Can ID is JR-OD-driven or Package-field-driven.
-- AX-B and AX-C change different fields (tail vs. feed); they are not interchangeable.
-- AX-A and AX-B/C target different aspects of the axial problem (total Can height vs. end-stack partition within the envelope).
-- AX-D is a separate hypothesis (electrode overlap limit vs. envelope limit).
+- RAD-A and RAD-B: both test the Can OD/ID question from different field angles. Can OD, Can ID, and JR OD must all be compared across both cases to resolve the ambiguity in the current evidence.
+- RAD-C is independent: tests JR OD control only.
+- AX-A, AX-B, AX-C, AX-D: all test different fields or different aspects of axial geometry. AX-B and AX-C are NOT interchangeable — they isolate different fields.
+- CEN-A: single test covers the Mandrel operativity question within the H001 constraint.
 
-**Total: 8 TBMs. Within the authorised 8–12 range.**
+No case is redundant. **Total: 8 TBMs.**
 
 ---
 
-## Pre-dispatch expected outcomes (Gate 10)
+## Pre-dispatch expected outcomes
 
-| Case | Expected result | Revision trigger |
-|---|---|---|
-| RAD-A | Can ID unchanged at ~18mm: m_dintDiameter is inoperative; Can ID follows JR OD. OR Can ID shifts: m_dintDiameter IS operative. Either outcome is actionable. | Update RMAP-3 hypothesis on return |
-| RAD-B | Can OD increases proportionally (m_dextDiameter operative). Small deviation from 1:1 expected. | Update RMAP-2 / GEO-003 status on return |
-| RAD-C | JR OD shifts toward 19mm (August class result transfers to T06 class). | Update GEO-001 / RMAP-1 status; establish T06 scale factor |
-| AX-A | Can height changes from ~70mm toward ~75mm. JR-to-Can-end distances may change symmetrically (AXIAL-001 predicts symmetric if changed at all). | Update AXIAL-001, GEO-010, GEO-013 status on return |
-| AX-B | End-stack geometry unchanged (T06 saturation is robust to separator tail); or bottom stack reduces. | Refine AXIAL-009 hypothesis on return |
-| AX-C | End-stack geometry unchanged (as AX-B); confirms field isolation. | Same as AX-B; compare AX-B vs AX-C deltas |
-| AX-D | End-stack unchanged: confirms envelope is the saturation cause (AXIAL-009 pack envelope explanation). OR stack extends: overlap-limited. | Distinguish AXIAL-009 competing explanations |
-| CEN-A | Mandrel body absent from STEP: m_dMandrelThickness_mm = 0 suppresses the domain. Most likely outcome given BDS builder logic. | Update GEO-005 / GEO-015 status; if absent, confirm JR is solid to axis |
+| Case | Most likely result | Alternative | Both outcomes actionable? |
+|---|---|---|---|
+| RAD-A | Can ID unchanged at ~18mm (m_dintDiameter not Can ID driver; Can ID tracks JR OD) | Can ID shifts toward 19mm (m_dintDiameter operative) | YES |
+| RAD-B | Can OD changes (m_dRepCanX/Y operative per August RMAP-2) | No change (REPORT block regenerated at import; another field drives Can OD) | YES |
+| RAD-C | JR OD shifts to ~17.5mm proportionally | JR OD unchanged (field not operative in T06 class) | YES |
+| AX-A | Can height changes from ~70mm toward ~75mm | No change (envelope fixed by another mechanism) | YES |
+| AX-B | No geometry change (T06 saturation robust to tail) | End-stack changes at tail end | YES |
+| AX-C | No geometry change (consistent with AX-B; both saturation-insensitive) | End-stack changes at feed end | YES |
+| AX-D | No end-stack change (saturation is envelope-limited, not overlap-limited) | End-stack extent increases | YES — distinguishes AXIAL-009 competing explanations |
+| CEN-A | Mandrel OD reduces proportionally (field operative); JR inner radius reduces | Mandrel OD unchanged (field inoperative); body absent or error | YES |

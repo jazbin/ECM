@@ -45,7 +45,15 @@ No broad multi-variable campaign unless explicitly justified by an internal cont
 | -Electrode Tab m_dLength_mm | pcd | 67.11mm (+2.00mm surplus) |
 | Package m_dintHeight | pcd | 65.11mm |
 
-STEP measurements available from T06: +Ve Tab Stem top-Y = 66.275mm. Can OD, Can ID, JR OD: **not yet measured** — RAD-A/B/C will establish these for the first time.
+STEP measurements available from T06 (exact B-Rep, committed audit 2026-09-17):
+- JR OD = 17.880992 mm
+- Can ID = 18.000000 mm
+- Can OD = 20.900 mm (approximate; from STEP bounding-box analysis)
+- JR axial height = 65.11 mm (EXACT match to OpenFOAM target)
+- +Ve Tab Stem top-Y = 66.275 mm
+- Can↔JR radial gap = 0.059504 mm (half-space)
+
+RAD-A/B/C will establish the operative field→geometry mappings, not these first measurements.
 
 ---
 
@@ -56,14 +64,13 @@ Hypothesis IDs tested: RMAP-3 (m_dintDiameter → Can ID?)
 Frozen baseline: T06
 Changed field: Package m_dintDiameter (pcd block)
   Old value: 20.9mm
-  New value: 20.5mm
+  New value: 19.0mm
 All other radial fields unchanged: m_dextDiameter=21, m_dJellyrollThickness_mm=17.9,
   m_dRepCanXDim=18, m_dRepCanYDim=18
-Predicted observable (if RMAP-3 true): Can ID changes proportionally (~20.5mm)
-  while Can OD and JR OD are unchanged
-Predicted observable (if RMAP-3 false): Can ID unchanged; m_dintDiameter has no
-  observable role in Can geometry
-Falsifier: Can ID unchanged → m_dintDiameter does not control Can ID in this class
+Primary question: which generated radial quantity (Can ID, Can OD, or neither) is
+  controlled by Package m_dintDiameter?
+  — Do NOT pre-assume the answer is Can ID; current evidence is ambiguous.
+Falsifier: no radial change in STEP → m_dintDiameter not a direct geometry driver
 Required STAR output: import result (PASS/FAIL)
 Required STEP measurement (if PASS):
   - Can OD from B-Rep bounding box on Can solid (outer radius × 2)
@@ -72,10 +79,11 @@ Required STEP measurement (if PASS):
 ```
 
 **Interpretation matrix:**
-- Can ID ≈ 20.5mm: m_dintDiameter → Can ID CONFIRMED
-- Can ID unchanged, Can OD ≈ 20.5mm: m_dintDiameter → Can OD (revises RMAP-2 and RMAP-3)
-- No observable changes: m_dintDiameter not a direct geometry driver; another field controls Can ID
-- Import fails: report exact error message
+- Can ID shifts toward 19mm, Can OD unchanged: m_dintDiameter → Can ID (supports RMAP-3)
+- Can OD shifts toward 19mm, Can ID unchanged: m_dintDiameter → Can OD (revises RMAP-2 and RMAP-3)
+- Both change: coupled geometry; investigate
+- Neither changes: m_dintDiameter not a direct geometry driver
+- Generation fails: report exact BDS error message
 
 ---
 
