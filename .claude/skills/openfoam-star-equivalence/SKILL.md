@@ -42,7 +42,7 @@ For each mismatch use:
 
 Before proposing, modifying, approving, or packaging any Robert/STAR/TBM experiment:
 
-1. Read `docs/equivalence/ECM_EQUIVALENCE_MASTER_MATRIX.md` (139 requirements across GEO/TOP/MAT/IFC/BC/SRC/IC/LUMP/ELEC/DIST/STAR/VAL/RUN families).
+1. Read `docs/equivalence/ECM_EQUIVALENCE_MASTER_MATRIX.md` (138 active requirements across GEO/TOP/MAT/IFC/BC/SRC/IC/LUMP/ELEC/DIST/STAR/VAL/RUN families; STAR-008 superseded 2026-09-23).
 2. Read `docs/equivalence/ECM_CAMPAIGN_READINESS_GATE.md` (10-point gate; all points must pass before dispatch).
 3. Preserve coverage of all requirement families — no family may lose its last resolution path as a result of any scoping decision.
 4. Distinguish the common thermal foundation (Test A) from the LUMP electrical track (OF `couplingMode lumped` ↔ STAR 0D RCR) and the DIST electrical track (OF `couplingMode elementWise` ↔ STAR RCRTable 3D). Both electrical tracks are required.

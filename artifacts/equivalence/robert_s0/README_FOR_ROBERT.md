@@ -22,8 +22,10 @@ Please fill in `ROBERT_RETURN_TEMPLATE.md` as you go, and check items off
 <!-- INTERNAL TRACEABILITY — not for Robert to act on; IDs reference internal audit matrix -->
 <!--
 R0         → RUN-004 (STAR version), STAR-001 (13-Region confirmation)
-S0-A       → STAR-008 (Can/JR overlap resolution), STAR-009 (Can/EndPlate overlap),
-             STAR-012 (Can computational topology), GEO-022/023/024 (Region volumes)
+S0-A       → STAR-009 (Can↔EndPlate overlap resolution — the only confirmed BDS-body overlap for Can),
+             STAR-012 (Can computational topology: monolithic vs subdivided),
+             GEO-022/023/024 (Region volumes)
+             [NOTE: STAR-008 superseded — no BDS Can/JR body overlap exists; T06 Can ID = 18.000 mm > JR OD = 17.881 mm]
 S0-B       → STAR-003 (Mandrel↔JR interface), STAR-007 (Can↔JR across radial gap),
              STAR-010 (+Root↔JR area), STAR-011 (−Root↔JR area),
              TOP-001 (JR↔Can radial interface existence), TOP-002 (radial area),
@@ -96,11 +98,13 @@ Does STAR show anything below the Can Region level? Choose one:
 - `SUBDIVIDED` — STAR exposes multiple separately addressable sub-regions, cell zones, or named components under Can
 - `NOT AVAILABLE` — cannot determine from the STAR UI
 
-**Question 2 — Overlap resolution:**
-Does the Can geometry appear to have been automatically clipped or resolved against a neighbouring body (e.g. a Can sub-volume that visually corresponds to the Jellyroll-occupied zone is absent, or the Can shape looks truncated where Jellyroll overlaps it)? Choose one:
-- `CLIPPED` — Can geometry visually appears resolved/clipped against a neighbour
-- `OVERLAP PRESERVED` — Can geometry visually appears to still overlap Jellyroll (full solid volume present despite geometric overlap)
+**Question 2 — Overlap resolution (Can↔EndPlate):**
+The T06 geometry has confirmed volumetric overlaps between the Can and the ±Ve EndPlates (approximately 5.3 mm³ each, at the top and bottom ends of the Can). Does STAR appear to have resolved or preserved these overlaps? Choose one:
+- `CLIPPED` — Can and/or EndPlate volumes appear to have been automatically trimmed/clipped where they overlapped; volumes look geometrically consistent and non-overlapping
+- `OVERLAP PRESERVED` — Can and EndPlate volumes appear to retain their original imported shapes and visually overlap at the ends
 - `CANNOT DETERMINE` — not possible to tell from the STAR UI/evidence
+
+(Note: the BDS Can and BDS Jellyroll bodies have a 0.059504 mm radial gap and do NOT volumetrically overlap as BDS bodies — do not look for a Can/Jellyroll body-overlap to be clipped; it does not exist in the T06 geometry.)
 
 If you can see a Region tree or component hierarchy under `Can` in STAR's tree view, please take a screenshot. We are **not** asking you to split anything or assign materials — just record what STAR's UI exposes.
 

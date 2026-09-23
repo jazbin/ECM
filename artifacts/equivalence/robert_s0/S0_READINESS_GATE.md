@@ -19,8 +19,8 @@ Only requirements for which this package produces directly discriminating eviden
 | S0 deliverable | Requirement IDs directly addressed |
 |---|---|
 | R0 (import + baseline) | RUN-004 (STAR version recorded), STAR-001 (13-Region import confirmed) |
-| S0-A (Region volumes) | STAR-008 (Can/JR overlap resolution), STAR-009 (Can/EndPlate overlap), GEO-022/023/024 (Region volumes) |
-| S0-A (Can topology) | STAR-012 (Can computational topology: monolithic vs subdivided; clipped vs overlap-preserved) |
+| S0-A (Region volumes) | STAR-009 (Can↔EndPlate overlap resolution — only confirmed BDS-body overlap for Can), GEO-022/023/024 (Region volumes) |
+| S0-A (Can topology) | STAR-012 (Can computational structure: monolithic vs subdivided; Can↔EndPlate overlap resolution) |
 | S0-B (interface table + areas) | STAR-003 (Mandrel↔JR existence), STAR-007 (Can↔JR interface across radial gap), STAR-010 (+Root↔JR area), STAR-011 (−Root↔JR area), TOP-001 (JR↔Can radial interface existence), TOP-002 (radial interface area), TOP-003 (JR↔Can bottom interface existence), TOP-005 (JR↔Cap top existence), TOP-006 (JR↔Cap top area), TOP-009 (gap check), TOP-011 (Mandrel↔JR existence), TOP-013 (+Root↔JR contact area), TOP-014 (−Root↔JR contact area), IFC-001 (JR↔Can radial gap-bridging), IFC-003 (JR↔Cap top ideal contact), IFC-006 (areas match targets) |
 | S0-C.1 (anisotropy capability) | MAT-006 (JR anisotropic cylindrical k), MAT-012 (Cap-equivalent anisotropic k) |
 | S0-C.2 (electrical/thermal independence, +Tab) | STAR-005 (+Tab electrical role preserved while thermal material changed) |
@@ -52,7 +52,7 @@ All 13 requirement families retain ≥ 1 future resolution path after S0's scope
 - LUMP: Test D-LUMP scope. LUMP-001 SATISFIED.
 - ELEC: S0-C.2, S0-C.3, S0-D cover STAR-005/006/013/014. ELEC-001..012 bulk in Test B/C/D.
 - DIST: DIST-001/002 SATISFIED. DIST-003..005 in Test B/C.
-- STAR: S0 covers STAR-001/003/005..014. STAR-015 conditional on STAR-012. STAR-016 conditional on S0-B + S0-D.
+- STAR: S0 covers STAR-001/003/005..007/009..014. STAR-008 SUPERSEDED (no active requirement). STAR-015 conditional on STAR-012 AND final geometry. STAR-016 conditional on S0-B + S0-D.
 - VAL: Test A/B/C/D scope.
 - RUN: RUN-004 in R0. Remainder in Test A/B/C/D.
 
@@ -104,7 +104,7 @@ Every requirement ID from Gate 1 maps to an explicit measurement or observation 
 |---|---|
 | RUN-004 | STAR version string (R0 step 1) |
 | STAR-001 | Full tree screenshot after import (R0) |
-| STAR-008/009 | Region volume table (S0-A) |
+| STAR-009 | Region volume table + Can topology tree + Can↔EndPlate overlap-resolution observation (S0-A) |
 | GEO-022/023/024 | Region volume table (S0-A) |
 | STAR-012 | Can topology: two independent questions (computational subdivision + overlap resolution) with screenshot (S0-A) |
 | STAR-003 | Mandrel↔JR row in interface table with type (S0-B) |
@@ -168,9 +168,9 @@ Pre-dispatch expected outcomes for hypotheses directly tested by S0:
 
 | Hypothesis | Expected outcome | Revision trigger |
 |---|---|---|
-| STAR-012 (Can Region topology) | Most likely MONOLITHIC / OVERLAP PRESERVED — BDS STEP typically produces full overlapping bodies; STAR may or may not auto-clip. Two-question format captures both dimensions independently. | STAR-015 activated if MONOLITHIC; material-assignment approach changes if SUBDIVIDED |
-| STAR-007 (Can↔JR interface across T06's radial gap) | No direct contact interface expected in T06: JR OD (17.88 mm) << Can ID (~20.6 mm); STAR likely reports no interface. Area would be zero or NOT AVAILABLE. | Revise if STAR creates a virtual/synthetic interface despite the gap |
-| STAR-010/011 (Root↔JR area) | Small area expected from T06 geometry; Root tabs are offset from full-disc JR face in T06 axial placement. | Revise if STAR reports area ≥ 100 mm² (would approach full-disc target of 3.325×10⁴ mm²) |
+| STAR-012 (Can computational structure) | BDS typically produces full solid bodies; STAR import behaviour is unknown. Computational subdivision answer (MONOLITHIC vs SUBDIVIDED) is independent of overlap-resolution. Any observed subdivision cannot be assumed to correspond to OF material zones. Two-question format captures both dimensions. | STAR-015 scope adjusts based on actual zone count and final geometry; SUBDIVIDED does not automatically solve the material-zone problem |
+| STAR-007 (Can↔JR interface across T06's radial gap) | T06 exact values: JR OD = 17.880992 mm, Can ID = 18.000 mm, radial gap = 0.059504 mm (diametral clearance 0.119008 mm). Whether STAR creates a thermal interface across this gap is precisely what S0-B tests. Expected outcome: **UNKNOWN** — do not prejudge. | Update based on actual STAR interface tree result |
+| STAR-010/011 (Root↔JR area) | Small area expected from T06 geometry; Root tabs are offset from full-disc JR face in T06 axial placement. OF full-disc target = 332.483 mm² (3.325×10⁻⁴ m²). Compare STAR-reported area quantitatively against this target. | Report actual STAR area vs 332.483 mm² target |
 | MAT-006/012 (anisotropic k) | Unknown STAR capability. Either answer is actionable. Y → MAT-006/012 move to PARTIAL; N → workaround required. | Update master matrix immediately on return |
 | STAR-005 (electrical role vs. thermal change) | Expected: +Tab Parts retained after k change if continuum properly isolated. | Update if STAR invalidates electrical model on any thermal material change |
 | STAR-014 (Core Part vs. thermal change) | Expected: Core Parts retained after k change on isolated continuum. | Update if STAR couples Core Part assignment to specific material type |
@@ -185,6 +185,6 @@ Note: RMAP-3 (`m_dintDiameter → Can ID?`) is a RAD-A hypothesis, not an S0 hyp
 
 All 10 gate points: **PASS** (or N/A where not applicable).
 
-Exact requirement IDs claimed by S0: RUN-004, STAR-001, STAR-003, STAR-005, STAR-006, STAR-007, STAR-008, STAR-009, STAR-010, STAR-011, STAR-012, STAR-013, STAR-014, GEO-022, GEO-023, GEO-024, MAT-006, MAT-012, TOP-001, TOP-002, TOP-003, TOP-005, TOP-006, TOP-009, TOP-011, TOP-013, TOP-014, IFC-001, IFC-003, IFC-006 (30 requirements across 8 families).
+Exact requirement IDs claimed by S0: RUN-004, STAR-001, STAR-003, STAR-005, STAR-006, STAR-007, STAR-009, STAR-010, STAR-011, STAR-012, STAR-013, STAR-014, GEO-022, GEO-023, GEO-024, MAT-006, MAT-012, TOP-001, TOP-002, TOP-003, TOP-005, TOP-006, TOP-009, TOP-011, TOP-013, TOP-014, IFC-001, IFC-003, IFC-006 (29 requirements across 8 families). STAR-008 superseded — not claimed.
 
 **Package is ready for dispatch when this sentence is removed and replaced with: "Dispatched: [date]."**

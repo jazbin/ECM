@@ -26,9 +26,10 @@ Can computational topology — two independent observations:
 - [ ] NOT AVAILABLE — cannot determine from STAR UI
 Details/notes on tree contents below Can Region:
 
-**Overlap resolution (choose one):**
-- [ ] CLIPPED — Can geometry visually appears resolved/clipped against Jellyroll or neighbour
-- [ ] OVERLAP PRESERVED — Can volume appears to retain the overlapping region
+**Overlap resolution — Can↔EndPlate (choose one):**
+(The T06 geometry has a confirmed ~5.3 mm³ Can↔EndPlate overlap at each end; BDS Can and BDS Jellyroll do NOT overlap as bodies)
+- [ ] CLIPPED — Can and/or EndPlate volumes appear trimmed/clipped where they overlap at the ends
+- [ ] OVERLAP PRESERVED — Can and EndPlate appear to retain original shapes and overlap at ends
 - [ ] CANNOT DETERMINE — not possible to tell from UI/evidence
 Details/notes:
 
