@@ -22,7 +22,7 @@
 
 **Check:** No requirement family in the master matrix has regressed from PARTIAL or OPEN to UNSEEN as a side-effect of this package's scope decisions.
 
-**How to verify:** For each GEO/TOP/MAT/IFC/BC/SRC/IC/ELEC/DIST/STAR/VAL/RUN family, confirm the coverage matrix still assigns ≥ 1 future or current experiment. If this package closes a blocker (e.g., S0-B), confirm the downstream requirements (e.g., GEO-007, TOP-001, IFC-001) are picked up by a named subsequent step.
+**How to verify:** For each GEO/TOP/MAT/IFC/BC/SRC/IC/LUMP/ELEC/DIST/STAR/VAL/RUN family, confirm the coverage matrix still assigns ≥ 1 future or current experiment. If this package closes a blocker (e.g., S0-B), confirm the downstream requirements (e.g., GEO-007, TOP-001, IFC-001) are picked up by a named subsequent step.
 
 **Dispatch blocker if:** Solving blocker X removes all planned steps that would address a downstream requirement family.
 
@@ -52,18 +52,41 @@
 
 ---
 
-## Gate 5 — Geometry dimension correctness
+## Gate 5 — Geometry dimensions and mode-correct configuration
 
-**Check:** Any TBM in this package uses the correct operative values for the dimensions it intends to test. Protected parameters are not inadvertently changed.
+**Check:** Any TBM in this package uses the correct operative values for the dimensions it intends to test, and configuration parameters match the intended RCR mode (common, lumped, or distributed).
 
-**How to verify:** For every TBM parameter in the package, confirm:
-- JR OD target (m_dJellyrollThickness_mm): if being set, confirm target = 20.6274 mm or is an intentional RAD sweep value.
-- Can OD (m_dRepCanXDim/YDim): if being set, confirm target = 21.09 mm or intentional sweep.
-- Can ID (m_dintDiameter or operative field): if being set, confirm target = 20.6274 mm or intentional sweep.
-- Protected parameters (m_bOnly1D=0, m_dAhCell=5.0, m_nRCRParameterSets=3, m_bLumpedEnergyBalance=0, IET=RCRTable 3D, Thermal=Distributed, +m_dS3=5mm, -m_dS3=50mm, Transport=0) are preserved unless this package is specifically testing one of them.
-- F-series failure mode check: if JR OD > 0.5 × Can OD (rough sanity), flag for review before sending.
+### 5a — Geometry
 
-**Dispatch blocker if:** Any protected parameter has been changed without justification, or JR OD >> Can OD in the same TBM.
+For every TBM parameter in the package, confirm:
+- JR OD target (m_dJellyrollThickness_mm): if being set, confirm target = 20.6274 mm or is an explicitly labelled intentional RAD sweep value.
+- Can OD (m_dRepCanXDim/YDim): if being set, confirm target = 21.09 mm or explicitly labelled intentional sweep.
+- Can ID (m_dintDiameter — or whatever field RAD-A identifies as operative; do not infer Can ID from m_dintDiameter until RAD-A confirms it): if being set, confirm target = 20.6274 mm or explicitly labelled intentional sweep.
+- Do not send a package with a radial combination already shown to be geometrically impossible (JR OD >> Can OD, as established by F-series failure analysis; i.e. JR OD must not substantially exceed the Can's operative outer dimension). JR OD = Can ID (exact contact) is OPEN and testable — do not treat it as prohibited.
+- Intentional sweep values must be labelled as such in the package README (e.g., "RAD-A sweep: m_dintDiameter 20.9→20.5mm").
+
+### 5b — Common mode-independent configuration
+
+Parameters required identically in both lumped and distributed tracks:
+- m_dAhCell = 5.0 Ah (NEXTSESSION protected; ELEC-004)
+- m_nRCRParameterSets = 3 (NEXTSESSION protected; ELEC-005)
+- Transport number fields = 0 (R005 confirmed; RUN-008)
+- +m_dS3 = 5 mm; −m_dS3 = 50 mm (NEXTSESSION protected; RUN-009)
+- AE characterisation data source (same dataset for both tracks; LUMP-007/ELEC-006)
+
+### 5c — Distributed-track-only configuration
+
+These settings are required for the distributed track. A lumped-track package may intentionally differ on these; that is not a blocker:
+- IET = RCRTable 3D (ELEC-001)
+- Thermal = Distributed (ELEC-002)
+- m_bOnly1D = 0 (ELEC-003; already SATISFIED)
+- m_bLumpedEnergyBalance = 0 (ELEC-011; already SATISFIED)
+
+### 5d — Lumped-track configuration
+
+Exact STAR settings for native 0D/lumped whole-cell RCR are OPEN (not yet established from a STAR run). A lumped-track package must not use distributed-track settings (IET=RCRTable 3D, Thermal=Distributed) as its target — these are distributed-only. Lumped-track IET and Thermal settings must be identified and recorded before Test D-LUMP.
+
+**Dispatch blocker if:** Any parameter in 5b has been changed without justification. Distributed-track settings inadvertently applied to a lumped-track package without justification. An intentional sweep value is not labelled as such. A radial combination already proven impossible is sent unchanged.
 
 ---
 
@@ -101,13 +124,20 @@
 
 ---
 
-## Gate 9 — Equivalence test plan consistency
+## Gate 9 — Requirement coverage continuity
 
-**Check:** This package does not reduce, remove, or weaken any planned step in `STAR_CLIENT_EQUIVALENCE_TEST_PLAN.md` or the RAD campaign in `TBM_NEXT_EXPERIMENTS.md` without explicit replacement.
+**Invariant:** No governing requirement in `ECM_EQUIVALENCE_MASTER_MATRIX.md` may lose all evidence coverage or all resolution paths as a result of this package's decisions.
 
-**How to verify:** After preparing this package, list any changes to the test plan or experiment plan it implies. For each change, confirm there is a named replacement step that covers the same requirement IDs. A "we don't need that test anymore" decision requires an evidence-backed justification referencing a specific requirement ID, not just a narrative.
+**How to verify:** For each requirement ID that is currently OPEN, PARTIAL, or NOT TESTED, confirm it still has at least one of:
+1. A planned future experiment that covers it (by name in `ECM_EXPERIMENT_COVERAGE_MATRIX.md`), OR
+2. Evidence that already SATISFIES it (documented in the matrix).
 
-**Dispatch blocker if:** A planned test (Test A/B/C/D, RAD-A..D2, S0-A..D, GEO-AX) is being skipped with no equivalent coverage of its requirement IDs.
+Planned experiments may be merged, superseded, renamed, or removed — experiment names are NOT sacred. What matters is that the requirement IDs they covered are still addressed. Specifically:
+- If a planned experiment (e.g., Test A, RAD-A, S0-B) is being changed or merged, list the requirement IDs it covered and confirm each is covered by the replacement.
+- A "we don't need that experiment anymore" decision is acceptable if and only if all of its requirement IDs are either SATISFIED from stronger existing evidence or transferred to a different named step.
+- "Narrative reasoning" is not a substitute for citing a requirement ID.
+
+**Dispatch blocker if:** Any OPEN or NOT TESTED requirement would have zero remaining resolution path after this package's decisions are applied.
 
 ---
 
@@ -144,11 +174,14 @@ ECM Campaign Readiness Gate — package: <NAME> — date: <DATE>
 [ ] Gate 2: No requirement family orphaned by this package's scope
 [ ] Gate 3: No contradiction in C01-C10 affects these instructions
 [ ] Gate 4: S0 prerequisite: [ ] not needed / [ ] satisfied (evidence: ___)
-[ ] Gate 5: Protected parameters verified; no JR OD >> Can OD
+[ ] Gate 5a: Geometry sweep values explicitly labelled; no proven-impossible radial combination; JR OD = Can ID OPEN (not prohibited)
+[ ] Gate 5b: Common mode-independent params preserved (Ah, RCR sets, Transport, S3, AE data source)
+[ ] Gate 5c: If DIST track — IET/Thermal/1D/LEB settings present; if LUMP track — distributed-only settings not wrongly applied
+[ ] Gate 5d: If LUMP track — note that lumped STAR settings are OPEN until identified
 [ ] Gate 6: All required measurements explicitly listed in README
 [ ] Gate 7: All upstream dependencies satisfied or parallel
 [ ] Gate 8: No stale/superseded claim used as design input
-[ ] Gate 9: No test plan step weakened without replacement
+[ ] Gate 9: Every OPEN/NOT TESTED requirement still has ≥ 1 future resolution path (requirement IDs verified, not just experiment names)
 [ ] Gate 10a: If electrical reqs in scope — track specified (LUMP / DIST / both); wedge_2170 not cited as distributed reference
 [ ] Gate 10: Pre-dispatch expected outcomes recorded for affected hypotheses
 

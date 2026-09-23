@@ -58,18 +58,17 @@ Columns: `Experiment | Type | Status | Req IDs addressed | Req IDs it CANNOT add
 
 ---
 
-## Tests A-LUMP / D-LUMP — Lumped Track Equivalence Tests (planned, not yet run)
+## Test D-LUMP — Lumped Track Coupled Comparison (planned, not yet run; requires common Test A pass)
 
 | Experiment | Type | Status | Req IDs addressed | Notable gaps | Output evidence needed | Dependencies | Still needed? |
 |---|---|---|---|---|---|---|---|
-| **Test A-LUMP — Thermal baseline (uniform heat source, lumped track geometry)** | STAR thermal run | NOT RUN | LUMP-005/006; MAT-001..012; BC-001..005; SRC-004 (lumped track); IC-001; IFC-001..006; VAL-004..015 | ELEC/DIST/LUMP-003/004 (no ECM yet) | T_JR_mean(t), Qdot(t), thermal probes; compare to `wedge_2170_thermal_qualification` baseline | S0 pass; geometry corrections; lumped-mode material mapping | YES |
-| **Test D-LUMP — Full coupled lumped comparison with OF reference** | STAR lumped ECM + thermal | NOT RUN | LUMP-003/004/005/006/007; ELEC-001 (lumped variant); VAL-001/002/003/004; RUN-001/002 | SRC-008 must be resolved; LUMP-007 (same AE data confirmed) | V(t) vs `wedge_2170` or `validation_lumped_paramset_21p09x70p02`; SOC(t); Qdot(t); T_JR_mean(t) | Test A-LUMP pass; LUMP-007 confirmed | YES |
+| **Test D-LUMP — Full coupled lumped comparison with OF reference** | STAR lumped ECM + thermal | NOT RUN | LUMP-003/004/005/006/007; LUMP-002 (lumped mode activation); VAL-001/002/003/004; RUN-001/002 | Lumped-track STAR IET/Thermal settings OPEN (must be identified); LUMP-007 AE data confirmed | V(t) vs `wedge_2170` or `validation_lumped_paramset_21p09x70p02`; SOC(t); Qdot(t); T_JR_mean(t) | Common Test A pass; lumped-track STAR settings identified; LUMP-007 confirmed | YES |
 
-## Tests A/B/C/D — Distributed Track Equivalence Tests (planned, not yet run; require S0 pass + geometry corrections)
+## Tests A (common) / B/C/D — Common Thermal + Distributed Track Equivalence Tests (planned, not yet run; require S0 pass + geometry corrections)
 
 | Experiment | Type | Status | Req IDs addressed | Notable gaps | Output evidence needed | Dependencies | Still needed? |
 |---|---|---|---|---|---|---|---|
-| **Test A — Thermal baseline (fixed heat source, no ECM)** | STAR thermal run | NOT RUN | MAT-001..012; BC-001..005; SRC-001/002/003/006/007; IC-001; IFC-001..006; VAL-004..015; TOP-010; STAR-004/012 | ELEC/DIST/RUN-001 (no ECM yet); VAL-001/002/016 (electrical) | T(x,t), T_regions(t), E_stored(t), Q_ext(t), V(t) n/a; 9 probe time series | S0 pass; geometry corrections (GEO-001/002); material mapping from BDS_TO_OPENFOAM | YES — primary thermal equivalence test |
+| **Test A — COMMON thermal baseline (fixed heat source, no ECM; applies to BOTH lumped and distributed tracks)** | STAR thermal run | NOT RUN | MAT-001..012; BC-001..005; SRC-001/002/003/006/007/008; IC-001; IFC-001..006; VAL-004..015; TOP-010; STAR-004/012; LUMP-005/006 (lumped-track thermal observables); GEO/TOP as applicable after geometry resolution | ELEC/DIST/RUN-001 (no ECM yet); VAL-001/002/016 (electrical); LUMP-003/004 (require coupled ECM); RUN-003 (time step — set here) | T(x,t), T_regions(t), E_stored(t), Q_ext(t), V(t) n/a; 9 probe time series; compare to `wedge_2170_thermal_qualification` reference CSV | S0 pass; geometry corrections (GEO-001/002); material mapping from BDS_TO_OPENFOAM; SRC-008 resolved (0% Cap heat) | YES — single common thermal test; not duplicated per-track |
 | **Test B — Electrical integration (ECM on, verify distributed activation)** | STAR ECM run | NOT RUN | ELEC-001/002/006/007/008/009/010/012; RUN-001/002/003/006 | DIST (not yet; spatial gradients needed for Test C); VAL-016 | V(t), SOC(t); no solver errors; native STAR model confirmed | Test A pass; correct TBM radial geometry | YES |
 | **Test C — Distributed semantics (spatial SOC/T coupling)** | STAR ECM + thermal | NOT RUN | DIST-001..005; VAL-016; ELEC-001..010 | All geometry reqs must already be met | T(x_A,t) ≠ T(x_B,t) → SOC(x_A,t) ≠ SOC(x_B,t); q(x_A,t) ≠ q(x_B,t) | Test B pass; spatial T gradient must exist | YES |
 | **Test D — Full coupled comparison with OF reference** | STAR ECM + thermal | NOT RUN | VAL-001..016; ELEC-009/010; SRC-004/005; all remaining open reqs | Must resolve SRC-008 (f_cap conflict) before test design | V(t) vs OF; SOC(t) vs OF; T_JR_mean vs OF; final energy balance | Test C pass; SRC-008 resolved; VAL-017 clean reference | YES |
@@ -116,11 +115,11 @@ Every historical and planned experiment maps to at least one requirement. No exp
 | MAT | 14 | 12 | 2 (MAT-006 anisotropic k capability; MAT-012 anisotropic k for Cap) | Need explicit STAR capability check in S0-C |
 | IFC | 6 | 4 | 2 (IFC-005 radiation check; IFC-002 explicit resistance value) | Need additions to S0-D and Test A |
 | BC | 5 | 3 | 2 (BC-003 no fixed-T; BC-004 no radiation) | Need addition to Test A setup checklist |
-| SRC | 8 | 6 | 1 (SRC-008 f_cap conflict unresolved — no test yet) | Must resolve before Test D |
+| SRC | 8 | 7 | 0 (SRC-008 resolved — 0% Cap heat; stale documentation is cleanup, not a blocker) | Test A uses 0% Cap heat; SRC requirement fully covered |
 | IC | 1 | 1 | 0 | Test A sets IC |
-| LUMP | 7 | 5 | 2 (LUMP-003/004 comparison itself requires Test D-LUMP which depends on full geometry fix) | Two-track lumped tests added; LUMP-001 SATISFIED from OF case evidence |
+| LUMP | 7 | 5 | 2 (LUMP-003/004: require Test D-LUMP which depends on full geometry fix + lumped STAR settings identification) | Test A-LUMP merged into common Test A; Test D-LUMP retained for coupled lumped comparison |
 | ELEC | 12 | 9 | 3 (ELEC-007/008/009 set during Test B/C/D but not in S0 scope) | Acceptable; gated correctly; ELEC = distributed track |
 | DIST | 5 | 5 | 0 | DIST-001/002 now SATISFIED from OF reference; Test C covers DIST-003..005 |
-| STAR | 14 | 12 | 2 (STAR-012 3-way Can split; STAR-013 resistance on face) | Add to S0-A and S0-D |
+| STAR | 16 | 12 | 2 (STAR-015 3-way material assignment within one Region — gated on STAR-012; STAR-016 production resistance applicability — gated on S0-B + S0-D) | STAR-012 now assigned to S0-A Region topology; STAR-013 generic capability to S0-D; STAR-015/016 conditional on prior results |
 | VAL | 17 | 15 | 2 (VAL-013 asymmetry observable; IFC-005/BC checks in Test A) | Fold into Test A acceptance |
 | RUN | 9 | 8 | 1 (RUN-003 time step matching) | Add to Test A/D setup |

@@ -20,7 +20,9 @@ Format: `ID | Claim A (source) | Claim B (source) | Stronger evidence | Canonica
 
 **Consequence if unresolved:** STAR Test D comparison based on 0.034 would compare against a non-existent OF configuration, making validation meaningless.
 
-**Files to update:** `docs/equivalence/OPENFOAM_THERMAL_OPERATOR_INVENTORY.md` (mark documented 0.034 as SUPERSEDED); `data/equivalence/openfoam_thermal_operator.json` (add `canonical_value: 0`); relevant Test D design instructions must specify 0% Cap.
+**SRC-008 requirement status:** RESOLVED. The requirement itself (direct heat: JR=100%, Can=0%, Cap=0%) is now SATISFIED in `ECM_EQUIVALENCE_MASTER_MATRIX.md` SRC-008. This contradiction is a stale-documentation cleanup item, not an open design question. No further OF investigation is needed to design tests — use 0% Cap heat. Test A and Test D-LUMP/DIST must specify 0% Cap heat.
+
+**Files to update:** `docs/equivalence/OPENFOAM_THERMAL_OPERATOR_INVENTORY.md` (mark documented 0.034 as SUPERSEDED); `data/equivalence/openfoam_thermal_operator.json` (add `canonical_value: 0`). These are cleanup tasks, not test-design blockers.
 
 ---
 
