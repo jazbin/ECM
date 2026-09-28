@@ -1,0 +1,11 @@
+case_id,phase,repo_relative_path,expected,run_default,notes
+CTRL_T06_PASS,control,artifacts/equivalence/robert_s0/input/T06_TARGET_AXIAL_SURPLUS_2p00.tbm,PASS,yes,Known passing T06 axial baseline
+CTRL_18650_PASS,control,tbm_validation/reference/HP18650/hp18650Spiral-DIST.tbm,PASS,yes,Known stock HP18650 control
+RAD_A,radial,artifacts/equivalence/geometry_campaign/input/GC_RAD_A_can_id_probe.tbm,UNKNOWN,yes,Package m_dintDiameter 20.9->19.0
+RAD_B,radial,artifacts/equivalence/geometry_campaign/input/GC_RAD_B_can_rep_xy_probe.tbm,UNKNOWN,yes,REPORT can X/Y 18->19
+RAD_C,radial,artifacts/equivalence/geometry_campaign/input/GC_RAD_C_jr_od_probe.tbm,UNKNOWN,yes,m_dJellyrollThickness_mm 17.9->17.5
+AX_A,reserve,artifacts/equivalence/geometry_campaign/input/GC_AX_A_ext_height_probe.tbm,UNKNOWN,no,Reserve
+AX_B,reserve,artifacts/equivalence/geometry_campaign/input/GC_AX_B_sep_tail_zero.tbm,UNKNOWN,no,Reserve
+AX_C,reserve,artifacts/equivalence/geometry_campaign/input/GC_AX_C_sep_feed_zero.tbm,UNKNOWN,no,Reserve
+AX_D,reserve,artifacts/equivalence/geometry_campaign/input/GC_AX_D_end_overlap_probe.tbm,UNKNOWN,no,Reserve
+CEN_A,reserve,artifacts/equivalence/geometry_campaign/input/GC_CEN_A_mandrel_probe.tbm,UNKNOWN,no,Reserve
