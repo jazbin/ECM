@@ -17,7 +17,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def main():
     choices=["none","report_xy","package_int","package_ext"]; ap=argparse.ArgumentParser(); ap.add_argument("--can-od-driver",required=True,choices=choices); ap.add_argument("--can-id-driver",required=True,choices=choices); ap.add_argument("--can-od",default="21.09"); ap.add_argument("--can-id",default="20.6274"); ap.add_argument("--gap-jr",default="20.50"); ap.add_argument("--contact-jr",default="20.6274"); ap.add_argument("--out-dir",type=Path,default=CAMPAIGN/"build"/"production"); a=ap.parse_args()
     if a.can_od_driver!="none" and a.can_od_driver==a.can_id_driver and a.can_od!=a.can_id:raise SystemExit("One field cannot independently impose different Can OD and ID; mapping is coupled")
-    text=BASE.read_text(encoding="utf-8"); text=set_driver(text,a.can_od_driver,a.can_od); text=set_driver(text,a.can_id_driver,a.can_id); a.out_dir.mkdir(parents=True,exist_ok=True)
+    text=BASE.read_text(encoding="latin-1"); text=set_driver(text,a.can_od_driver,a.can_od); text=set_driver(text,a.can_id_driver,a.can_id); a.out_dir.mkdir(parents=True,exist_ok=True)
     for case,jr in [("PROD_GAP",a.gap_jr),("PROD_CONTACT",a.contact_jr)]:
-        p=a.out_dir/f"{case}.tbm"; p.write_text(patch(text,r"m_dJellyrollThickness_mm",jr),encoding="utf-8"); print(case,p,sha(p))
+        p=a.out_dir/f"{case}.tbm"; p.write_text(patch(text,r"m_dJellyrollThickness_mm",jr),encoding="latin-1"); print(case,p,sha(p))
 if __name__=="__main__":main()

@@ -1,0 +1,8 @@
+case_id,tbm_file,sha256,expected_result,purpose
+CTRL_T06_PASS,cases/CTRL_T06_PASS.tbm,433a8162b6f02bbc0a5781bc7f789345adaecf8bd2b9d5ac7bd6199ed8fb6f71,PASS,Known passing T06 axial baseline; first case to run and record
+CTRL_18650_PASS,cases/CTRL_18650_PASS.tbm,604f18c2844d07af77ba593f6d43afb1a66924560b490ab3d1891327dd950666,PASS,Stock HP18650 control; replay to validate path substitution
+CTRL_E004_BOTH_ZERO,cases/CTRL_E004_BOTH_ZERO.tbm,66a68e9f001aa051b0a3d453604fd90da1a6f6d33f61535f33fbedd2d26d0fc1,FAIL_E004,Synthetic from T06; both tab surpluses zeroed; expected E004 Electrode Root 1 extrusion=0
+CTRL_CAN_NEG_JR20p6274,cases/CTRL_CAN_NEG_JR20p6274.tbm,2042c8fbbbc0ad5f08e14a0dda3fc1dfbef818200bbbdb772f62de572169a093,FAIL_CAN_THICKNESS,Synthetic from T06; JR OD 20.6274 > Can ID 18; expected Can Thickness is -ve
+RAD_A,cases/RAD_A.tbm,05db85fc8c27856044d16429dfa7b659656fd250bd190106e0cfb6911ad8deaa,UNKNOWN,Radial probe: Package m_dintDiameter 20.9->19.0; isolates Can ID field mapping
+RAD_B,cases/RAD_B.tbm,c15d05f90bfacacb7a7397fa9ecb1b20cec0c856ff23c0f66fe00900ba43d82b,UNKNOWN,Radial probe: m_dRepCanXDim + m_dRepCanYDim 18->19; isolates REPORT Can X/Y field mapping
+RAD_C,cases/RAD_C.tbm,c82653dcae49e3b33eabb81cd4c6a9387794c42470a79e35b1014487033e2de5,UNKNOWN,Radial probe: m_dJellyrollThickness_mm 17.9->17.5; isolates JR OD field mapping
