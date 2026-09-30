@@ -62,16 +62,26 @@ def patch_field(text: str, field_name: str, new_value: str | float) -> str:
 
 # ── block definition ─────────────────────────────────────────────────────────
 
-# Run-order position: 01 … 18 (sortable)
+# Run-order position: 01 … 20 (sortable)
 # case_id   : short ID used for STEP filename and results folder
 # family    : CTRL / RAD_A / RAD_B / RAD_C / PROD
 # patches   : dict of {field_name: new_value}  (empty = T06 copy)
 # expected  : PASS / FAIL_CAN_THICKNESS / UNKNOWN
 # hyp       : mapping hypothesis tested (free text)
 # notes     : scientific rationale
+#
+# NOTE — Package m_dextDiameter in PROD cases:
+# T06 has m_dextDiameter=21 (package external diameter); production target is 21.09 mm.
+# All PROD cases set m_dextDiameter=21.09 for two reasons:
+#   1. Physical correctness: the package external diameter SHOULD match the production cell OD.
+#   2. Insurance: if m_dextDiameter is the actual Can OD driver (HypD), we get the right geometry.
+# Evidence strongly favours HypA (m_dintDiameter→Can OD, exact T06 match); m_dextDiameter=21
+# is 0.1 mm off from T06 Can OD=20.9, making HypD far less plausible. Changing m_dextDiameter
+# in PROD cases is therefore a deliberate correctness measure, not an experiment. It is listed
+# in patches so the isolation audit tracks it explicitly.
 
 BLOCK = [
-    # ── CONTROLS ──────────────────────────────────────────────────────────
+    # ── CONTROLS ──────────────────────────────────────────────────────────────
     {
         "pos": "01", "case_id": "CTRL_T06_S", "family": "CTRL",
         "patches": {},
@@ -203,19 +213,19 @@ BLOCK = [
         "notes": "Widest range in RAD-C family; confirms linearity over >1 mm span",
     },
 
-    # ── PRODUCTION CANDIDATES (all assume HypA mapping confirmed by RAD-A/B) ─
+    # ── PRODUCTION CANDIDATES — HypA branch ──────────────────────────────
     # HypA: m_dintDiameter → Can OD (1:1), m_dRepCanX/Y → Can ID (1:1),
-    #        m_dJellyrollThickness_mm → JR OD (1:1, offset ≈ −0.019 mm).
+    #       m_dJellyrollThickness_mm → JR OD (1:1, offset ≈ −0.019 mm).
     # Target: Can OD=21.09, Can ID=20.6274, JR OD=20.6274 (ideal contact).
-    # Varied JR OD from safe positive clearance to exact contact to bracket
-    # the STAR-CAD construction boundary (H004-3).
+    # m_dextDiameter set to 21.09 in all PROD cases (see block-level note above).
     #
-    # Safety: Can OD (21.09) > Can ID (20.6274) → wall = 0.2313 mm (target value). ✓
-    #          JR OD ≤ Can ID for all cases (positive or zero clearance). ✓
-    #          Tab surplus unchanged at +2.00 mm / +2.00 mm (T06 frozen). ✓
+    # Safety: Can OD (21.09) > Can ID (20.6274) → wall = 0.2313 mm. ✓
+    #         JR OD ≤ Can ID for all cases (positive or zero clearance). ✓
+    #         Tab surplus unchanged at +2.00 mm / +2.00 mm (T06 frozen). ✓
     {
-        "pos": "14", "case_id": "PROD_D1_GAP", "family": "PROD",
+        "pos": "14", "case_id": "PROD_A_D1_GAP", "family": "PROD",
         "patches": {
+            "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
             "m_dRepCanXDim": "20.6274",
             "m_dRepCanYDim": "20.6274",
@@ -233,8 +243,9 @@ BLOCK = [
         ),
     },
     {
-        "pos": "15", "case_id": "PROD_D1_SLIM", "family": "PROD",
+        "pos": "15", "case_id": "PROD_A_D1_SLIM", "family": "PROD",
         "patches": {
+            "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
             "m_dRepCanXDim": "20.6274",
             "m_dRepCanYDim": "20.6274",
@@ -251,26 +262,29 @@ BLOCK = [
         ),
     },
     {
-        "pos": "16", "case_id": "PROD_D1_NEAR", "family": "PROD",
+        "pos": "16", "case_id": "PROD_A_CONT_LIT", "family": "PROD",
         "patches": {
+            "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
             "m_dRepCanXDim": "20.6274",
             "m_dRepCanYDim": "20.6274",
-            "m_dJellyrollThickness_mm": "20.619",
+            "m_dJellyrollThickness_mm": "20.6274",
         },
         "expected": "UNKNOWN",
         "hyp": (
-            "HypA full production: JR OD≈20.600 (m_dJR=20.619); "
-            "radial clearance ≈ 0.014 mm (very tight)"
+            "HypA contact LITERAL: m_dJR=20.6274 (= Can ID target, no offset correction); "
+            "realized JR OD ≈ 20.608 (offset ≈ −0.019 mm); gap ≈ 0.010 mm"
         ),
         "notes": (
-            "RAD-D1 near-contact candidate. Tests STAR-CAD tolerance for very thin "
-            "clearance. PASS or FAIL both informative for locating construction boundary."
+            "H004-3 near-contact test with literal target value. "
+            "PASS → JR OD ≈ Can ID achievable without exact compensation. "
+            "FAIL 'Can Thickness is -ve' → unexpectedly, JR OD > Can ID even without compensation."
         ),
     },
     {
-        "pos": "17", "case_id": "PROD_D2_CONT", "family": "PROD",
+        "pos": "17", "case_id": "PROD_A_CONT_COMP", "family": "PROD",
         "patches": {
+            "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
             "m_dRepCanXDim": "20.6274",
             "m_dRepCanYDim": "20.6274",
@@ -278,19 +292,69 @@ BLOCK = [
         },
         "expected": "UNKNOWN",
         "hyp": (
-            "HypA exact contact: JR OD=Can ID=20.6274 (m_dJR=20.6464, offset +0.019 mm); "
-            "radial clearance = 0 mm (H004-3 test)"
+            "HypA contact COMPENSATED: m_dJR=20.6464 (= target 20.6274 + offset +0.019 mm); "
+            "realized JR OD ≈ 20.6274 → gap = 0 mm (H004-3 test)"
         ),
         "notes": (
             "RAD-D2: H004-3 exact-contact constructibility test. "
-            "PASS → preferred production geometry achievable. "
-            "FAIL → locates upper JR OD construction boundary; PROD_D1_GAP or SLIM becomes target."
+            "PASS → preferred production geometry (JR OD = Can ID = 20.6274) achievable. "
+            "FAIL → locates upper JR OD construction boundary; PROD_A_D1_GAP or SLIM becomes target."
+        ),
+    },
+
+    # ── PRODUCTION CANDIDATES — HypB branch ──────────────────────────────
+    # HypB (alternative): m_dRepCanX/Y → Can OD, m_dintDiameter → Can ID.
+    # T06 numerical evidence DOES NOT support a 1:1 mapping under HypB
+    # (m_dRepCanXDim=18 ≠ T06 Can OD=20.9; m_dintDiameter=20.9 ≠ T06 Can ID=18.0).
+    # However, if the REPORT block values are authoritative inputs (not derived),
+    # HypB production candidates set them to the correct production values directly.
+    # Under HypA: both cases FAIL 'Can Thickness is -ve' (m_dRepXY=21.09 → Can ID=21.09
+    #             > Can OD from m_dint=20.6274 → negative wall). That FAIL is diagnostic.
+    # Under HypB: both cases PASS with Can OD=21.09, Can ID=20.6274, JR OD as specified.
+    # Including these avoids a second POD block if HypB turns out correct.
+    {
+        "pos": "18", "case_id": "PROD_B_D1", "family": "PROD",
+        "patches": {
+            "Package m_dextDiameter": "21.09",
+            "Package m_dintDiameter": "20.6274",
+            "m_dRepCanXDim": "21.09",
+            "m_dRepCanYDim": "21.09",
+            "m_dJellyrollThickness_mm": "20.519",
+        },
+        "expected": "UNKNOWN",
+        "hyp": (
+            "HypB positive-clearance: Can OD=21.09 (m_dRepXY=21.09), Can ID=20.6274 (m_dint=20.6274), "
+            "JR OD≈20.500 (m_dJR=20.519); gap≈0.064 mm. "
+            "Under HypA: FAIL 'Can Thickness is -ve' (Can ID=21.09 > Can OD=20.6274)"
+        ),
+        "notes": (
+            "HypB RAD-D1 candidate. PASS → HypB confirmed, production geometry achievable. "
+            "FAIL 'Can Thickness is -ve' → additional HypA confirmation."
+        ),
+    },
+    {
+        "pos": "19", "case_id": "PROD_B_CONT_LIT", "family": "PROD",
+        "patches": {
+            "Package m_dextDiameter": "21.09",
+            "Package m_dintDiameter": "20.6274",
+            "m_dRepCanXDim": "21.09",
+            "m_dRepCanYDim": "21.09",
+            "m_dJellyrollThickness_mm": "20.6274",
+        },
+        "expected": "UNKNOWN",
+        "hyp": (
+            "HypB contact LITERAL: m_dJR=20.6274 (literal target, no offset correction); "
+            "realized JR OD≈20.608; gap≈0.010 mm. Under HypA: FAIL."
+        ),
+        "notes": (
+            "HypB H004-3 near-contact test. PASS → HypB contact geometry obtainable. "
+            "FAIL 'Can Thickness is -ve' → HypA confirmed again."
         ),
     },
 
     # ── END CONTROL ───────────────────────────────────────────────────────
     {
-        "pos": "18", "case_id": "CTRL_T06_E", "family": "CTRL",
+        "pos": "20", "case_id": "CTRL_T06_E", "family": "CTRL",
         "patches": {},
         "expected": "PASS",
         "hyp": "—",
@@ -386,7 +450,7 @@ def generate(out_dir: Path) -> list[dict]:
             "notes":          spec["notes"],
         }
         rows.append(row)
-        print(f"  {pos} {case_id:20s}  {row['tbm_sha256'][:16]}…  "
+        print(f"  {pos} {case_id:25s}  {row['tbm_sha256'][:16]}…  "
               f"changed={len(patches)} field(s)")
 
     return rows
@@ -409,13 +473,13 @@ def write_run_order(rows: list[dict], out_dir: Path) -> None:
         "Estimated time: {:.0f}–{:.0f} min at 10–20 s/case".format(
             len(rows) * 10 / 60, len(rows) * 20 / 60),
         "",
-        f"{'Pos':<4} {'Case ID':<20} {'Expected':<20} {'Changed field(s)':<55} {'TBM SHA256 prefix'}",
-        "-" * 120,
+        f"{'Pos':<4} {'Case ID':<25} {'Expected':<20} {'Changed field(s)':<65} {'TBM SHA256 prefix'}",
+        "-" * 130,
     ]
     for r in rows:
         lines.append(
-            f"{r['run_pos']:<4} {r['case_id']:<20} {r['expected']:<20} "
-            f"{r['changed_fields']:<55} {r['tbm_sha256'][:16]}…"
+            f"{r['run_pos']:<4} {r['case_id']:<25} {r['expected']:<20} "
+            f"{r['changed_fields']:<65} {r['tbm_sha256'][:16]}…"
         )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Run order → {path}")
@@ -444,8 +508,8 @@ def write_isolation_audit(rows: list[dict], out_dir: Path) -> None:
     """Verify each TBM changes exactly the intended fields and nothing else."""
     t06_text = T06_SRC.read_text(encoding="latin-1")
     audit_fields = [
-        "Package m_dintDiameter",
         "Package m_dextDiameter",
+        "Package m_dintDiameter",
         "m_dJellyrollThickness_mm",
         "m_dRepCanXDim",
         "m_dRepCanYDim",

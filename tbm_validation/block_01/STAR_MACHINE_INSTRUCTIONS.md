@@ -1,8 +1,8 @@
 # BLOCK 01 — STAR-CCM+ Machine Instructions
 
 **Block:** 01 (radial mapping + production candidates)
-**TBM count:** 18
-**Estimated runtime:** 3–6 min (18 × 10 s) to 6–10 min (18 × 20 s)
+**TBM count:** 20
+**Estimated runtime:** 3–7 min (20 × 10 s) to 7–10 min (20 × 20 s)
 **Prepared by:** offline workspace (no Claude access during session)
 
 ---
@@ -12,9 +12,10 @@
 This block answers a single question: which TBM fields control generated Can OD,
 Can ID, and JR OD in STAR's `Create from Tbm` geometry builder?
 
-Using those answers it also includes precomputed production candidates, so the same
-session may produce the final OpenFOAM-equivalent 2170 geometry without a second
-POD block.
+Using those answers it also includes precomputed production candidates under both
+HypA (m_dint→Can OD, m_dRepXY→Can ID) and HypB (m_dRepXY→Can OD, m_dint→Can ID),
+so the same session may produce the final OpenFOAM-equivalent 2170 geometry without
+a second POD block.
 
 You do not need to understand the geometry. Your only jobs are:
 1. Import each TBM in order.
@@ -26,7 +27,7 @@ You do not need to understand the geometry. Your only jobs are:
 
 ## Before you start
 
-Verify the `cases/` folder contains exactly 18 `.tbm` files:
+Verify the `cases/` folder contains exactly 20 `.tbm` files:
 
 ```
 01_CTRL_T06_S.tbm
@@ -42,11 +43,13 @@ Verify the `cases/` folder contains exactly 18 `.tbm` files:
 11_RC_17P5.tbm
 12_RC_17P0.tbm
 13_RC_16P0.tbm
-14_PROD_D1_GAP.tbm
-15_PROD_D1_SLIM.tbm
-16_PROD_D1_NEAR.tbm
-17_PROD_D2_CONT.tbm
-18_CTRL_T06_E.tbm
+14_PROD_A_D1_GAP.tbm
+15_PROD_A_D1_SLIM.tbm
+16_PROD_A_CONT_LIT.tbm
+17_PROD_A_CONT_COMP.tbm
+18_PROD_B_D1.tbm
+19_PROD_B_CONT_LIT.tbm
+20_CTRL_T06_E.tbm
 ```
 
 Verify the `RETURN/` folder exists with one sub-folder per case ID (names without the
@@ -56,7 +59,7 @@ run-number prefix, e.g. `RETURN/CTRL_T06_S/`, `RETURN/RA_19P0/`, …).
 
 ## Step 1 — Start STAR-CCM+ with POD licence
 
-Launch STAR with your POD licence. Create a **new empty simulation** (File → New).
+Launch STAR with your POD licence.
 
 Do not open any existing simulation.
 
@@ -74,41 +77,48 @@ Do not consume more POD time.
 
 ## Step 3 — Run each case in RUN_ORDER.txt
 
-Work through the 18 TBMs **in order** (01 through 18).
+Work through the 20 TBMs **in order** (01 through 20).
 
-For each case:
+**CRITICAL: Use a fresh empty simulation for EVERY TBM.**
+Do NOT import multiple TBMs into the same simulation. Each case must be
+completely independent. The procedure for each case is:
 
-### If import SUCCEEDS (geometry appears in scene)
+### For each case (repeat 20 times)
 
-1. Export the geometry as a STEP file.
-   - File → Export → STEP  OR  right-click the geometry node → Export → STEP
-   - Save to: `RETURN/<case_id>/<case_id>.step`
-   - Example: `RETURN/CTRL_T06_S/CTRL_T06_S.step`
-   - Use the **case_id** exactly as listed — do NOT include the run-number prefix.
+1. **Create a new empty simulation.** File → New (or close and reopen STAR).
+   Do NOT import the next TBM into the previous simulation.
 
-2. Do **not** close the simulation between cases. Just keep importing.
-   - If STAR requires a fresh simulation per TBM, create a new one (File → New)
-     before the next import.
+2. **Import the TBM.** Battery Cell → Create from Tbm… → select the next `.tbm` file.
 
-### If import FAILS (STAR shows an error)
+3. **If import SUCCEEDS (geometry appears in scene):**
+   - Export the geometry as a STEP file.
+     - File → Export → STEP  OR  right-click the geometry node → Export → STEP
+     - Save to: `RETURN/<case_id>/<case_id>.step`
+     - Example: `RETURN/CTRL_T06_S/CTRL_T06_S.step`
+     - Use the **case_id** exactly as listed — do NOT include the run-number prefix.
+   - Close or discard the simulation (do not save).
 
-1. Copy the **exact** error text into a file called `ERROR.txt` inside the case
-   folder: `RETURN/<case_id>/ERROR.txt`
-2. Do **not** attempt to fix the TBM.
-3. Continue immediately to the next case.
+4. **If import FAILS (STAR shows an error):**
+   - Copy the **exact** error text into a file called `ERROR.txt` inside the case
+     folder: `RETURN/<case_id>/ERROR.txt`
+   - Do **not** attempt to fix the TBM.
+   - Close or discard the simulation.
+
+5. **Continue immediately to the next case.**
 
 ### Expected FAIL cases (do not be alarmed)
 
 | Case | Expected error |
 |---|---|
-| `09_RB_21P0.tbm` | "Can Thickness is -ve" (deliberate diagnostic) |
+| `09_RB_21P0.tbm` | "Can Thickness is -ve" (deliberate diagnostic canary) |
 
-Cases `16_PROD_D1_NEAR.tbm` and `17_PROD_D2_CONT.tbm` have unknown outcomes —
-both PASS and FAIL are informative. Record result either way.
+Cases `16_PROD_A_CONT_LIT.tbm`, `17_PROD_A_CONT_COMP.tbm`, `18_PROD_B_D1.tbm`,
+and `19_PROD_B_CONT_LIT.tbm` have unknown outcomes — both PASS and FAIL are
+informative. Record result either way.
 
 ---
 
-## Step 4 — After the last case (18_CTRL_T06_E)
+## Step 4 — After the last case (20_CTRL_T06_E)
 
 1. Close STAR immediately — do not keep the session running.
 2. Copy the entire `RETURN/` folder back to the workspace.
@@ -125,9 +135,7 @@ RETURN/
     ERROR.txt              ← if FAIL (leave empty folder if skipped)
   RA_19P0/
     RA_19P0.step
-  RA_20P0/
-    RA_20P0.step
-  ... (one folder per case)
+  ...
   CTRL_T06_E/
     CTRL_T06_E.step
 ```
@@ -136,9 +144,8 @@ RETURN/
 
 ## Timing
 
-At 10 s per import: ~3 min
-At 20 s per import: ~6 min
-STEP export adds ~10 s per PASS case.
+At 10 s per import + 10 s STEP export: ~7 min
+At 20 s per import + 10 s STEP export: ~10 min
 Total session including setup: aim for under 30 min.
 
 ---
@@ -158,4 +165,5 @@ Do not restart and re-run already-completed cases.
 - Change any TBM.
 - Run a Java macro.
 - Inspect geometry beyond confirming the import succeeded.
+- Import more than one TBM into a single simulation.
 - Keep STAR running after the last case.
