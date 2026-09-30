@@ -15,7 +15,6 @@ import argparse
 import csv
 import hashlib
 import re
-import shutil
 from pathlib import Path
 
 HERE   = Path(__file__).resolve().parent   # /workspace/tbm_validation/block_01
@@ -62,9 +61,9 @@ def patch_field(text: str, field_name: str, new_value: str | float) -> str:
 
 # ── block definition ─────────────────────────────────────────────────────────
 
-# Run-order position: 01 … 20 (sortable)
+# Run-order position: 01 … 23 (sortable)
 # case_id   : short ID used for STEP filename and results folder
-# family    : CTRL / RAD_A / RAD_B / RAD_C / PROD
+# family    : CTRL / RAD_A / RAD_B / RAD_C / PEXT / PROD
 # patches   : dict of {field_name: new_value}  (empty = T06 copy)
 # expected  : PASS / FAIL_CAN_THICKNESS / UNKNOWN
 # hyp       : mapping hypothesis tested (free text)
@@ -74,11 +73,12 @@ def patch_field(text: str, field_name: str, new_value: str | float) -> str:
 # T06 has m_dextDiameter=21 (package external diameter); production target is 21.09 mm.
 # All PROD cases set m_dextDiameter=21.09 for two reasons:
 #   1. Physical correctness: the package external diameter SHOULD match the production cell OD.
-#   2. Insurance: if m_dextDiameter is the actual Can OD driver (HypD), we get the right geometry.
-# Evidence strongly favours HypA (m_dintDiameter→Can OD, exact T06 match); m_dextDiameter=21
-# is 0.1 mm off from T06 Can OD=20.9, making HypD far less plausible. Changing m_dextDiameter
-# in PROD cases is therefore a deliberate correctness measure, not an experiment. It is listed
-# in patches so the isolation audit tracks it explicitly.
+#   2. Insurance: if m_dextDiameter is the actual Can OD driver (HypD / PEXT), we get the
+#      right geometry. PEXT family tests this hypothesis directly.
+# Evidence favours HypA (m_dintDiameter→Can OD, exact T06 match at 20.9 mm vs m_dext=21 mm
+# which is 0.1 mm off); HypA is preferred but PEXT is not causally eliminated.
+# Changing m_dextDiameter in PROD cases is a deliberate correctness measure, listed in
+# patches so the isolation audit tracks it explicitly.
 
 BLOCK = [
     # ── CONTROLS ──────────────────────────────────────────────────────────────
@@ -135,44 +135,52 @@ BLOCK = [
     # T06 state: m_dRepCanX/Y = 18 → generated Can ID = 18.000 mm (exact match).
     # Causal question: does changing m_dRepCanX/Y drive Can OD, Can ID, or is
     # the REPORT block regenerated/overwritten by STAR at import?
-    # Safety: all upward steps keep JR OD (≈17.88) << new Can ID >> current Can OD (≈20.9).
-    #         RB_21P0 deliberately exceeds current Can OD to act as a canary:
-    #         FAIL → confirms HypA (m_dRepCanX/Y → Can ID, 21 > Can OD ≈ 20.9).
-    #         PASS → m_dRepCanX/Y drives Can OD or is ignored (REPORT overwritten).
+    #
+    # HypA pattern (m_dRepCanX/Y → Can ID):
+    #   Lower cases PASS (Can ID tracks m_dRepXY, Can OD ≈ 20.9 unchanged).
+    #   RB_21P0: m_dRepXY=21 → Can ID=21 > Can OD≈20.9 → FAIL "Can Thickness is -ve".
+    #
+    # HypB pattern (m_dRepCanX/Y → Can OD, m_dint → Can ID = 20.9 unchanged):
+    #   RB_19P0/20P0/20P6274: m_dRepXY < 20.9 → Can OD < Can ID=20.9 → FAIL "Can Thickness is -ve".
+    #   RB_21P0: m_dRepXY=21 > 20.9 → Can OD > Can ID → PASS.
+    #
+    # HypB implication requires field value check: FAIL is only diagnostic evidence
+    # when the m_dRepXY value < T06 m_dint (20.9); any "thickness" failure for lower
+    # cases implies Can OD = m_dRepXY < Can ID = m_dint.
     {
         "pos": "06", "case_id": "RB_19P0", "family": "RAD_B",
         "patches": {"m_dRepCanXDim": "19.0", "m_dRepCanYDim": "19.0"},
         "expected": "PASS",
-        "hyp": "RMAP-2 / HypA: m_dRepCanX/Y → Can ID (Δ = +1 mm)",
-        "notes": "Upward step; establishes whether Can ID or Can OD responds",
+        "hyp": "HypA: m_dRepCanX/Y → Can ID (Δ = +1 mm). HypB: FAIL (19.0 < m_dint=20.9)",
+        "notes": "Upward step vs T06=18; HypA→PASS, HypB→FAIL. Both outcomes diagnostic.",
     },
     {
         "pos": "07", "case_id": "RB_20P0", "family": "RAD_B",
         "patches": {"m_dRepCanXDim": "20.0", "m_dRepCanYDim": "20.0"},
         "expected": "PASS",
-        "hyp": "RMAP-2 / HypA: m_dRepCanX/Y → Can ID (Δ = +2 mm)",
-        "notes": "Larger upward step; second calibration point for slope",
+        "hyp": "HypA: m_dRepCanX/Y → Can ID (Δ = +2 mm). HypB: FAIL (20.0 < 20.9)",
+        "notes": "Larger upward step; second data point for whichever pattern emerges",
     },
     {
         "pos": "08", "case_id": "RB_20P6274", "family": "RAD_B",
         "patches": {"m_dRepCanXDim": "20.6274", "m_dRepCanYDim": "20.6274"},
         "expected": "PASS",
-        "hyp": "RMAP-2 / HypA: m_dRepCanX/Y = production Can ID target (20.6274 mm)",
+        "hyp": "HypA: Can ID target value (20.6274 mm). HypB: FAIL (20.6274 < 20.9)",
         "notes": (
-            "Production Can ID target value in isolation (m_dintDiameter still T06=20.9). "
-            "PASS → Can ID 20.6274 achievable; wall = (20.9−20.6274)/2 = 0.136 mm (thin but positive). "
-            "FAIL 'Can Thickness is -ve' → 20.6274 > actual Can OD (unexpected)."
+            "Production Can ID target in isolation (m_dint still T06=20.9). "
+            "HypA PASS: wall = (20.9−20.6274)/2 = 0.136 mm (thin but positive). "
+            "HypB FAIL: m_dRepXY=20.6274 < m_dint=20.9 → Can OD < Can ID."
         ),
     },
     {
         "pos": "09", "case_id": "RB_21P0", "family": "RAD_B",
         "patches": {"m_dRepCanXDim": "21.0", "m_dRepCanYDim": "21.0"},
         "expected": "FAIL_CAN_THICKNESS",
-        "hyp": "Canary: expected FAIL under HypA (m_dRepCanX/Y → Can ID = 21 > Can OD ≈ 20.9)",
+        "hyp": "Canary: HypA→FAIL (Can ID=21>Can OD≈20.9). HypB→PASS (Can OD=21>Can ID=20.9).",
         "notes": (
-            "Deliberately exceeds T06 Can OD ≈ 20.9 mm. "
-            "FAIL 'Can Thickness is -ve' confirms m_dRepCanX/Y → Can ID (HypA). "
-            "PASS (any geometry) would indicate m_dRepCanX/Y → Can OD or ignored."
+            "Deliberately set above T06 Can OD ≈ 20.9 mm. "
+            "FAIL 'Can Thickness is -ve' → HypA (m_dRepXY → Can ID, 21 > Can OD). "
+            "PASS → HypB (m_dRepXY → Can OD, 21 > Can ID=20.9) or field overwritten/ignored."
         ),
     },
 
@@ -189,8 +197,6 @@ BLOCK = [
     # T06 state: m_dJellyrollThickness=17.9 → realized JR OD = 17.880992 mm (offset −0.019 mm).
     # August 2026 characterization confirmed this mapping on a different geometry class.
     # Purpose: verify mapping holds on T06 class and calibrate the offset for production range.
-    # Safety: all downward steps move JR OD away from Can ID (18 mm). Cannot test upward
-    # without also raising Can ID (that is done in PROD cases below).
     {
         "pos": "11", "case_id": "RC_17P5", "family": "RAD_C",
         "patches": {"m_dJellyrollThickness_mm": "17.5"},
@@ -213,6 +219,36 @@ BLOCK = [
         "notes": "Widest range in RAD-C family; confirms linearity over >1 mm span",
     },
 
+    # ── PEXT: probe Package m_dextDiameter ───────────────────────────────
+    # T06 state: m_dextDiameter=21 → Can OD ≈ 20.9 mm.
+    # HypA says m_dintDiameter=20.9 → Can OD=20.9 (exact match, more plausible).
+    # HypD says m_dextDiameter → Can OD (would give 21.0 ≠ 20.9; 0.1 mm discrepancy).
+    # These two large symmetric steps eliminate or confirm HypD independently.
+    # T06 at m_dext=21.0 serves as the reference point; PEXT covers ±0.5 mm from it.
+    # Safety: Can OD >> Can ID=18 and >> JR OD≈17.88 regardless of which hypothesis is true.
+    #   Under HypD: PEXT_20P5 → Can OD≈20.5, wall≈1.25 mm; PEXT_21P5 → Can OD≈21.5, wall≈1.75 mm.
+    #   Under HypA: Can OD stays ≈20.9 (m_dint=20.9 unchanged); both PEXT PASS safely.
+    {
+        "pos": "14", "case_id": "PEXT_20P5", "family": "PEXT",
+        "patches": {"Package m_dextDiameter": "20.5"},
+        "expected": "PASS",
+        "hyp": "PEXT probe: m_dextDiameter 21→20.5 (Δ = −0.5 mm). HypD: Can OD≈20.5. HypA: Can OD≈20.9 (unchanged).",
+        "notes": (
+            "Large downward step in m_dextDiameter; T06=21.0 provides the reference. "
+            "Can OD response (or lack thereof) distinguishes HypD from HypA."
+        ),
+    },
+    {
+        "pos": "15", "case_id": "PEXT_21P5", "family": "PEXT",
+        "patches": {"Package m_dextDiameter": "21.5"},
+        "expected": "PASS",
+        "hyp": "PEXT probe: m_dextDiameter 21→21.5 (Δ = +0.5 mm). HypD: Can OD≈21.5. HypA: Can OD≈20.9 (unchanged).",
+        "notes": (
+            "Large upward step; combined with PEXT_20P5 and T06 baseline gives 3-point "
+            "PEXT calibration for confident slope measurement."
+        ),
+    },
+
     # ── PRODUCTION CANDIDATES — HypA branch ──────────────────────────────
     # HypA: m_dintDiameter → Can OD (1:1), m_dRepCanX/Y → Can ID (1:1),
     #       m_dJellyrollThickness_mm → JR OD (1:1, offset ≈ −0.019 mm).
@@ -220,10 +256,9 @@ BLOCK = [
     # m_dextDiameter set to 21.09 in all PROD cases (see block-level note above).
     #
     # Safety: Can OD (21.09) > Can ID (20.6274) → wall = 0.2313 mm. ✓
-    #         JR OD ≤ Can ID for all cases (positive or zero clearance). ✓
-    #         Tab surplus unchanged at +2.00 mm / +2.00 mm (T06 frozen). ✓
+    #         JR OD ≤ Can ID for all cases. ✓  Tab surplus: T06 +2.00/+2.00 mm frozen. ✓
     {
-        "pos": "14", "case_id": "PROD_A_D1_GAP", "family": "PROD",
+        "pos": "16", "case_id": "PROD_A_D1_GAP", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
@@ -239,11 +274,11 @@ BLOCK = [
         ),
         "notes": (
             "RAD-D1 primary candidate. Positive clearance comparable to T06 baseline. "
-            "Expected PASS; geometry closest to T06 clearance magnitude."
+            "Expected PASS; CAD fallback if contact candidates fail."
         ),
     },
     {
-        "pos": "15", "case_id": "PROD_A_D1_SLIM", "family": "PROD",
+        "pos": "17", "case_id": "PROD_A_D1_SLIM", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
@@ -252,17 +287,11 @@ BLOCK = [
             "m_dJellyrollThickness_mm": "20.569",
         },
         "expected": "PASS",
-        "hyp": (
-            "HypA full production: JR OD≈20.550 (m_dJR=20.569); "
-            "radial clearance ≈ 0.039 mm"
-        ),
-        "notes": (
-            "RAD-D1 slim-clearance candidate. Tests whether smaller but still "
-            "positive clearance builds successfully."
-        ),
+        "hyp": "HypA: JR OD≈20.550 (m_dJR=20.569); radial clearance ≈ 0.039 mm",
+        "notes": "RAD-D1 slim-clearance candidate. CAD fallback between GAP and contact.",
     },
     {
-        "pos": "16", "case_id": "PROD_A_CONT_LIT", "family": "PROD",
+        "pos": "18", "case_id": "PROD_A_CONT_LIT", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
@@ -277,12 +306,11 @@ BLOCK = [
         ),
         "notes": (
             "H004-3 near-contact test with literal target value. "
-            "PASS → JR OD ≈ Can ID achievable without exact compensation. "
-            "FAIL 'Can Thickness is -ve' → unexpectedly, JR OD > Can ID even without compensation."
+            "PASS → JR OD ≈ Can ID achievable without offset compensation."
         ),
     },
     {
-        "pos": "17", "case_id": "PROD_A_CONT_COMP", "family": "PROD",
+        "pos": "19", "case_id": "PROD_A_CONT_COMP", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "21.09",
@@ -297,23 +325,17 @@ BLOCK = [
         ),
         "notes": (
             "RAD-D2: H004-3 exact-contact constructibility test. "
-            "PASS → preferred production geometry (JR OD = Can ID = 20.6274) achievable. "
-            "FAIL → locates upper JR OD construction boundary; PROD_A_D1_GAP or SLIM becomes target."
+            "PASS → preferred production geometry achievable."
         ),
     },
 
     # ── PRODUCTION CANDIDATES — HypB branch ──────────────────────────────
-    # HypB (alternative): m_dRepCanX/Y → Can OD, m_dintDiameter → Can ID.
-    # T06 numerical evidence DOES NOT support a 1:1 mapping under HypB
-    # (m_dRepCanXDim=18 ≠ T06 Can OD=20.9; m_dintDiameter=20.9 ≠ T06 Can ID=18.0).
-    # However, if the REPORT block values are authoritative inputs (not derived),
-    # HypB production candidates set them to the correct production values directly.
-    # Under HypA: both cases FAIL 'Can Thickness is -ve' (m_dRepXY=21.09 → Can ID=21.09
-    #             > Can OD from m_dint=20.6274 → negative wall). That FAIL is diagnostic.
-    # Under HypB: both cases PASS with Can OD=21.09, Can ID=20.6274, JR OD as specified.
-    # Including these avoids a second POD block if HypB turns out correct.
+    # HypB: m_dRepCanX/Y → Can OD, m_dintDiameter → Can ID.
+    # Under HypA: PROD_B cases FAIL "Can Thickness is -ve" (m_dRepXY=21.09→Can ID=21.09>Can OD=20.627).
+    # Under HypB: PROD_B cases PASS with Can OD=21.09, Can ID=20.6274.
+    # Including both branches avoids a second POD block if HypB is true.
     {
-        "pos": "18", "case_id": "PROD_B_D1", "family": "PROD",
+        "pos": "20", "case_id": "PROD_B_D1", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "20.6274",
@@ -323,17 +345,13 @@ BLOCK = [
         },
         "expected": "UNKNOWN",
         "hyp": (
-            "HypB positive-clearance: Can OD=21.09 (m_dRepXY=21.09), Can ID=20.6274 (m_dint=20.6274), "
-            "JR OD≈20.500 (m_dJR=20.519); gap≈0.064 mm. "
-            "Under HypA: FAIL 'Can Thickness is -ve' (Can ID=21.09 > Can OD=20.6274)"
+            "HypB positive-clearance: Can OD=21.09 (m_dRepXY), Can ID=20.6274 (m_dint), "
+            "JR OD≈20.500; gap≈0.064 mm. Under HypA: FAIL."
         ),
-        "notes": (
-            "HypB RAD-D1 candidate. PASS → HypB confirmed, production geometry achievable. "
-            "FAIL 'Can Thickness is -ve' → additional HypA confirmation."
-        ),
+        "notes": "HypB RAD-D1 candidate. PASS → HypB confirmed. FAIL → HypA reconfirmed.",
     },
     {
-        "pos": "19", "case_id": "PROD_B_CONT_LIT", "family": "PROD",
+        "pos": "21", "case_id": "PROD_B_CONT_LIT", "family": "PROD",
         "patches": {
             "Package m_dextDiameter": "21.09",
             "Package m_dintDiameter": "20.6274",
@@ -343,18 +361,34 @@ BLOCK = [
         },
         "expected": "UNKNOWN",
         "hyp": (
-            "HypB contact LITERAL: m_dJR=20.6274 (literal target, no offset correction); "
-            "realized JR OD≈20.608; gap≈0.010 mm. Under HypA: FAIL."
+            "HypB contact LITERAL: m_dJR=20.6274; realized JR OD≈20.608; gap≈0.010 mm. "
+            "Under HypA: FAIL."
+        ),
+        "notes": "HypB H004-3 near-contact, literal target value.",
+    },
+    {
+        "pos": "22", "case_id": "PROD_B_CONT_COMP", "family": "PROD",
+        "patches": {
+            "Package m_dextDiameter": "21.09",
+            "Package m_dintDiameter": "20.6274",
+            "m_dRepCanXDim": "21.09",
+            "m_dRepCanYDim": "21.09",
+            "m_dJellyrollThickness_mm": "20.6464",
+        },
+        "expected": "UNKNOWN",
+        "hyp": (
+            "HypB contact COMPENSATED: m_dJR=20.6464 (target 20.6274 + offset +0.019 mm); "
+            "realized JR OD≈20.6274 → gap=0 (H004-3). Under HypA: FAIL."
         ),
         "notes": (
-            "HypB H004-3 near-contact test. PASS → HypB contact geometry obtainable. "
-            "FAIL 'Can Thickness is -ve' → HypA confirmed again."
+            "HypB H004-3 offset-compensated contact. Prevents BLOCK 02 if HypB is true "
+            "and literal 20.6274 realizes below the target."
         ),
     },
 
     # ── END CONTROL ───────────────────────────────────────────────────────
     {
-        "pos": "20", "case_id": "CTRL_T06_E", "family": "CTRL",
+        "pos": "23", "case_id": "CTRL_T06_E", "family": "CTRL",
         "patches": {},
         "expected": "PASS",
         "hyp": "—",
@@ -386,11 +420,9 @@ def generate(out_dir: Path) -> list[dict]:
         case_id  = spec["case_id"]
         patches  = spec["patches"]
 
-        # Apply patches to T06 baseline
         text = t06_text
         changed_fields = {}
         for field, new_val in patches.items():
-            # Record old value before patching
             rx = re.compile(
                 rf"^(\s*{re.escape(field)}\s*=\s*)([-\d.]+)([^\r\n]*)$",
                 re.MULTILINE,
@@ -404,7 +436,6 @@ def generate(out_dir: Path) -> list[dict]:
             changed_fields[field] = {"old": old_val, "new": str(new_val)}
             text = patch_field(text, field, str(new_val))
 
-        # Write TBM
         tbm_name = f"{pos}_{case_id}.tbm"
         tbm_path = out_dir / tbm_name
         tbm_path.write_text(text, encoding="latin-1")
@@ -433,21 +464,20 @@ def generate(out_dir: Path) -> list[dict]:
                     f"to {ms_new[0].group(2)!r} without being in patches."
                 )
 
-        # Build manifest row
         row = {
-            "run_pos":        pos,
-            "case_id":        case_id,
-            "family":         spec["family"],
-            "tbm_file":       tbm_name,
+            "run_pos":         pos,
+            "case_id":         case_id,
+            "family":          spec["family"],
+            "tbm_file":        tbm_name,
             "baseline_sha256": T06_SHA_EXPECTED,
-            "tbm_sha256":     sha256(tbm_path),
-            "changed_fields": "; ".join(
+            "tbm_sha256":      sha256(tbm_path),
+            "changed_fields":  "; ".join(
                 f"{k}: {v['old']}→{v['new']}"
                 for k, v in changed_fields.items()
             ) if changed_fields else "—",
-            "expected":       spec["expected"],
-            "hyp":            spec["hyp"],
-            "notes":          spec["notes"],
+            "expected":        spec["expected"],
+            "hyp":             spec["hyp"],
+            "notes":           spec["notes"],
         }
         rows.append(row)
         print(f"  {pos} {case_id:25s}  {row['tbm_sha256'][:16]}…  "
@@ -491,16 +521,13 @@ def write_results_template(rows: list[dict], out_dir: Path) -> None:
         w = csv.writer(f)
         w.writerow([
             "run_pos", "case_id", "expected",
-            "actual_result",           # PASS / FAIL / TIMEOUT / SKIP
-            "star_error_exact_text",   # leave blank if PASS
-            "step_file_name",          # exact filename of exported STEP if PASS
+            "actual_result",
+            "star_error_exact_text",
+            "step_file_name",
             "operator_notes",
         ])
         for r in rows:
-            w.writerow([
-                r["run_pos"], r["case_id"], r["expected"],
-                "", "", "", "",
-            ])
+            w.writerow([r["run_pos"], r["case_id"], r["expected"], "", "", "", ""])
     print(f"Results template → {path}")
 
 
@@ -544,41 +571,31 @@ def write_isolation_audit(rows: list[dict], out_dir: Path) -> None:
         tbm_path = out_dir / f"{spec['pos']}_{spec['case_id']}.tbm"
         if not tbm_path.exists():
             audit_rows.append({
-                "case_id": spec["case_id"],
-                "field": "—",
+                "case_id": spec["case_id"], "field": "—",
                 "status": "ERROR: TBM NOT GENERATED",
-                "t06_value": "—",
-                "actual_value": "—",
-                "expected_value": "—",
+                "t06_value": "—", "actual_value": "—", "expected_value": "—",
             })
             all_ok = False
             continue
 
         tbm_vals = get_vals(tbm_path.read_text(encoding="latin-1"))
         for f in audit_fields:
-            t06_v  = t06_vals.get(f, "?")
-            tbm_v  = tbm_vals.get(f, "?")
-            exp_v  = str(spec["patches"].get(f, t06_v))
+            t06_v = t06_vals.get(f, "?")
+            tbm_v = tbm_vals.get(f, "?")
+            exp_v = str(spec["patches"].get(f, t06_v))
 
             if f in spec["patches"]:
-                # Should have changed
                 ok = (tbm_v == exp_v)
                 status = "CHANGED_OK" if ok else f"CHANGE_WRONG(got {tbm_v!r})"
             else:
-                # Should NOT have changed
                 ok = (tbm_v == t06_v)
                 status = "UNCHANGED_OK" if ok else f"UNINTENDED_CHANGE({t06_v!r}→{tbm_v!r})"
 
             if not ok:
                 all_ok = False
-
             audit_rows.append({
-                "case_id":        spec["case_id"],
-                "field":          f,
-                "status":         status,
-                "t06_value":      t06_v,
-                "actual_value":   tbm_v,
-                "expected_value": exp_v,
+                "case_id": spec["case_id"], "field": f, "status": status,
+                "t06_value": t06_v, "actual_value": tbm_v, "expected_value": exp_v,
             })
 
     path = out_dir.parent / "ISOLATION_AUDIT.csv"
@@ -590,7 +607,8 @@ def write_isolation_audit(rows: list[dict], out_dir: Path) -> None:
         w.writeheader()
         w.writerows(audit_rows)
 
-    violations = [r for r in audit_rows if "WRONG" in r["status"] or "UNINTENDED" in r["status"] or "ERROR" in r["status"]]
+    violations = [r for r in audit_rows
+                  if "WRONG" in r["status"] or "UNINTENDED" in r["status"] or "ERROR" in r["status"]]
     if violations:
         print(f"ISOLATION AUDIT — FAILED ({len(violations)} violations):")
         for v in violations:
@@ -602,7 +620,6 @@ def write_isolation_audit(rows: list[dict], out_dir: Path) -> None:
 
 
 def create_return_skeleton(base_dir: Path, rows: list[dict]) -> None:
-    """Create empty RETURN/ folder structure for STAR operator to fill."""
     ret = base_dir / "RETURN"
     ret.mkdir(exist_ok=True)
     readme = (
@@ -624,8 +641,7 @@ def create_return_skeleton(base_dir: Path, rows: list[dict]) -> None:
 
 def main():
     ap = argparse.ArgumentParser(description="Generate BLOCK 01 TBMs")
-    ap.add_argument("--out-dir", type=Path,
-                    default=HERE / "cases",
+    ap.add_argument("--out-dir", type=Path, default=HERE / "cases",
                     help="Directory for generated TBM files")
     args = ap.parse_args()
 

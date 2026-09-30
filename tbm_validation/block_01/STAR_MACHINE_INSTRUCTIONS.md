@@ -1,8 +1,8 @@
 # BLOCK 01 — STAR-CCM+ Machine Instructions
 
-**Block:** 01 (radial mapping + production candidates)
-**TBM count:** 20
-**Estimated runtime:** 3–7 min (20 × 10 s) to 7–10 min (20 × 20 s)
+**Block:** 01 (radial mapping + PEXT + production candidates)
+**TBM count:** 23
+**Estimated runtime:** 4–8 min (23 × 10 s) to 8–12 min (23 × 20 s)
 **Prepared by:** offline workspace (no Claude access during session)
 
 ---
@@ -27,7 +27,7 @@ You do not need to understand the geometry. Your only jobs are:
 
 ## Before you start
 
-Verify the `cases/` folder contains exactly 20 `.tbm` files:
+Verify the `cases/` folder contains exactly 23 `.tbm` files:
 
 ```
 01_CTRL_T06_S.tbm
@@ -43,13 +43,16 @@ Verify the `cases/` folder contains exactly 20 `.tbm` files:
 11_RC_17P5.tbm
 12_RC_17P0.tbm
 13_RC_16P0.tbm
-14_PROD_A_D1_GAP.tbm
-15_PROD_A_D1_SLIM.tbm
-16_PROD_A_CONT_LIT.tbm
-17_PROD_A_CONT_COMP.tbm
-18_PROD_B_D1.tbm
-19_PROD_B_CONT_LIT.tbm
-20_CTRL_T06_E.tbm
+14_PEXT_20P5.tbm
+15_PEXT_21P5.tbm
+16_PROD_A_D1_GAP.tbm
+17_PROD_A_D1_SLIM.tbm
+18_PROD_A_CONT_LIT.tbm
+19_PROD_A_CONT_COMP.tbm
+20_PROD_B_D1.tbm
+21_PROD_B_CONT_LIT.tbm
+22_PROD_B_CONT_COMP.tbm
+23_CTRL_T06_E.tbm
 ```
 
 Verify the `RETURN/` folder exists with one sub-folder per case ID (names without the
@@ -77,13 +80,13 @@ Do not consume more POD time.
 
 ## Step 3 — Run each case in RUN_ORDER.txt
 
-Work through the 20 TBMs **in order** (01 through 20).
+Work through the 23 TBMs **in order** (01 through 23).
 
 **CRITICAL: Use a fresh empty simulation for EVERY TBM.**
 Do NOT import multiple TBMs into the same simulation. Each case must be
 completely independent. The procedure for each case is:
 
-### For each case (repeat 20 times)
+### For each case (repeat 23 times)
 
 1. **Create a new empty simulation.** File → New (or close and reopen STAR).
    Do NOT import the next TBM into the previous simulation.
@@ -110,15 +113,19 @@ completely independent. The procedure for each case is:
 
 | Case | Expected error |
 |---|---|
-| `09_RB_21P0.tbm` | "Can Thickness is -ve" (deliberate diagnostic canary) |
+| `09_RB_21P0.tbm` | "Can Thickness is -ve" under HypA (deliberate diagnostic canary) |
 
-Cases `16_PROD_A_CONT_LIT.tbm`, `17_PROD_A_CONT_COMP.tbm`, `18_PROD_B_D1.tbm`,
-and `19_PROD_B_CONT_LIT.tbm` have unknown outcomes — both PASS and FAIL are
-informative. Record result either way.
+Cases `16_PROD_A_CONT_LIT.tbm`, `17_PROD_A_CONT_COMP.tbm` (PROD_A contact) and
+`20_PROD_B_D1.tbm`, `21_PROD_B_CONT_LIT.tbm`, `22_PROD_B_CONT_COMP.tbm` (PROD_B branch)
+have **unknown** expected outcomes — both PASS and FAIL are informative. Record the result
+either way. Under HypA, all PROD_B cases are expected to FAIL "Can Thickness is -ve".
+
+`14_PEXT_20P5.tbm` and `15_PEXT_21P5.tbm` are expected to PASS under any hypothesis.
+They are safe isolated probes of Package m_dextDiameter.
 
 ---
 
-## Step 4 — After the last case (20_CTRL_T06_E)
+## Step 4 — After the last case (23_CTRL_T06_E)
 
 1. Close STAR immediately — do not keep the session running.
 2. Copy the entire `RETURN/` folder back to the workspace.
@@ -144,8 +151,8 @@ RETURN/
 
 ## Timing
 
-At 10 s per import + 10 s STEP export: ~7 min
-At 20 s per import + 10 s STEP export: ~10 min
+At 10 s per import + 10 s STEP export: ~8 min
+At 20 s per import + 10 s STEP export: ~12 min
 Total session including setup: aim for under 30 min.
 
 ---
