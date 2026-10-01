@@ -57,7 +57,7 @@ Flowthermolab subsequently confirmed that its current licence does **not** inclu
 | Date | Provider / Route | Status | What was asked / learned | Next action |
 |---|---|---|---|---|
 | 2026-09-xx to 2026-10-01 | **Flowthermolab** | **FAILED / refund initiated** | Explicitly requested STAR-CCM+ POD with Batteries / `batterysim`. Provider quoted 10 h access, but supplied entitlement without Battery. After checking with Siemens, provider said adding Battery requires significant additional cost and at least 100 h. | Do not rely on this route unless Flowthermolab reverses position and supplies the originally requested entitlement. |
-| 2026-10-01 | **Rescale** | **EMAIL SENT — awaiting response** | Asked specifically whether the **Rescale-provided STAR-CCM+ On-Demand licence includes the Batteries add-on / `batterysim` licence feature**. Also asked about own `.tbm` files, full interactive GUI, software + compute pricing, and minimum purchase/commitment. | Await explicit written confirmation of `batterysim` entitlement before creating/paying for anything. |
+| 2026-10-01 | **Rescale** | **NO — route closed** | Rescale was contacted specifically about its provided STAR-CCM+ On-Demand licence and whether it includes the Batteries / `batterysim` entitlement. The response did not provide a usable Batteries-enabled route for this project. | Do not spend more time on Rescale for the current TBM campaign unless their licensing offering changes. |
 | Prior research | **ITCR, Zagreb** | Researched; no confirmed successful entitlement | Identified as a local Siemens/Simcenter route. | Revisit only with an explicit written `batterysim` entitlement question. |
 | Prior research | **Volupe** | Researched | Siemens simulation partner; possible trial/evaluation route. | Contact if Rescale cannot provide Batteries. |
 | Prior research | **TechSim Engineering CEE** | Researched | Regional Siemens/Simcenter route. | Contact if needed. |
@@ -67,7 +67,7 @@ Flowthermolab subsequently confirmed that its current licence does **not** inclu
 
 ---
 
-## Rescale enquiry sent — 2026-10-01
+## Rescale enquiry — 2026-10-01
 
 **To:** `sales@rescale.com`  
 **CC:** `support@rescale.com`
@@ -84,7 +84,7 @@ It also asks whether:
 - there is any minimum licence purchase or commitment;
 - software and compute are charged separately and at what approximate rates.
 
-**No purchase or setup should proceed until Rescale explicitly confirms `batterysim`.**
+**Outcome:** Rescale did not provide a usable Batteries / `batterysim` route. Marked closed for the current campaign.
 
 ---
 
@@ -120,14 +120,14 @@ Avoid spending time on generic STAR-CCM+ trial offers unless Batteries is confir
 
 ## Immediate next action
 
-Wait for replies from **Rescale** and **TrampoCFD**.
+Wait for **TrampoCFD**.
 
-If either Rescale or TrampoCFD confirms Batteries / `batterysim`:
+If TrampoCFD confirms Batteries / `batterysim`:
 - verify GUI + `.tbm` import capability;
 - obtain exact pricing/minimum commitment;
 - run a minimal entitlement smoke test before starting the prepared 23-case BLOCK 01 campaign.
 
-If neither Rescale nor TrampoCFD can provide `batterysim`:
+If TrampoCFD cannot provide `batterysim`:
 - contact Siemens directly and request a short Batteries-enabled evaluation entitlement;
 - in parallel contact one or more established Siemens simulation partners with the same gating question.
 
