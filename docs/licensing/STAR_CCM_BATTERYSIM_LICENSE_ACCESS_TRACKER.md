@@ -61,7 +61,7 @@ Flowthermolab subsequently confirmed that its current licence does **not** inclu
 | Prior research | **ITCR, Zagreb** | Researched; no confirmed successful entitlement | Identified as a local Siemens/Simcenter route. | Revisit only with an explicit written `batterysim` entitlement question. |
 | Prior research | **Volupe** | Researched | Siemens simulation partner; possible trial/evaluation route. | Contact if Rescale cannot provide Batteries. |
 | Prior research | **TechSim Engineering CEE** | Researched | Regional Siemens/Simcenter route. | Contact if needed. |
-| Prior research | **TrampoCFD** | Researched | Advertises licence-included STAR-CCM+ PAYG, but Batteries entitlement has not been verified. | Ask only one gating question first: does supplied entitlement include `batterysim`? |
+| 2026-10-01 | **TrampoCFD** | **EMAIL SENT — awaiting response** | Asked about short-term STAR-CCM+ access and specifically whether the supplied entitlement includes the Batteries / `batterysim` feature required for the TBM workflow. | Await explicit written confirmation of `batterysim` entitlement and any minimum purchase / pricing conditions. |
 | Prior research | **Rescale** | Now contacted | Public documentation indicates Rescale-provided STAR-CCM+ On-Demand licensing exists, but Batteries entitlement is not publicly confirmed. | See 2026-10-01 outreach above. |
 | Prior research | **Siemens direct** | Not yet exhausted | Potential route for a Batteries-enabled evaluation entitlement or referral to an authorized provider. | Use if Rescale does not confirm suitable access. |
 
@@ -120,14 +120,14 @@ Avoid spending time on generic STAR-CCM+ trial offers unless Batteries is confir
 
 ## Immediate next action
 
-Wait for Rescale's reply.
+Wait for replies from **Rescale** and **TrampoCFD**.
 
-If Rescale confirms Batteries / `batterysim`:
+If either Rescale or TrampoCFD confirms Batteries / `batterysim`:
 - verify GUI + `.tbm` import capability;
 - obtain exact pricing/minimum commitment;
 - run a minimal entitlement smoke test before starting the prepared 23-case BLOCK 01 campaign.
 
-If Rescale does **not** provide `batterysim`:
+If neither Rescale nor TrampoCFD can provide `batterysim`:
 - contact Siemens directly and request a short Batteries-enabled evaluation entitlement;
 - in parallel contact one or more established Siemens simulation partners with the same gating question.
 
